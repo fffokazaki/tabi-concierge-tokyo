@@ -1,6 +1,6 @@
 ---
 title: "MASTER"
-version: "1.2.0"
+version: "1.3.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -178,12 +178,15 @@ AIツールがランタイム・依存のバージョンを選定する際は、
 
 | カテゴリ | 技術 | バージョン | 確認日・情報源 | AIへの注意点 |
 | -------- | ---- | ---------- | -------------- | ------------ |
-| Frontend | React | 18.x | 未確認（実装着手時に確定） | UI は実装済み。既存実装の書き方に合わせる |
-| Frontend Runtime | dc-runtime | 未確認 | 未確認（実装着手時に確定） | 既存 UI がこの構成で動作している |
-| Protocol | MCP（Model Context Protocol） | 未確認 | 未確認（実装着手時に確定） | ツールは汎用語彙で定義する（旅行アプリ固有の語彙を持ち込まない） |
-| Backend | OpenCode ＋ Cloudflare Workers AI | 未確認 | 未確認（主催者提供スタック） | 主催者公認スタックで完結させる |
-| Database | 使用しない | - | - | POC は同梱静的データ。DB を前提としたコードを生成しない |
-| Infra | Cloudflare | マネージド | - | サーバーレス。コンテナ構成を前提にしない |
+| Frontend | React | 19.2.x | 2026-08-15 / npm | ブラウザで動く。**workerd では動かない**（SPA 構成） |
+| Build | Vite ＋ @cloudflare/vite-plugin | Vite 8.2.x / plugin 1.52.x | 2026-08-15 / npm | dev・preview・本番のすべてで worker コードが workerd 上で動く |
+| Runtime（本番） | **workerd** | `compatibility_date: 2026-08-15` で固定 | 2026-08-15 / wrangler types | Node ではない。`fs` / `net` は使えない |
+| Runtime（ツール） | Node.js | 24（`.nvmrc` / `engines`） | 2026-08-15 | wrangler と Vite を起動するホスト。本番には存在しない |
+| Server routing | Hono | 4.13.x | 2026-08-15 / npm | Workers ネイティブ |
+| Protocol | MCP（`createMcpHandler`） | 未着手（Step 5） | - | `McpAgent` は deprecated。ステートレス実装を使い DO は使わない |
+| Database | Cloudflare D1 | 未着手（Step 2） | - | ADR-007 で採用。Text-to-SQL の実行基盤 |
+| AI | Cloudflare Workers AI | 未着手（Step 3） | - | モデルは `@cf/meta/llama-3.1-8b-instruct-fp8-fast`（無料枠のため） |
+| Infra | Cloudflare Workers | マネージド | - | サーバーレス。コンテナは使わない |
 
 > **未確認の扱い**: 上表の「未確認」は、推測で埋めずに実装着手時へ持ち越している項目。実バージョンを確認したら本表と [ARCHITECTURE.md](./02-design/ARCHITECTURE.md) §8 を同時に更新すること。
 
@@ -199,10 +202,11 @@ AIツールがランタイム・依存のバージョンを選定する際は、
 
 #### フロントエンド
 
-- フレームワーク: React 18.x（日本語版・英語版の2バージョンが実装済み・2026-08-15 動作確認）
-- 状態管理: 未確認（既存 UI 実装に準ずる）
-- スタイリング: 未確認（既存 UI 実装に準ずる）
-- ビルド: JSX 事前変換 ＋ ローカル React バンドル（CDN 依存を外しオフライン動作を確認済み）
+- フレームワーク: React 19.2.x（`src/` 配下。Vite でビルドし、ブラウザで動く）
+- 状態管理: 未導入（必要になった時点で判断）
+- スタイリング: プレーン CSS（`src/index.css`）。デザインプロトタイプの oklch 配色を踏襲
+- ビルド: Vite 8 ＋ `@cloudflare/vite-plugin`
+- **デザインの正典**: [/showcase/](../public/showcase/README.md)（`public/showcase/`）。これは実装ではなくプロトタイプ
 
 #### バックエンド
 
@@ -246,16 +250,26 @@ AIツールがランタイム・依存のバージョンを選定する際は、
 
 ```text
 tabi-concierge-tokyo/
-├── docs/                 # AI仕様駆動開発ドキュメント（詳細は「ドキュメント構造ガイド（AIツール向け）」を参照）
-├── frontend/             # 旅コンシェルジュTOKYO（React UI・5機能: プロフィール/プラン/スキャン/周辺/あなたへ）
-├── mcp-server/           # オープンデータ・コンシェルジュ（MCP サーバー。検索・集計・出典取得）
-├── data/                 # 利用オープンデータ（最大10件）の実体とメタ情報（カタログURL・タイトル・取得日）
+├── index.html            # SPA のエントリ（Vite）
+├── src/                  # React 19。ブラウザで動く
+├── worker/               # Cloudflare Worker。ローカルも本番も workerd で動く
+│   ├── index.ts          #   Hono。/api/* と /mcp を分岐
+│   └── core/             #   検索・集計・出典生成（/api/* と /mcp が共有）※Step 3 で作成
+├── public/
+│   └── showcase/         # デザインプロトタイプ（.dc.html 一式）→ /showcase/ で公開
+├── data/                 # 利用オープンデータの実体とメタ情報 ※Step 2 で作成
+├── docs/                 # AI仕様駆動開発ドキュメント
+├── wrangler.jsonc        # Worker 設定（compatibility_date でランタイム挙動を固定）
+├── vite.config.ts
+├── .nvmrc                # 24（ツールチェーンの Node バージョン）
 └── .github/
-    └── skills/           # プロジェクト固有の開発規約スキル4本（レビュー・エラーハンドリング・テスト・スキル作成安全性）
+    └── skills/           # プロジェクト固有の開発規約スキル4本
 ```
 
-- `frontend/` `mcp-server/` `data/` は**未作成**（POC 実装時（〜2026-08-23）に作成する予定の構成）。実際に作成した時点で本節を実態に合わせて更新すること
-- 層構成ではなく「クライアント／サーバー」で分割している。この境界は ADR-003 の設計判断そのものであり、安易に跨がせない
+- 配置は [@cloudflare/vite-plugin の公式レイアウト](https://developers.cloudflare.com/workers/vite-plugin/tutorial/)に従う（`index.html` と `src/` をルート、`worker/` を並置）。設定の落とし穴を減らすため独自構成にしない
+- **単一 Worker が3つの顔を持つ**: `/` が SPA、`/api/*` が JSON API、`/mcp` が MCP。中の `worker/core/` は1つで共有する（ADR-008）
+- `worker/core/` と `data/` は**未作成**（Step 2〜3 で作成）
+- 生成物（`dist/`・`worker-configuration.d.ts`・`node_modules/`・`.wrangler/`）はコミットしない
 - 層構成の詳細は [ARCHITECTURE.md](./02-design/ARCHITECTURE.md)、テスト戦略は [TESTING.md](./04-quality/TESTING.md) を参照
 - 新規コードの配置判断は、上記のディレクトリ構造と [ARCHITECTURE.md](./02-design/ARCHITECTURE.md) §3 を根拠にする。[DECISION_TREE.md](./03-implementation/DECISION_TREE.md) は Web API バックエンド前提のサンプルのままで**本プロジェクトに未適用**のため、固有化するまで必須の判断根拠にしない
 - `docs/` 配下の詳細構造は本書の「ドキュメント構造ガイド（AIツール向け）」を参照（重複記載しない）
@@ -765,6 +779,13 @@ Changelog エントリには以下のカテゴリを使用する（[Keep a Chang
 - [ ] 定数の配置が層責務に沿っている（Domain/Application/Infrastructure）
 
 ## Changelog
+
+### [1.3.0] - 2026-08-15
+
+#### 変更
+
+- 技術スタック表を実装着手後の実値へ更新（React 19.2 / Vite 8.2 / Hono 4.13 / workerd / Node 24）。workerd と Node の役割の違いを明記
+- ディレクトリ構造を実態へ更新。`frontend/` `mcp-server/` の想定を @cloudflare/vite-plugin 公式レイアウト（`index.html` / `src/` / `worker/` / `public/showcase/`）へ変更
 
 ### [1.2.0] - 2026-08-15
 

@@ -1,2 +1,17 @@
 # multi-agent / cross-model レビューの出力先（コミット対象外）
 .review-results/
+
+# Claude Code のローカル作業状態（プランなど）
+.claude/
+
+# Node / ビルド成果物
+node_modules/
+dist/
+.wrangler/
+
+# 環境変数
+.dev.vars
+.env*.local
+
+# wrangler types が生成（npm install の prepare で再生成される）
+worker-configuration.d.ts
