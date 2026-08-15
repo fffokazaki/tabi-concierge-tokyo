@@ -98,6 +98,24 @@ docs/                 # AI仕様駆動開発ドキュメント（索引は docs/
 
 現在地とタスクは [ROADMAP.md](docs/07-project-management/ROADMAP.md) / [TASKS.md](docs/07-project-management/TASKS.md) を参照。
 
+## 公開URL
+
+| URL | 内容 |
+| --- | --- |
+| <https://tabi-concierge-tokyo.opendata-002.workers.dev> | アプリ本体（実装中） |
+| <https://tabi-concierge-tokyo.opendata-002.workers.dev/showcase/> | **デザインプロトタイプ**（5画面・日英）。デザインの正典であり実装ではない |
+
+## 開発
+
+```bash
+npm install     # Node 24（.nvmrc）
+npm run dev     # Vite + workerd。http://localhost:5173
+npm run build
+npm run deploy  # Cloudflare へデプロイ
+```
+
+`npm run dev` は `worker/` のコードを**本番と同じ workerd 上で**実行する。`/api/health` の `runtime` が `Cloudflare-Workers` を返すことで確認できる。
+
 ## 資料
 
 - [開発ドキュメント（MASTER）](docs/MASTER.md) — AI仕様駆動開発の中央ハブ。各文書への索引はここから

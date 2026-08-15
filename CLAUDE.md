@@ -56,12 +56,16 @@ Issue があれば件名に含める: feat: #12 ...
 
 | 項目 | 実態 |
 | --- | --- |
-| フロントエンド | React 18.x（UI は実装済み・日英2バージョン） |
-| バックエンド | OpenCode ＋ Cloudflare Workers AI |
-| 接続 | MCP（最小3ツール: データセット検索・集計・出典取得） |
-| データベース | **使用しない**。POC はダウンロード済みオープンデータを同梱する |
+| フロントエンド | React 19（`src/`）。**ブラウザで動く**。workerd では動かない |
+| Worker | Hono（`worker/`）。ローカルも本番も **workerd** で動く（Node ではない） |
+| ビルド | Vite 8 ＋ `@cloudflare/vite-plugin`。ツールチェーンは Node 24（`.nvmrc`） |
+| デプロイ先 | Cloudflare Workers（アカウント `opendata`）。<https://tabi-concierge-tokyo.opendata-002.workers.dev> |
+| 接続 | MCP は `createMcpHandler`（ステートレス。**Durable Objects は使わない**）※Step 5 |
+| データベース | Cloudflare D1 ※Step 2 で導入 |
 | 認証 | **実装しない**（POC 段階） |
 | コンテナ | 使用しない（サーバーレス） |
+
+> **workerd は Node ではない**。`worker/` のコードで `fs` / `net` を前提にしたライブラリは動かない。ローカル確認は必ず `npm run dev`（workerd 上で動く）で行い、`node` で直接実行しない。テストは `@cloudflare/vitest-pool-workers` を使う。
 
 バージョンが「未確認」の項目は実装着手時に確認して [ARCHITECTURE.md](docs/02-design/ARCHITECTURE.md) §8 と [MASTER.md](docs/MASTER.md) を更新する。推測で書かない。
 

@@ -494,6 +494,26 @@ Webフック。イベント発生時に外部サービスに通知する仕組�
 
 都庁全局と62区市町村のオープンデータを集約したカタログサイト（<https://catalog.data.metro.tokyo.lg.jp/>）。本プロジェクトが扱うデータの唯一の出所。
 
+### workerd
+
+Cloudflare Workers を動かしているランタイム。**Node.js ではない**。同じ V8 エンジンを使うため JS の文法・標準ライブラリは共通だが、周辺 API は Web 標準（`fetch` / `Request` / `Response` / `WebCrypto`）＋ Cloudflare のバインディングで構成され、`fs` や `net` は存在しない。ローカル開発（`wrangler dev` / `@cloudflare/vite-plugin`）でも同じ workerd が動くため、本番と挙動が一致する。
+
+### compatibility_date
+
+`wrangler.jsonc` に書く日付で、**workerd の挙動を固定する実質的なバージョン指定**。この日付より後に入った破壊的変更は適用されない。workerd 自体のバージョン（`1.YYYYMMDD.N` 形式）はアプリ側で選べない。
+
+### nodejs_compat
+
+`compatibility_flags` に指定すると、workerd 上で Node.js 組み込みモジュールの一部（`node:crypto` / `node:buffer` / `node:stream` / `process.env` / `path` など）が使えるようになるフラグ。**すべての Node API が使えるようになるわけではない**。
+
+### dc-runtime
+
+デザインプロトタイプ（`public/showcase/`）が使っている宣言的コンポーネント runtime（`<x-dc>` / `<sc-if>` / `{{ }}` テンプレート ＋ `support.js`）。**React ではなく、API 呼び出しを組み込めない**。本番アプリの実装には使わない。
+
+### showcase
+
+`public/showcase/` に保全したデザインプロトタイプと、その公開 URL（`/showcase/`）。デザインの正典であり、**動作するアプリではない**。
+
 ### 代表エリア
 
 POC の対象として絞り込んだエリア（渋谷・上野・浅草など）。全都域対応はスコープ外（ADR-004）。

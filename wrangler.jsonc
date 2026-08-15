@@ -3,6 +3,11 @@
   "name": "tabi-concierge-tokyo",
   "main": "./worker/index.ts",
 
+  // デプロイ先アカウント。PoC 用の仮アカウント `opendata`。
+  // 明示しないと、複数アカウントを持つ環境では deploy が対話プロンプトで止まる。
+  // アカウント ID は秘密情報ではない（ダッシュボードの URL に現れる）。
+  "account_id": "0028241cbea27945fc2015dde8f2a5fd",
+
   // ランタイム（workerd）の挙動を固定する。Node のバージョンとは無関係。
   // 新機能を取り込みたくなったら日付を進める。
   "compatibility_date": "2026-08-15",
