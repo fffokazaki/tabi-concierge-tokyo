@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.2.0"
+version: "1.3.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-15"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 5
+ace_entry_count: 7
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -224,8 +224,17 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-2-3 | `Closes #N` は develop 向け PR では発火しない — Git Flow では Issue クローズを手動前提で設計する | process | [playbook/process.md#ace-2-3](./playbook/process.md#ace-2-3) |
 | ACE-4-1 | 配置済みファイルを「必要時にコピー」と案内し続ける索引は、次の実行で自分の修正を消す経路になる | knowledge-management | [playbook/knowledge-management.md#ace-4-1](./playbook/knowledge-management.md#ace-4-1) |
 | ACE-4-2 | ベンダリングしたテンプレートをローカル修正したら、上流との差分を文書内に列挙する | documentation-quality | [playbook/documentation-quality.md#ace-4-2](./playbook/documentation-quality.md#ace-4-2) |
+| ACE-6-1 | 入口ドキュメントに「すべての〜は〜を持つ」型の全称命題を書かない — 例外1件で嘘になる | documentation-quality | [playbook/documentation-quality.md#ace-6-1](./playbook/documentation-quality.md#ace-6-1) |
+| ACE-6-2 | 文書へリンクするときは、リンク先が自分で持っている留保も一緒に運ぶ | documentation-quality | [playbook/documentation-quality.md#ace-6-2](./playbook/documentation-quality.md#ace-6-2) |
 
 ## Changelog
+
+### [1.3.0] - 2026-08-15
+
+#### 追加
+
+- ACE-6-1: 入口ドキュメントに全称命題を書かない（Issue #5 / PR #6）
+- ACE-6-2: リンクするときはリンク先の留保も一緒に運ぶ（Issue #5 / PR #6）
 
 ### [1.2.0] - 2026-08-15
 
