@@ -16,7 +16,7 @@ updated: "2026-08-15"
 旅コンシェルジュTOKYO（Tabi Concierge Tokyo）
 
 - 主催: 東京都知事杯オープンデータ・ハッカソン 2026
-- 参加チーム: チームshiwata（株式会社フィールフロウ / FeelFlow Inc.）
+- 参加チーム: チームshiwata
 - リポジトリ: <https://github.com/fffokazaki/tabi-concierge-tokyo>
 
 ### バージョン
