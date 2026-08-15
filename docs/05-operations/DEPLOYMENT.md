@@ -1,11 +1,11 @@
 ---
 title: "DEPLOYMENT"
-version: "1.2.0"
+version: "1.3.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-15"
-changeImpact: "low"
+updated: "2026-08-16"
+changeImpact: "high"
 ---
 
 # DEPLOYMENT.md - デプロイメント・運用ガイド
@@ -137,25 +137,80 @@ GitHub Actions/GitLab CI/Jenkinsによる自動化パイプライン。
 
 `deployment/ci-cd.md`
 
-## 3. インフラストラクチャ
+## 3. インフラストラクチャ — Cloudflare へのデプロイ
+
+**本プロジェクトの実デプロイ手順。この節はテンプレートではなく実態を記述している。**
 
 ### 環境構成
 
-| 環境        | 用途         | URL例               | インフラ |
-| ----------- | ------------ | ------------------- | -------- |
-| Development | 開発環境     | dev.example.com     | 軽量構成 |
-| Staging     | ステージング | staging.example.com | 本番同等 |
-| Production  | 本番環境     | app.example.com     | 高可用性 |
+| 環境 | 用途 | URL | 実行環境 |
+| --- | --- | --- | --- |
+| ローカル | 開発 | <http://localhost:5173> | **workerd**（`@cloudflare/vite-plugin` 経由。本番と同じランタイム） |
+| 本番 | 提出・共有 | <https://tabi-concierge-tokyo.opendata-002.workers.dev> | Cloudflare Workers |
 
-### デプロイメント方式
+ステージングは設けない（First Stage はライブデモ不可のため、常時公開の可用性要件が無い）。
 
-- **Blue-Green Deployment**: 本番環境
-- **Rolling Update**: ステージング環境
-- **Direct Deployment**: 開発環境
+### 前提
 
-### 詳細ドキュメント
+| 項目 | 値 |
+| --- | --- |
+| Cloudflare アカウント | `opendata`（PoC 用の仮アカウント）。`wrangler.jsonc` の `account_id` に明示 |
+| Node.js | 24（`.nvmrc` / `engines`）。**ツールチェーン用であり本番ランタイムではない** |
+| wrangler | v4.123 以上（`@cloudflare/vite-plugin` が peer で要求） |
 
-`deployment/infrastructure.md`
+初回は認証が必要。
+
+```bash
+npx wrangler login   # ブラウザで OAuth。opendata アカウントへのアクセスを許可する
+npx wrangler whoami  # opendata が一覧に出ることを確認
+```
+
+### デプロイ
+
+```bash
+npm install     # prepare で wrangler types が走り worker-configuration.d.ts が生成される
+npm run dev     # ローカル（workerd）で確認
+npm run deploy  # vite build → wrangler deploy
+```
+
+### デプロイ後の確認
+
+```bash
+U=https://tabi-concierge-tokyo.opendata-002.workers.dev
+curl -s $U/api/health   # runtime が "Cloudflare-Workers" であること
+curl -s -o /dev/null -w '%{http_code}\n' $U/            # 200（SPA）
+curl -s -o /dev/null -w '%{http_code}\n' $U/showcase/   # 200（デザインプロトタイプ）
+curl -s -o /dev/null -w '%{http_code}\n' $U/api/nope    # 404（SPA に倒れないこと）
+```
+
+`/api/health` の `runtime` は、**ローカルと本番が同じランタイムで動いているか**を実測するために置いている。設定ファイルの読み合わせでは確認できない。
+
+### 静的アセットの挙動（注意）
+
+- `not_found_handling: "single-page-application"` により、**存在しないパスだけ** `index.html` に倒れる。実在する `/showcase/*` はそのまま配信される
+- 既定の `html_handling` により `/showcase/xxx.dc.html` は `/showcase/xxx.dc` へ 307 リダイレクトされる。ブラウザは追従するため実害はない
+- 静的アセットへのリクエストは**無料・無制限**で、Worker のスクリプトサイズ上限（3 MB gzip）にもカウントされない
+
+### 環境変数と secret
+
+- 非機密: `wrangler.jsonc` の `vars`
+- 機密: `npx wrangler secret put NAME`（対話プロンプト。**コマンド引数や `echo` パイプで値を渡さない**）
+- ローカル: `.dev.vars`（gitignore 済み）
+
+### バインディングを追加したとき
+
+`wrangler.jsonc` を変更したら型を再生成する。`Env` は手書きしない。
+
+```bash
+npm run cf-typegen   # wrangler types
+```
+
+### ロールバック
+
+```bash
+npx wrangler versions list
+npx wrangler rollback [<VERSION_ID>]
+```
 
 ## 4. モニタリング
 
@@ -279,6 +334,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.3.0] - 2026-08-16
+
+#### 追加
+
+- §3 に **Cloudflare への実デプロイ手順**を記述（従来は Cloudflare の記述が1件も無かった）。環境構成・認証・デプロイ・デプロイ後の確認・静的アセットの挙動・secret・型再生成・ロールバック
 
 ### [1.2.0] - 2026-08-15
 

@@ -19,7 +19,8 @@
 | 企画 | ✅ 完了（最終企画案 v1.0） |
 | UI デザイン | ✅ プロトタイプ完成（5画面・日英2バージョン → `/showcase/`） |
 | UI 実装 | 🔄 着手（骨組みのみ。プラン画面はこれから） |
-| Cloudflare 基盤 | ✅ Worker ＋ SPA ＋ showcase をデプロイ済み |
+| Cloudflare 基盤 | ✅ Worker ＋ SPA ＋ showcase をデプロイ済み（<https://tabi-concierge-tokyo.opendata-002.workers.dev>） |
+| データ（D1） | ⛔ ブロック中（[Issue #10](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/10) の確定待ち） |
 | データ組み込み | ⬜ 未着手 |
 | MCP 接続 | ⬜ 未着手 |
 | 提出物（資料・キャプチャ・動画） | ⬜ 未着手 |
@@ -28,8 +29,8 @@
 
 ### 🔴 優先度: Critical（提出締切に直結）
 
-- [ ] オープンデータをダウンロードしてアプリに組み込み、POC として一部データを動作させる
-- [ ] 利用オープンデータ10件リストの確定（[DATABASE.md](../02-design/DATABASE.md) のたたき台は旅行アプリ主体の企画に合わせた見直しが必要。提出直前に URL を最新化。特に「東京都の人口（推計）」は毎月更新）
+- [ ] **利用オープンデータの確定（[Issue #10](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/10)）← 現在のブロッカー。**代表エリア（渋谷・上野）のデータが1件も入っていないため、後続が全部止まる
+- [ ] オープンデータを D1 へ取り込む（スキーマ設計 ＋ シード）
 - [ ] 渋谷・上野など代表エリアに絞った画面イメージを作成（既存 UI の SCENARIOS をオープンデータ由来の内容へ差し替え）
 - [ ] 提出用画面キャプチャ（1600×900px・1〜3点）の切り出し
 - [ ] 提出資料（16:9・必須4項目を含む）の完成
