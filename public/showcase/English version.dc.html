@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="./image-slot.js"></script>
+<style>body{margin:0}a{color:oklch(46% 0.12 75)}a:hover{color:oklch(38% 0.12 75)}</style>
+</helmet>
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:oklch(93% 0.012 75);padding:48px;font-family:'Karla',sans-serif;box-sizing:border-box">
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="402px" height="874px" hint-size="402px,874px">
+<div style="height:100%;display:flex;flex-direction:column;background:oklch(97% 0.014 75);position:relative;overflow:hidden">
+<div style="flex:1;overflow-y:auto;padding-top:54px">
+
+<sc-if value="{{ isSetup }}" hint-placeholder-val="{{ true }}">
+<div style="padding:22px 20px 4px">
+<div style="font-size:11px;font-weight:700;letter-spacing:1.6px;color:oklch(46% 0.12 75);text-transform:uppercase;margin-bottom:8px">Trip bio</div>
+<div style="font-family:'Lora',serif;font-size:24px;font-weight:600;color:oklch(22% 0.02 75);line-height:1.25">Tell me about your trip.</div>
+<div style="font-size:13px;color:oklch(48% 0.02 75);margin-top:7px;line-height:1.5">Everything after this — routes, etiquette notes, recommendations — is built around these answers.</div>
+</div>
+<div style="padding:20px 20px 40px;display:flex;flex-direction:column;gap:18px">
+
+<div style="background:#fff;border:1px solid oklch(88% 0.015 75);border-radius:14px;padding:14px">
+<div style="font-size:11.5px;font-weight:700;color:oklch(30% 0.02 75);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">Who's going</div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<sc-for list="{{ counters }}" as="row" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+<div style="flex:1;min-width:0">
+<div style="font-size:13.5px;font-weight:600;color:oklch(22% 0.02 75)">{{ row.label }}</div>
+<div style="font-size:11.5px;color:oklch(52% 0.02 75);margin-top:2px">{{ row.hint }}</div>
+</div>
+<div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+<div onClick="{{ row.dec }}" style="width:30px;height:30px;border-radius:50%;border:1px solid oklch(84% 0.015 75);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:oklch(40% 0.02 75);user-select:none">−</div>
+<div style="min-width:22px;text-align:center;font-size:15px;font-weight:700;color:oklch(22% 0.02 75)">{{ row.value }}</div>
+<div onClick="{{ row.inc }}" style="width:30px;height:30px;border-radius:50%;border:1px solid oklch(84% 0.015 75);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:oklch(40% 0.02 75);user-select:none">+</div>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+
+<sc-for list="{{ choiceGroups }}" as="group" hint-placeholder-count="3">
+<div style="background:#fff;border:1px solid oklch(88% 0.015 75);border-radius:14px;padding:14px">
+<div style="font-size:11.5px;font-weight:700;color:oklch(30% 0.02 75);text-transform:uppercase;letter-spacing:0.5px">{{ group.label }}</div>
+<div style="font-size:11.5px;color:oklch(52% 0.02 75);margin-top:3px;line-height:1.5">{{ group.hint }}</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:11px">
+<sc-for list="{{ group.options }}" as="opt" hint-placeholder-count="3">
+<div onClick="{{ opt.onClick }}" style="{{ opt.style }}">{{ opt.label }}</div>
+</sc-for>
+</div>
+</div>
+</sc-for>
+
+<div style="background:#fff;border:1px solid oklch(88% 0.015 75);border-radius:14px;padding:14px">
+<div style="font-size:11.5px;font-weight:700;color:oklch(30% 0.02 75);text-transform:uppercase;letter-spacing:0.5px">Anything else</div>
+<div style="font-size:11.5px;color:oklch(52% 0.02 75);margin-top:3px;line-height:1.5">Dietary needs, mobility, things you'd rather skip.</div>
+<input value="{{ tripNotes }}" onChange="{{ onNotesChange }}" placeholder="e.g. vegetarian, no long walks" style="width:100%;box-sizing:border-box;margin-top:11px;border:1px solid oklch(88% 0.015 75);border-radius:10px;padding:10px 12px;font-family:'Karla',sans-serif;font-size:13px;color:oklch(22% 0.02 75);background:oklch(98% 0.008 75);outline:none">
+</div>
+
+<div onClick="{{ saveTrip }}" style="background:oklch(46% 0.12 75);color:#fff;border-radius:12px;padding:15px;text-align:center;font-size:14.5px;font-weight:700;cursor:pointer">Build my briefing</div>
+<div style="font-size:11.5px;color:oklch(55% 0.02 75);text-align:center;line-height:1.5">You can change any of this later from the Briefing screen.</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isBriefing }}" hint-placeholder-val="{{ false }}">
+<div style="padding:22px 20px 4px">
+<div onClick="{{ goSetup }}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:oklch(95% 0.014 75);border:1px solid oklch(88% 0.015 75);border-radius:10px;padding:9px 12px;margin-bottom:14px;cursor:pointer">
+<div style="font-size:12px;color:oklch(35% 0.02 75);line-height:1.4">{{ tripSummary }}</div>
+<div style="font-size:11px;font-weight:700;color:oklch(46% 0.12 75);flex-shrink:0">Edit</div>
+</div>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+<div style="font-size:11px;font-weight:700;letter-spacing:1.6px;color:oklch(46% 0.12 75);text-transform:uppercase">AI Trip Briefing</div>
+<div style="display:flex;align-items:center;gap:4px;background:oklch(46% 0.12 75);border-radius:100px;padding:2px 8px 2px 6px">
+<div style="width:6px;height:6px;background:#fff;transform:rotate(45deg)"></div>
+<span style="font-size:9.5px;font-weight:700;color:#fff;letter-spacing:0.3px">AI</span>
+</div>
+</div>
+<div style="font-family:'Lora',serif;font-size:24px;font-weight:600;color:oklch(22% 0.02 75);line-height:1.25">Plan tomorrow with local knowledge.</div>
+<div style="font-size:13px;color:oklch(48% 0.02 75);margin-top:7px;line-height:1.5">Tell me your plans and interests — I'll build a route with etiquette notes built in.</div>
+</div>
+<div style="display:flex;gap:8px;padding:14px 20px 4px;overflow-x:auto">
+<sc-for list="{{ briefingChips }}" as="chip" hint-placeholder-count="3">
+<div onClick="{{ chip.onClick }}" style="{{ chip.style }}">{{ chip.label }}</div>
+</sc-for>
+</div>
+<div style="padding:18px 20px 64px">
+<div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+<div style="max-width:82%;background:oklch(46% 0.12 75);color:#fff;font-size:13.5px;line-height:1.5;padding:11px 14px;border-radius:14px 14px 4px 14px">{{ activeScenario.prompt }}</div>
+</div>
+<div style="background:oklch(99% 0.008 75);border:1px solid oklch(88% 0.015 75);border-radius:14px;padding:16px">
+<div style="display:flex;align-items:center;gap:6px;margin-bottom:14px">
+<div style="width:6px;height:6px;background:oklch(46% 0.12 75);transform:rotate(45deg)"></div>
+<span style="font-size:11.5px;font-weight:700;color:oklch(46% 0.12 75);text-transform:uppercase;letter-spacing:0.5px">Your route</span>
+</div>
+<sc-for list="{{ orderedStops }}" as="stop" hint-placeholder-count="3">
+<div onClick="{{ stop.onSelect }}" draggable="true" onDragStart="{{ stop.onDragStart }}" onDragOver="{{ stop.onDragOver }}" onDrop="{{ stop.onDrop }}" onDragEnd="{{ stop.onDragEnd }}" style="{{ stop.cardStyle }}">
+<div style="display:flex;gap:12px">
+<sc-if value="{{ stop.showMoveControls }}" hint-placeholder-val="{{ true }}">
+<div style="width:14px;padding-top:5px;flex-shrink:0;cursor:grab;color:{{ mutedColor }}">
+<svg width="10" height="16" viewBox="0 0 10 16"><circle cx="2.5" cy="2.5" r="1.4" fill="currentColor"/><circle cx="7.5" cy="2.5" r="1.4" fill="currentColor"/><circle cx="2.5" cy="8" r="1.4" fill="currentColor"/><circle cx="7.5" cy="8" r="1.4" fill="currentColor"/><circle cx="2.5" cy="13.5" r="1.4" fill="currentColor"/><circle cx="7.5" cy="13.5" r="1.4" fill="currentColor"/></svg>
+</div>
+</sc-if>
+<div style="width:52px;height:52px;flex-shrink:0;border-radius:10px;overflow:hidden">
+<image-slot id="{{ stop.photoId }}" shape="rounded" radius="10" placeholder="Photo" style="width:52px;height:52px"></image-slot>
+</div>
+<div style="flex:1;min-width:0">
+<div style="font-size:11px;font-weight:700;color:oklch(48% 0.02 75);letter-spacing:0.3px">{{ stop.time }}</div>
+<div style="font-family:'Lora',serif;font-size:15px;font-weight:600;color:oklch(22% 0.02 75);margin-top:2px">{{ stop.place }}</div>
+<div style="font-size:12.5px;color:oklch(40% 0.02 75);line-height:1.5;margin-top:3px">{{ stop.note }}</div>
+</div>
+</div>
+</div>
+</sc-for>
+<div style="border-top:1px solid oklch(88% 0.015 75);margin:6px 0 14px"></div>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+<div style="font-size:11.5px;font-weight:700;color:oklch(30% 0.02 75);text-transform:uppercase;letter-spacing:0.5px">{{ etiquetteTitle }}</div>
+<sc-if value="{{ hasStopSelected }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ clearStopSelection }}" style="font-size:11px;font-weight:600;color:oklch(46% 0.12 75);cursor:pointer">Show all</div>
+</sc-if>
+</div>
+<sc-for list="{{ etiquetteRows }}" as="tip" hint-placeholder-count="3">
+<div style="display:flex;gap:9px;margin-bottom:12px">
+<div style="width:6px;height:6px;border-radius:50%;background:oklch(46% 0.12 75);margin-top:6px;flex-shrink:0"></div>
+<div style="flex:1;min-width:0">
+<div style="font-size:12.5px;line-height:1.6;color:oklch(35% 0.02 75)">{{ tip.text }}</div>
+<div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+<div onClick="{{ tip.onUp }}" style="{{ tip.upStyle }}">Helpful</div>
+<div onClick="{{ tip.onDown }}" style="{{ tip.downStyle }}">Not accurate</div>
+<sc-if value="{{ tip.hasNote }}" hint-placeholder-val="{{ false }}">
+<div style="font-size:10.5px;color:oklch(52% 0.02 75)">{{ tip.note }}</div>
+</sc-if>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+
+<div style="background:oklch(99% 0.008 75);border:1px solid oklch(88% 0.015 75);border-radius:14px;padding:16px;margin-top:16px">
+<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:4px">
+<div style="font-size:11.5px;font-weight:700;color:oklch(46% 0.12 75);text-transform:uppercase;letter-spacing:0.5px">Review your day</div>
+<div style="font-size:10.5px;color:oklch(52% 0.02 75)">{{ reviewProgress }}</div>
+</div>
+<div style="font-size:11.5px;color:oklch(52% 0.02 75);line-height:1.5;margin-bottom:12px">Rate the places you actually went. Your notes feed back into the etiquette tips other travellers see.</div>
+<div style="display:flex;flex-direction:column;gap:14px">
+<sc-for list="{{ reviewRows }}" as="row" hint-placeholder-count="3">
+<div style="border-top:1px solid oklch(90% 0.015 75);padding-top:12px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+<div style="font-family:'Lora',serif;font-size:14px;font-weight:600;color:oklch(22% 0.02 75);flex:1;min-width:0">{{ row.place }}</div>
+<div style="display:flex;gap:5px;flex-shrink:0">
+<sc-for list="{{ row.dots }}" as="dot" hint-placeholder-count="5">
+<div onClick="{{ dot.onClick }}" style="{{ dot.style }}"></div>
+</sc-for>
+</div>
+</div>
+<input value="{{ row.text }}" onChange="{{ row.onText }}" placeholder="{{ row.placeholder }}" style="width:100%;box-sizing:border-box;margin-top:9px;border:1px solid oklch(88% 0.015 75);border-radius:10px;padding:9px 11px;font-family:'Karla',sans-serif;font-size:12.5px;color:oklch(22% 0.02 75);background:#fff;outline:none">
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isScan }}" hint-placeholder-val="{{ false }}">
+<div style="padding:22px 20px 4px">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+<div style="font-size:11px;font-weight:700;letter-spacing:1.6px;color:oklch(46% 0.12 75);text-transform:uppercase">AI Culture Guide</div>
+<div style="display:flex;align-items:center;gap:4px;background:oklch(46% 0.12 75);border-radius:100px;padding:2px 8px 2px 6px">
+<div style="width:6px;height:6px;background:#fff;transform:rotate(45deg)"></div>
+<span style="font-size:9.5px;font-weight:700;color:#fff;letter-spacing:0.3px">AI</span>
+</div>
+</div>
+<div style="font-family:'Lora',serif;font-size:24px;font-weight:600;color:oklch(22% 0.02 75);line-height:1.25">Point your camera, get context.</div>
+</div>
+<div style="padding:14px 20px 0">
+<div style="position:relative;height:230px;border-radius:16px;overflow:hidden;background:oklch(24% 0.01 75)">
+<div style="position:absolute;inset:0;background:repeating-linear-gradient(135deg, oklch(30% 0.015 75) 0px, oklch(30% 0.015 75) 3px, transparent 3px, transparent 16px)"></div>
+<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-size:10px;color:rgba(255,255,255,0.4);text-align:center;padding:0 30px">camera view — {{ activeScan.category }}</div>
+<div style="position:absolute;top:18px;left:18px;width:22px;height:22px;border-top:2px solid rgba(255,255,255,0.7);border-left:2px solid rgba(255,255,255,0.7);border-radius:4px 0 0 0"></div>
+<div style="position:absolute;top:18px;right:18px;width:22px;height:22px;border-top:2px solid rgba(255,255,255,0.7);border-right:2px solid rgba(255,255,255,0.7);border-radius:0 4px 0 0"></div>
+<div style="position:absolute;bottom:18px;left:18px;width:22px;height:22px;border-bottom:2px solid rgba(255,255,255,0.7);border-left:2px solid rgba(255,255,255,0.7);border-radius:0 0 0 4px"></div>
+<div style="position:absolute;bottom:18px;right:18px;width:22px;height:22px;border-bottom:2px solid rgba(255,255,255,0.7);border-right:2px solid rgba(255,255,255,0.7);border-radius:0 0 4px 0"></div>
+</div>
+</div>
+<div style="padding:16px 20px 64px">
+<div style="display:inline-block;background:oklch(90% 0.04 75);color:oklch(30% 0.02 75);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;padding:4px 9px;border-radius:6px;margin-bottom:8px">{{ activeScan.category }}</div>
+<div style="font-family:'Lora',serif;font-size:20px;font-weight:600;color:oklch(22% 0.02 75)">{{ activeScan.title }}</div>
+<div style="font-size:13px;line-height:1.6;color:oklch(35% 0.02 75);margin-top:8px">{{ activeScan.what }}</div>
+<div style="font-size:11.5px;font-weight:700;color:oklch(30% 0.02 75);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 10px">What to do</div>
+<sc-for list="{{ activeScan.howTo }}" as="step" hint-placeholder-count="3">
+<div style="display:flex;gap:9px;margin-bottom:9px">
+<div style="width:6px;height:6px;border-radius:50%;background:oklch(66% 0.14 75);margin-top:6px;flex-shrink:0"></div>
+<div style="font-size:12.5px;line-height:1.6;color:oklch(35% 0.02 75)">{{ step }}</div>
+</div>
+</sc-for>
+<div style="font-size:11.5px;font-weight:700;color:oklch(30% 0.02 75);text-transform:uppercase;letter-spacing:0.5px;margin:14px 0 10px">Manners</div>
+<sc-for list="{{ activeScan.manners }}" as="m" hint-placeholder-count="2">
+<div style="display:flex;gap:9px;margin-bottom:9px">
+<div style="width:6px;height:6px;border-radius:50%;background:oklch(46% 0.12 75);margin-top:6px;flex-shrink:0"></div>
+<div style="font-size:12.5px;line-height:1.6;color:oklch(35% 0.02 75)">{{ m }}</div>
+</div>
+</sc-for>
+<div onClick="{{ nextScan }}" style="text-align:center;margin-top:16px;padding:12px;border:1.5px solid oklch(88% 0.015 75);border-radius:12px;font-size:13px;font-weight:600;color:oklch(46% 0.12 75);cursor:pointer">Scan next example</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isNearby }}" hint-placeholder-val="{{ false }}">
+<div style="padding:22px 20px 8px">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+<div style="font-size:11px;font-weight:700;letter-spacing:1.6px;color:oklch(46% 0.12 75);text-transform:uppercase">Community Guide</div>
+<div style="display:flex;align-items:center;gap:4px;background:oklch(46% 0.12 75);border-radius:100px;padding:2px 8px 2px 6px">
+<div style="width:6px;height:6px;background:#fff;transform:rotate(45deg)"></div>
+<span style="font-size:9.5px;font-weight:700;color:#fff;letter-spacing:0.3px">AI translated</span>
+</div>
+</div>
+<div style="font-family:'Lora',serif;font-size:24px;font-weight:600;color:oklch(22% 0.02 75);line-height:1.25">Notes from Yanaka Ginza</div>
+<div style="font-size:13px;color:oklch(48% 0.02 75);margin-top:7px;line-height:1.5">You're near this street — here's what residents want you to know.</div>
+</div>
+<div style="padding:14px 20px 64px">
+<sc-for list="{{ nearbyNotes }}" as="note" hint-placeholder-count="4">
+<div style="background:oklch(99% 0.008 75);border:1px solid oklch(88% 0.015 75);border-radius:14px;padding:14px;margin-bottom:12px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:oklch(30% 0.02 75);background:oklch(90% 0.04 75);padding:3px 8px;border-radius:6px">{{ note.type }}</div>
+<div style="font-size:11px;color:oklch(48% 0.02 75)">{{ note.author }}</div>
+</div>
+<div style="font-size:13.5px;line-height:1.55;color:oklch(22% 0.02 75);font-weight:500">{{ note.text }}</div>
+<div onClick="{{ note.toggle }}" style="font-size:12px;font-weight:600;color:oklch(46% 0.12 75);margin-top:8px;cursor:pointer">{{ note.whyLabel }}</div>
+<sc-if value="{{ note.expanded }}" hint-placeholder-val="{{ false }}">
+<div style="font-size:12.5px;line-height:1.6;color:oklch(40% 0.02 75);margin-top:8px"><b style="color:oklch(30% 0.02 75)">Why: </b>{{ note.why }}</div>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ isForYou }}" hint-placeholder-val="{{ false }}">
+<div style="padding:22px 20px 8px">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+<div style="font-size:11px;font-weight:700;letter-spacing:1.6px;color:oklch(46% 0.12 75);text-transform:uppercase">For You</div>
+<div style="display:flex;align-items:center;gap:4px;background:oklch(46% 0.12 75);border-radius:100px;padding:2px 8px 2px 6px">
+<div style="width:6px;height:6px;background:#fff;transform:rotate(45deg)"></div>
+<span style="font-size:9.5px;font-weight:700;color:#fff;letter-spacing:0.3px">Personalized</span>
+</div>
+</div>
+<div style="font-family:'Lora',serif;font-size:24px;font-weight:600;color:oklch(22% 0.02 75);line-height:1.25">Recommended around your interests</div>
+</div>
+<div style="display:flex;gap:8px;padding:14px 20px 4px;overflow-x:auto">
+<sc-for list="{{ interestChips }}" as="chip" hint-placeholder-count="5">
+<div onClick="{{ chip.onClick }}" style="{{ chip.style }}">{{ chip.label }}</div>
+</sc-for>
+</div>
+<div style="padding:14px 20px 64px">
+<sc-for list="{{ recommendations }}" as="rec" hint-placeholder-count="4">
+<div style="background:oklch(99% 0.008 75);border:1px solid oklch(88% 0.015 75);border-radius:14px;overflow:hidden;margin-bottom:12px">
+<div style="width:100%;height:120px">
+<image-slot id="{{ rec.photoId }}" shape="rect" placeholder="Photo" style="width:100%;height:120px"></image-slot>
+</div>
+<div style="padding:14px">
+<div style="display:flex;align-items:center;gap:5px;margin-bottom:9px">
+<div style="width:5px;height:5px;background:oklch(66% 0.14 75);transform:rotate(45deg)"></div>
+<div style="font-size:11.5px;font-weight:600;color:oklch(46% 0.12 75)">{{ rec.reason }}</div>
+</div>
+<div style="font-family:'Lora',serif;font-size:15.5px;font-weight:600;color:oklch(22% 0.02 75)">{{ rec.name }}</div>
+<div style="font-size:11.5px;color:oklch(48% 0.02 75);margin-top:3px">{{ rec.area }}</div>
+<div style="font-size:12.5px;line-height:1.55;color:oklch(35% 0.02 75);margin-top:8px">{{ rec.blurb }}</div>
+</div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+</div>
+<sc-if value="{{ showTabs }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;justify-content:space-around;padding:10px 12px 20px;border-top:1px solid oklch(88% 0.015 75);background:oklch(99% 0.008 75)">
+<div onClick="{{ goBriefing }}" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
+<svg width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="3" width="16" height="11" rx="3" fill="none" stroke="{{ tabColors.briefing }}" stroke-width="1.6"/><path d="M7 14l-1.5 3.5L9 14" fill="{{ tabColors.briefing }}"/></svg>
+<span style="font-size:9.5px;font-weight:600;color:{{ tabColors.briefing }}">Briefing</span>
+</div>
+<div onClick="{{ goScan }}" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
+<svg width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="5" width="16" height="11" rx="2.5" fill="none" stroke="{{ tabColors.scan }}" stroke-width="1.6"/><circle cx="10" cy="10.5" r="3.4" fill="none" stroke="{{ tabColors.scan }}" stroke-width="1.6"/><rect x="7" y="3" width="6" height="2.2" rx="1" fill="{{ tabColors.scan }}"/></svg>
+<span style="font-size:9.5px;font-weight:600;color:{{ tabColors.scan }}">Scan</span>
+</div>
+<div onClick="{{ goNearby }}" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
+<svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="8" r="5.5" fill="none" stroke="{{ tabColors.nearby }}" stroke-width="1.6"/><circle cx="10" cy="8" r="1.8" fill="{{ tabColors.nearby }}"/><path d="M10 13.5L10 17" stroke="{{ tabColors.nearby }}" stroke-width="1.6" stroke-linecap="round"/></svg>
+<span style="font-size:9.5px;font-weight:600;color:{{ tabColors.nearby }}">Nearby</span>
+</div>
+<div onClick="{{ goForYou }}" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
+<svg width="20" height="20" viewBox="0 0 20 20"><rect x="6.5" y="6.5" width="7" height="7" rx="1.5" fill="none" stroke="{{ tabColors.foryou }}" stroke-width="1.6" transform="rotate(45 10 10)"/></svg>
+<span style="font-size:9.5px;font-weight:600;color:{{ tabColors.foryou }}">For You</span>
+</div>
+</div>
+</sc-if>
+</div>
+</x-import>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:500,&quot;height&quot;:940},&quot;cardDensity&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;comfortable&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;comfortable&quot;,&quot;compact&quot;],&quot;section&quot;:&quot;Route cards&quot;},&quot;showMoveControls&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Route cards&quot;}}">
+const ACCENT_DEEP = 'oklch(46% 0.12 75)';
+const TEXT = 'oklch(22% 0.02 75)';
+const MUTED = 'oklch(48% 0.02 75)';
+const BG2 = 'oklch(99% 0.008 75)';
+const BORDER = 'oklch(88% 0.015 75)';
+
+const SCENARIOS = [
+  { id: 'ramen', label: 'Asakusa & Ueno + ramen', interest: 'Ramen', prompt: '"Tomorrow: Asakusa & Ueno, I love ramen"',
+    stops: [
+      { time: '9:00 AM', place: 'Senso-ji Temple, Asakusa', note: 'Arrive early to beat the tour groups.',
+        etiquette: ['Bow once before passing through the torii gate, and rinse your hands at the water basin before approaching the main hall.', 'Many visitors come to pray, not pose — avoid photographing people mid-prayer.'] },
+      { time: '11:30 AM', place: 'Ueno Park', note: 'Cherry blossoms in spring; museums year-round.',
+        etiquette: ['During cherry blossom season, picnic spots are claimed early — arrive by mid-morning for a good spot.', 'Keep noise down near the shrine areas within the park.'] },
+      { time: '1:00 PM', place: 'Ramen Jiro Ueno', note: 'Because you like ramen — a 5 min walk from the park, known locally for its rich tonkotsu broth.',
+        etiquette: ['Order and pay at the ticket machine near the entrance before sitting down.', 'Slurping noodles is normal here, not rude — meals are eaten quickly.'] },
+    ],
+    etiquette: [
+      'At the shrine: bow once before passing through the torii gate, and rinse your hands at the water basin before approaching the main hall.',
+      'Photography: many visitors come to pray, not pose — avoid photographing people mid-prayer.',
+      'On the train: keep voices low, and offer priority seats near the doors to elderly or pregnant passengers.',
+    ] },
+  { id: 'nightlife', label: 'Shibuya nightlife', interest: 'Nightlife', prompt: '"Shibuya at night — into nightlife"',
+    stops: [
+      { time: '6:00 PM', place: 'Shibuya Sky observation deck', note: 'Best light just before sunset.',
+        etiquette: ['Book a timed entry slot in advance — walk-ups often queue for over an hour.', 'The rooftop deck is open-air and unfenced near the edges; mind the wind.'] },
+      { time: '8:00 PM', place: 'Nonbei Yokocho', note: 'A narrow alley of tiny bars, most seating just 4–6 people.',
+        etiquette: ['Many small bars charge a seating fee (500–1000 yen) — ask before you sit down.', 'These bars are tiny — if it looks full, it is; wait to be invited in.'] },
+      { time: '10:00 PM', place: 'Golden Gai, Shinjuku', note: "Because you're into nightlife — dozens of themed micro-bars, some charge a seating fee.",
+        etiquette: ['Last trains run around midnight; confirm your route home before you start.', 'Some bars allow smoking indoors — check signage at the door if that matters to you.'] },
+    ],
+    etiquette: [
+      'Many small bars charge a seating fee (500–1000 yen) — ask before you sit down.',
+      'Last trains run around midnight; confirm your route home before you start.',
+      'Some bars allow smoking indoors — check signage at the door if that matters to you.',
+    ] },
+  { id: 'family', label: 'Family day, keep it calm', interest: 'Family', prompt: '"Family day with kids, something calm"',
+    stops: [
+      { time: '10:00 AM', place: 'National Museum of Nature and Science, Ueno', note: 'Interactive exhibits — the dinosaur hall is a highlight for kids.',
+        etiquette: ['Most museums offer discounted family tickets — ask at the counter.', 'Strollers can be left at a staffed counter near the entrance if the halls get crowded.'] },
+      { time: '1:00 PM', place: 'Ueno Zoo', note: 'Home to giant pandas; strollers available to rent.',
+        etiquette: ['The panda enclosure gets crowded on weekends — a queue system limits viewing time.', 'Flash photography is not allowed near the animals.'] },
+      { time: '3:30 PM', place: 'Yanaka Ginza', note: "Because you wanted something calm — a quiet old-town street with snacks kids can try, like taiyaki.",
+        etiquette: ['Strollers are welcome on trains outside rush hour (7–9am, 5–7pm).', 'Family restrooms with changing tables are marked with a baby icon at major stations.'] },
+    ],
+    etiquette: [
+      'Strollers are welcome on trains outside rush hour (7–9am, 5–7pm).',
+      'Most museums offer discounted family tickets — ask at the counter.',
+      'Family restrooms with changing tables are marked with a baby icon at major stations.',
+    ] },
+];
+
+const SCAN_ITEMS = [
+  { category: 'Shrine', title: 'Torii Gate',
+    what: 'A torii gate marks the entrance to a Shinto shrine, separating the sacred grounds from the ordinary world outside.',
+    howTo: ['Bow once before passing through.', 'Walk along the sides of the path — the center is reserved for the deity.', 'At the water basin, rinse both hands, then your mouth, before approaching the main hall.'],
+    manners: ['Keep your voice down near the main hall.', 'Photography is usually fine, but avoid photographing people mid-prayer.'] },
+  { category: 'Restaurant', title: 'Ramen Ticket Machine',
+    what: 'Many ramen shops use a vending machine at the entrance — you order and pay before you sit down.',
+    howTo: ['Choose your dish on the machine and insert cash.', 'Take the printed ticket and hand it to staff at the counter.', 'Look for an English-language button, often in a corner of the screen.'],
+    manners: ['Slurping noodles is normal here, not rude.', 'Meals are eaten quickly; lingering to chat is uncommon in busy shops.'] },
+  { category: 'Public Transit', title: 'Priority Seat Sign',
+    what: 'This marks a priority seating area for elderly, pregnant, injured, or disabled passengers, and those with infants.',
+    howTo: ['Offer the seat if someone who needs it boards, even if the train looked empty when you sat down.', 'Switch your phone to silent mode near these seats.'],
+    manners: ['Avoid loud calls or unmuted music anywhere on the train.', 'Line up at the marked spots on the platform rather than crowding the doors.'] },
+];
+
+const NEARBY_NOTES = [
+  { type: 'Rule', text: 'Please take your trash home with you — there are no public bins on this street.',
+    why: 'Japan removed most street bins after a 1995 safety incident, so shops and residents carry trash home or to a convenience store instead.', author: 'Shop owner' },
+  { type: 'Rule', text: "Please don't photograph inside the cat shrine without asking.",
+    why: 'Some visitors come here for quiet reflection, not as a photo backdrop — a quick ask is appreciated.', author: 'Resident' },
+  { type: 'Welcome', text: 'Kids are welcome to gently pet the neighborhood cats — just no chasing.',
+    why: 'The cats are fed and cared for by several shop owners along the street and are used to people.', author: 'Shopkeeper' },
+  { type: 'Event', text: 'Local festival (Yanaka Matsuri) this Saturday, 4–8 PM near the shrine steps.',
+    why: 'An annual neighborhood event with food stalls and a small parade — visitors are welcome.', author: 'Neighborhood association' },
+];
+
+const RECOMMENDATIONS = [
+  { id: 'ramen-jiro', name: 'Ramen Jiro Ueno', area: 'Ueno', tag: 'Ramen', reason: 'Because you like ramen', blurb: 'Rich tonkotsu broth, 5 min walk from Ueno Park. Popular with locals at lunch.' },
+  { id: 'yanaka-ginza', name: 'Yanaka Ginza', area: 'Yanaka', tag: 'Culture', reason: 'Because you enjoy quiet neighborhoods', blurb: 'Old-town shopping street, largely untouched since the postwar years.' },
+  { id: 'kahaku', name: 'National Museum of Nature and Science', area: 'Ueno', tag: 'Family', reason: "Because you're traveling with family", blurb: 'Interactive exhibits, including a full-scale dinosaur hall.' },
+  { id: 'shimokitazawa', name: 'Shimokitazawa', area: 'Setagaya', tag: 'Culture', reason: 'Because you liked vintage shopping areas', blurb: 'Over 100 vintage stores and small live-music venues packed into a few blocks.' },
+  { id: 'nonbei-yokocho', name: 'Nonbei Yokocho', area: 'Shibuya', tag: 'Nightlife', reason: "Because you're interested in nightlife", blurb: 'A narrow alley of tiny themed bars, most seating just a handful of people.' },
+];
+
+const INTERESTS = ['All', 'Ramen', 'Culture', 'Family', 'Nightlife'];
+
+class Component extends DCLogic {
+  state = {
+    screen: 'setup',
+    trip: { adults: 2, kids: 0, days: 3, pace: 'Balanced', setting: 'A mix', budget: 'Mid-range', interests: ['Ramen', 'Culture'], notes: '' },
+    scenarioId: 'ramen',
+    scanIndex: 0,
+    activeInterest: 'Ramen',
+    expandedNotes: {},
+    stopOrder: {},
+    selectedStop: {},
+    dragPos: null,
+    tipFeedback: {},
+    reviews: {},
+  };
+
+  getOrder(scenarioId, len) {
+    return this.state.stopOrder[scenarioId] || Array.from({ length: len }, (_, i) => i);
+  }
+
+  selectStop = (scenarioId, idx) => {
+    this.setState((s) => ({
+      selectedStop: { ...s.selectedStop, [scenarioId]: s.selectedStop[scenarioId] === idx ? null : idx },
+    }));
+  };
+
+  reorderStop = (scenarioId, fromPos, toPos, len) => {
+    if (fromPos === toPos) return;
+    this.setState((s) => {
+      const order = [...this.getOrder(scenarioId, len)];
+      const [moved] = order.splice(fromPos, 1);
+      order.splice(toPos, 0, moved);
+      return { stopOrder: { ...s.stopOrder, [scenarioId]: order } };
+    });
+  };
+
+  setTrip = (key, val) => this.setState((s) => ({ trip: { ...s.trip, [key]: val } }));
+  bump = (key, delta, min, max) => this.setState((s) => ({
+    trip: { ...s.trip, [key]: Math.max(min, Math.min(max, s.trip[key] + delta)) },
+  }));
+  toggleTripInterest = (tag) => this.setState((s) => {
+    const has = s.trip.interests.includes(tag);
+    const interests = has ? s.trip.interests.filter((t) => t !== tag) : [...s.trip.interests, tag];
+    return { trip: { ...s.trip, interests } };
+  });
+  saveTrip = () => this.setState((s) => ({
+    screen: 'briefing',
+    activeInterest: s.trip.interests[0] || 'All',
+    scenarioId: s.trip.kids > 0 ? 'family' : (s.trip.interests.includes('Nightlife') ? 'nightlife' : 'ramen'),
+  }));
+  voteTip = (key, vote) => this.setState((s) => ({
+    tipFeedback: { ...s.tipFeedback, [key]: s.tipFeedback[key] === vote ? null : vote },
+  }));
+  setReview = (key, patch) => this.setState((s) => ({
+    reviews: { ...s.reviews, [key]: { rating: 0, text: '', ...(s.reviews[key] || {}), ...patch } },
+  }));
+  goSetup = () => this.setState({ screen: 'setup' });
+  goBriefing = () => this.setState({ screen: 'briefing' });
+  goScan = () => this.setState({ screen: 'scan' });
+  goNearby = () => this.setState({ screen: 'nearby' });
+  goForYou = () => this.setState({ screen: 'foryou' });
+  selectScenario = (id, interest) => this.setState({ scenarioId: id, activeInterest: interest });
+  nextScan = () => this.setState((s) => ({ scanIndex: (s.scanIndex + 1) % SCAN_ITEMS.length }));
+  setInterest = (tag) => this.setState({ activeInterest: tag });
+  toggleNote = (idx) => this.setState((s) => ({ expandedNotes: { ...s.expandedNotes, [idx]: !s.expandedNotes[idx] } }));
+
+  renderVals() {
+    const { screen, scenarioId, scanIndex, activeInterest, expandedNotes, selectedStop, trip } = this.state;
+    const pill = (on) => `font-size:12.5px;font-weight:600;padding:8px 13px;border-radius:100px;cursor:pointer;flex-shrink:0;white-space:nowrap;border:1px solid ${on ? 'oklch(46% 0.12 75)' : 'oklch(86% 0.015 75)'};background:${on ? 'oklch(46% 0.12 75)' : '#fff'};color:${on ? '#fff' : 'oklch(38% 0.02 75)'}`;
+    const group = (label, hint, key, opts) => ({
+      label, hint,
+      options: opts.map((o) => ({ label: o, style: pill(trip[key] === o), onClick: () => this.setTrip(key, o) })),
+    });
+    const counters = [
+      { label: 'Adults', hint: 'Ages 13 and up', value: trip.adults, dec: () => this.bump('adults', -1, 1, 12), inc: () => this.bump('adults', 1, 1, 12) },
+      { label: 'Kids', hint: 'Changes pacing and venue picks', value: trip.kids, dec: () => this.bump('kids', -1, 0, 8), inc: () => this.bump('kids', 1, 0, 8) },
+      { label: 'Days in Tokyo', hint: 'How long you have', value: trip.days, dec: () => this.bump('days', -1, 1, 21), inc: () => this.bump('days', 1, 1, 21) },
+    ];
+    const choiceGroups = [
+      { label: 'Interests', hint: 'Pick as many as you like.',
+        options: ['Ramen', 'Culture', 'Family', 'Nightlife', 'Shopping', 'Nature'].map((t) => ({
+          label: t, style: pill(trip.interests.includes(t)), onClick: () => this.toggleTripInterest(t),
+        })) },
+      group('Indoors or outdoors', 'Shapes what gets suggested when the weather turns.', 'setting', ['Mostly outdoors', 'A mix', 'Mostly indoors']),
+      group('Pace', 'How much you want to fit into a day.', 'pace', ['Relaxed', 'Balanced', 'Packed']),
+      group('Budget', 'Per person, per day.', 'budget', ['Budget', 'Mid-range', 'Splurge']),
+    ];
+    const party = trip.adults + (trip.kids ? ` adult${trip.adults > 1 ? 's' : ''}, ${trip.kids} kid${trip.kids > 1 ? 's' : ''}` : ` adult${trip.adults > 1 ? 's' : ''}`);
+    const tripSummary = `${party} \u00b7 ${trip.days} day${trip.days > 1 ? 's' : ''} \u00b7 ${trip.pace.toLowerCase()} pace \u00b7 ${trip.interests.slice(0, 2).join(', ') || 'no interests yet'}`;
+    const activeScenario = SCENARIOS.find((s) => s.id === scenarioId) || SCENARIOS[0];
+    const activeScan = SCAN_ITEMS[scanIndex];
+    const showMoveControls = this.props.showMoveControls ?? true;
+    const cardDensity = this.props.cardDensity ?? 'comfortable';
+    const cardPad = cardDensity === 'compact' ? '10px 12px' : '14px 14px';
+    const cardGap = cardDensity === 'compact' ? '10px' : '16px';
+
+    const order = this.getOrder(scenarioId, activeScenario.stops.length);
+    const selIdx = selectedStop[scenarioId];
+    const dragOverPos = this.state.dragPos;
+    const orderedStops = order.map((origIdx, pos) => {
+      const stop = activeScenario.stops[origIdx];
+      const selected = selIdx === origIdx;
+      const isDragOver = dragOverPos === pos;
+      return {
+        ...stop,
+        photoId: `stop-${scenarioId}-${origIdx}`,
+        showMoveControls,
+        cardStyle: `padding:${cardPad};margin-bottom:${cardGap};border-radius:12px;cursor:grab;border:1.5px solid ${isDragOver ? ACCENT_DEEP : selected ? ACCENT_DEEP : 'transparent'};background:${isDragOver ? 'oklch(93% 0.05 75)' : selected ? 'oklch(96% 0.03 75)' : 'transparent'};transition:background 0.15s,border-color 0.15s`,
+        onSelect: () => this.selectStop(scenarioId, origIdx),
+        onDragStart: (e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(pos)); },
+        onDragOver: (e) => { e.preventDefault(); if (this.state.dragPos !== pos) this.setState({ dragPos: pos }); },
+        onDrop: (e) => {
+          e.preventDefault();
+          const fromPos = Number(e.dataTransfer.getData('text/plain'));
+          this.reorderStop(scenarioId, fromPos, pos, activeScenario.stops.length);
+          this.setState({ dragPos: null });
+        },
+        onDragEnd: () => this.setState({ dragPos: null }),
+      };
+    });
+
+    const selectedStopData = selIdx != null ? activeScenario.stops[selIdx] : null;
+    const etiquetteTitle = selectedStopData ? `Etiquette for ${selectedStopData.place}` : 'Local etiquette for this route';
+    const displayedEtiquette = selectedStopData ? (selectedStopData.etiquette || []) : activeScenario.etiquette;
+
+    const voteStyle = (on, positive) => `font-size:10.5px;font-weight:700;padding:4px 9px;border-radius:100px;cursor:pointer;flex-shrink:0;white-space:nowrap;border:1px solid ${on ? (positive ? 'oklch(46% 0.12 75)' : 'oklch(52% 0.13 30)') : 'oklch(88% 0.015 75)'};background:${on ? (positive ? 'oklch(46% 0.12 75)' : 'oklch(52% 0.13 30)') : '#fff'};color:${on ? '#fff' : 'oklch(45% 0.02 75)'}`;
+    const etiquetteRows = displayedEtiquette.map((text, i) => {
+      const key = `${scenarioId}:${selIdx == null ? 'all' : selIdx}:${i}`;
+      const vote = this.state.tipFeedback[key];
+      return {
+        text, key,
+        upStyle: voteStyle(vote === 'up', true),
+        downStyle: voteStyle(vote === 'down', false),
+        onUp: () => this.voteTip(key, 'up'),
+        onDown: () => this.voteTip(key, 'down'),
+        hasNote: !!vote,
+        note: vote === 'up' ? 'Thanks — noted.' : "We'll ask a local to re-check this.",
+      };
+    });
+
+    const reviewRows = orderedStops.map((stop) => {
+      const key = `${scenarioId}:${stop.place}`;
+      const review = this.state.reviews[key] || { rating: 0, text: '' };
+      return {
+        place: stop.place,
+        text: review.text,
+        placeholder: review.rating >= 4 ? 'What made it worth it?' : 'Anything future travellers should know?',
+        dots: [1, 2, 3, 4, 5].map((n) => ({
+          onClick: () => this.setReview(key, { rating: review.rating === n ? 0 : n }),
+          style: `width:15px;height:15px;border-radius:50%;cursor:pointer;border:1px solid ${n <= review.rating ? 'oklch(46% 0.12 75)' : 'oklch(84% 0.015 75)'};background:${n <= review.rating ? 'oklch(46% 0.12 75)' : '#fff'}`,
+        })),
+        onText: (e) => this.setReview(key, { text: e.target.value }),
+      };
+    });
+    const reviewedCount = reviewRows.filter((r) => (this.state.reviews[`${scenarioId}:${r.place}`] || {}).rating > 0).length;
+    const reviewProgress = `${reviewedCount} of ${reviewRows.length} rated`;
+
+    const briefingChips = SCENARIOS.map((s) => {
+      const active = s.id === scenarioId;
+      return {
+        label: s.label,
+        onClick: () => this.selectScenario(s.id, s.interest),
+        style: `padding:8px 14px;border-radius:100px;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;border:1px solid ${active ? ACCENT_DEEP : BORDER};background:${active ? ACCENT_DEEP : BG2};color:${active ? '#fff' : TEXT}`,
+      };
+    });
+
+    const interestChips = INTERESTS.map((tag) => {
+      const active = tag === activeInterest;
+      return {
+        label: tag,
+        onClick: () => this.setInterest(tag),
+        style: `padding:8px 14px;border-radius:100px;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;border:1px solid ${active ? ACCENT_DEEP : BORDER};background:${active ? ACCENT_DEEP : BG2};color:${active ? '#fff' : TEXT}`,
+      };
+    });
+
+    const recommendations = (activeInterest === 'All' ? RECOMMENDATIONS : RECOMMENDATIONS.filter((r) => r.tag === activeInterest)).map((r) => ({ ...r, photoId: `rec-${r.id}` }));
+
+    const nearbyNotes = NEARBY_NOTES.map((n, idx) => ({
+      ...n,
+      expanded: !!expandedNotes[idx],
+      whyLabel: expandedNotes[idx] ? 'Hide reason' : 'Why?',
+      toggle: () => this.toggleNote(idx),
+    }));
+
+    const activeColor = ACCENT_DEEP, inactiveColor = MUTED;
+
+    return {
+      isSetup: screen === 'setup',
+      showTabs: screen !== 'setup',
+      counters,
+      choiceGroups,
+      tripSummary,
+      tripNotes: trip.notes,
+      onNotesChange: (e) => this.setTrip('notes', e.target.value),
+      saveTrip: this.saveTrip,
+      goSetup: this.goSetup,
+      isBriefing: screen === 'briefing',
+      isScan: screen === 'scan',
+      isNearby: screen === 'nearby',
+      isForYou: screen === 'foryou',
+      activeScenario,
+      orderedStops,
+      etiquetteTitle,
+      etiquetteRows,
+      reviewRows,
+      reviewProgress,
+      hasStopSelected: !!selectedStopData,
+      clearStopSelection: selectedStopData ? () => this.selectStop(scenarioId, selIdx) : null,
+      mutedColor: MUTED,
+      activeScan,
+      briefingChips,
+      interestChips,
+      recommendations,
+      nearbyNotes,
+      tabColors: {
+        briefing: screen === 'briefing' ? activeColor : inactiveColor,
+        scan: screen === 'scan' ? activeColor : inactiveColor,
+        nearby: screen === 'nearby' ? activeColor : inactiveColor,
+        foryou: screen === 'foryou' ? activeColor : inactiveColor,
+      },
+      goBriefing: this.goBriefing,
+      goScan: this.goScan,
+      goNearby: this.goNearby,
+      goForYou: this.goForYou,
+      nextScan: this.nextScan,
+    };
+  }
+}
+</script>
+</body>
+</html>

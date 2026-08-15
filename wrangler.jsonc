@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "tabi-concierge-tokyo",
+  "main": "./worker/index.ts",
+
+  // ランタイム（workerd）の挙動を固定する。Node のバージョンとは無関係。
+  // 新機能を取り込みたくなったら日付を進める。
+  "compatibility_date": "2026-08-15",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "assets": {
+    // React SPA。存在しないパスだけ index.html に倒す。
+    // 実在する /showcase/* はそのまま配信されるため、SPA ルーティングと衝突しない。
+    "not_found_handling": "single-page-application",
+    // Worker を先に通すパス。これ以外は静的アセットが優先される。
+    "run_worker_first": ["/api/*", "/mcp"]
+    // directory は指定しない（Vite のビルド出力が自動的に使われる）
+  },
+
+  "observability": {
+    "enabled": true
+  }
+
+  // 以降のステップで追加するバインディング:
+  //   "ai": { "binding": "AI" }                                   … Workers AI（Step 3）
+  //   "d1_databases": [{ "binding": "DB", "database_name": "...", "database_id": "..." }]  … D1（Step 2）
+}

@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "types": ["node"]
+  },
+  // worker-configuration.d.ts は `wrangler types` が生成する（Env と workerd の型）。
+  // 手書きしないこと。wrangler.jsonc を変更したら再生成する。
+  "include": ["worker", "worker-configuration.d.ts"]
+}
