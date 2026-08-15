@@ -99,8 +99,9 @@ Issue があれば件名に含める: feat: #12 ...
 The established design source-of-truth is `public/showcase/`（see「デザインの正典」in docs/MASTER.md）. Sho also has `Design.pdf` / `Design_English.pdf` reference files not yet added to the repo — once added, they'll go in a `design/` folder. Until then, match layout/colors/copy to `public/showcase/`. [Cloudinary export to be added once shared.]
 
 ### Sho's current TODOs
-- [ ] Build out frontend screens/components based on the design reference (`public/showcase/` for now; `design/Design.pdf` once added)
+- [x] Build out frontend screens/components based on the design reference — 旅のプロフィール→プラン画面 done in `src/features/plan/`. PR open from `feature/trip-plan-screen` into `develop` (not yet merged)
 - [ ] Generate a list of all API endpoints the frontend needs (request/response shape, purpose) and share with Okazaki — cross-check against [docs/02-design/API.md](docs/02-design/API.md), which already defines the MCP tool surface
+- [ ] Write up the concrete API requirements list from what the built screen actually needs (see `src/features/plan/types.ts`: `Trip`, `Scenario`, `Stop`, `EtiquetteTip`, `ProvenanceSource`) and share with Okazaki — this is the actionable version of the item above, now that the shapes aren't hypothetical
 - [ ] Add Cloudinary design URL/ZIP to `design/` once available
 
 ### Working conventions
