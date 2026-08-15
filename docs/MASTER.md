@@ -1,10 +1,11 @@
 ---
 title: "MASTER"
-version: "1.0.0"
+version: "1.1.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-15"
+changeImpact: "medium"
 ---
 
 # AI駆動開発マスタードキュメント
@@ -585,7 +586,7 @@ metrics:
 本リポジトリに配置済み（`/ace-setup` により作成）:
 
 - [08-knowledge/PLAYBOOK.md](./08-knowledge/PLAYBOOK.md) - ACE Playbook（AIツール向け構造化知見。索引 + 運用ルール）
-- [05-operations/deployment/ace-cycle.md](./05-operations/deployment/ace-cycle.md) - ACE サイクル運用手順（Generate → Reflect → Curate）
+- [05-operations/deployment/ace-cycle.md](./05-operations/deployment/ace-cycle.md) - ACE サイクル運用手順（Generate → Reflect → Curate ＋ 定期 Refine）
 
 未導入（必要時に ff-dev-toolkit の `docs-template/` からコピー）:
 
@@ -752,6 +753,12 @@ Changelog エントリには以下のカテゴリを使用する（[Keep a Chang
 - [ ] 定数の配置が層責務に沿っている（Domain/Application/Infrastructure）
 
 ## Changelog
+
+### [1.1.0] - 2026-08-15
+
+#### 追加
+
+- ナレッジベースの索引を「本リポジトリに配置済み」と「未導入」に分け、`/ace-setup` で配置した PLAYBOOK.md・ace-cycle.md へのリンクを追加（Issue #3）
 
 ### [1.0.0] - 2026-08-15
 

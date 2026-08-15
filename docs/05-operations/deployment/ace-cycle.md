@@ -5,6 +5,22 @@
 
 ## 概要
 
+> ⚠️ **本リポジトリでの位置づけ（2026-08-15 時点）**
+> 本ファイルは ff-dev-toolkit の運用手順をコピーし、**本リポジトリ向けに 2 箇所だけ手を入れたもの**（末尾の Changelog は上流の改訂履歴であり、本リポジトリの変更履歴ではない）。
+>
+> **上流との差分**（`/ace-setup` 再実行・上流再同期の際は巻き戻るため、都度この 2 点を再適用すること）:
+>
+> 1. 本注記（冒頭 callout）
+> 2. §「コミットメッセージの規則を忘れた」— 上流は件名に `[category]` を含める例を示すが、同じ文書の Phase 3 は「件名は短く、カテゴリは body の `Categories:`」と定義しており自己矛盾している。Phase 3 側を SSOT として統一した
+>
+> 次は**本リポジトリに未導入**のため、記載どおりには実行できない:
+>
+> - `scripts/ace/*.ts`（`check-entry-format` / `ace-refine-report` / `ace-reuse-report` 等）と対応する `npm run ace:*` — 未導入。**エントリが 0 件の段階では必須ゲートとして扱わない**。件数・行数が増えて自動検証が必要になった時点で、ff-dev-toolkit の `docs-template/scripts/ace/` から導入する
+> - `knowledge-management.md` / `git-workflow.md` / `ace-autonomous.md` — 未導入（必要時に ff-dev-toolkit の `docs-template/05-operations/deployment/` から同一相対パスでコピー）
+> - 本文中の例示（Prisma の `findMany`・N+1 対策など）は上流テンプレートのサンプルであり、本プロジェクトの実態ではない（本プロジェクトは DB を使わない → [DATABASE.md](../../02-design/DATABASE.md)）
+>
+> 本リポジトリで実際に使うのは `/ace-curate <PR番号>`（ff-dev-toolkit プラグインが提供）と、その追記先である [PLAYBOOK.md](../../08-knowledge/PLAYBOOK.md)。
+
 ACE (Agentic Context Engineering) サイクルは、マージ後・cleanup 後に AIツールと協力して知見を抽出・評価・記録する運用手順です。
 
 **目的**: 開発で得た知見を構造化し、AIツールが次回タスクで自動参照できる Playbook エントリとして永続化する
@@ -362,12 +378,12 @@ ACE_REUSE_STALE_DAYS=120 npm run ace:reuse-report
 
 ### コミットメッセージの規則を忘れた
 
-**形式**: `knowledge: ACE-XXX [category] [summary]`
+**形式**: 件名 `knowledge: ACE-XXX <要約>` ／ カテゴリは commit body の `Categories:` 行（件名に `[category]` を入れない — commitlint の `header-max-length` 対策。§Phase 3 のコミット例が SSOT）
 **例**:
 
-- `knowledge: ACE-001 [coding] TypeScript strict mode の例外パターン`
-- `knowledge: ACE-002,ACE-003 [testing,security] モック分離、JWT検証`
-- `knowledge: ACE-004 [performance] helpful+1 (既存エントリ更新)`
+- `knowledge: ACE-438-1 TypeScript strict mode の例外パターン` + body `Categories: coding`
+- `knowledge: ACE-438-1..2 モック分離、JWT検証` + body `Categories: testing, security`
+- `knowledge: ACE-438-1 helpful+1 (既存エントリ更新)` + body `Categories: performance`
 
 ---
 

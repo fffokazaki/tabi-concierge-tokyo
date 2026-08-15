@@ -15,7 +15,7 @@ references:
 
 # ACE Playbook
 
-> **Parent**: [BEST_PRACTICES.md](./BEST_PRACTICES.md) | **関連**: [ACE サイクル運用手順](../05-operations/deployment/ace-cycle.md) | ACE フレームワーク概念（本リポジトリ未導入。理論的背景は <https://github.com/feel-flow/ai-spec-driven-development/blob/develop/docs/ACE_FRAMEWORK.md>）
+> **Parent**: `08-knowledge/BEST_PRACTICES.md`（本リポジトリ未導入。必要時に ff-dev-toolkit の `docs-template/08-knowledge/BEST_PRACTICES.md` からコピー） | **関連**: [ACE サイクル運用手順](../05-operations/deployment/ace-cycle.md) | ACE フレームワーク概念（本リポジトリ未導入。理論的背景は <https://github.com/feel-flow/ai-spec-driven-development/blob/develop/docs/ACE_FRAMEWORK.md>）
 
 ## 概要
 
@@ -24,6 +24,9 @@ references:
 ACE (Agentic Context Engineering) Playbook は、開発プロセスで得た知見を **AIツールが直接参照できる構造化形式** で蓄積するファイルです。
 
 GitHub Discussions が「人間が読むためのナラティブ（物語的記録）」であるのに対し、Playbook は「AIが参照するための構造化知見（delta方式: 差分のみを末尾追記する更新方式）」として機能します。
+
+> **本リポジトリでの前提（2026-08-15 時点）**: `scripts/ace/*.ts`（`check-entry-format` / `check-category-size` / `ace-reuse-report` 等）と対応する `npm run ace:*` は**未導入**。
+> 以降に登場する「機械ゲートが強制する / exit 1 でブロックする」という記述は、**導入後に有効になる規約**として読むこと。エントリが増えて自動検証が必要になった時点で、ff-dev-toolkit の `docs-template/scripts/ace/` から導入する。
 
 ### 運用ルール
 
