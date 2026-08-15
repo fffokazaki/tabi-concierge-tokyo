@@ -39,5 +39,6 @@ data/        # 利用オープンデータ（最大10件）のリストとメタ
 
 ## 資料
 
+- [開発ドキュメント（MASTER）](docs/MASTER.md) — AI仕様駆動開発の中央ハブ。各文書への索引はここから
 - [企画概要](docs/proposal-summary.md)
 - [First Stageプレゼン構成・台本](docs/first-stage-presentation.md)
