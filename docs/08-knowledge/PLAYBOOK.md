@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.4.0"
+version: "1.5.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-15"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 7
+ace_entry_count: 9
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -228,8 +228,17 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-4-2 | ベンダリングしたテンプレートをローカル修正したら、上流との差分を文書内に列挙する | documentation-quality | [playbook/documentation-quality.md#ace-4-2](./playbook/documentation-quality.md#ace-4-2) |
 | ACE-6-1 | 入口ドキュメントに「すべての〜は〜を持つ」型の全称命題を書かない — 例外1件で嘘になる | documentation-quality | [playbook/documentation-quality.md#ace-6-1](./playbook/documentation-quality.md#ace-6-1) |
 | ACE-6-2 | 文書へリンクするときは、リンク先が自分で持っている留保も一緒に運ぶ | documentation-quality | [playbook/documentation-quality.md#ace-6-2](./playbook/documentation-quality.md#ace-6-2) |
+| ACE-8-1 | 規約を書いた PR は、その規約を最初に破る — 規約追加とセルフチェックを同じコミットに入れる | documentation-quality | [playbook/documentation-quality.md#ace-8-1](./playbook/documentation-quality.md#ace-8-1) |
+| ACE-8-2 | チーム外の人が入る瞬間、個人設定に置いたルールは「緩い」のではなく「存在しない」 | knowledge-management | [playbook/knowledge-management.md#ace-8-2](./playbook/knowledge-management.md#ace-8-2) |
 
 ## Changelog
+
+### [1.5.0] - 2026-08-15
+
+#### 追加
+
+- ACE-8-1: 規約を書いた PR はその規約を最初に破る（Issue #7 / PR #8）
+- ACE-8-2: 個人設定のルールは外部メンバーには存在しないのと同じ（Issue #7 / PR #8）
 
 ### [1.4.0] - 2026-08-15
 
