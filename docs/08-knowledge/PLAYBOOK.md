@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.0.0"
+version: "1.1.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-15"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 0
+ace_entry_count: 3
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -219,10 +219,19 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 
 | エントリID | タイトル                                                                                                                                                                    | Category              | 参照先                                                                                       |
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------- |
-
-（エントリはまだありません。最初の `/ace-curate` 実行時に追記されます）
+| ACE-2-1 | テンプレート文書で危険なのは空のプレースホルダーではなく、確定事項と矛盾する「もっともらしい汎用記述」 | documentation-quality | [playbook/documentation-quality.md#ace-2-1](./playbook/documentation-quality.md#ace-2-1) |
+| ACE-2-2 | 「未適用テンプレート」の警告は索引ではなく各ファイル本体に置く — 索引を通らない到達経路があるため | documentation-quality | [playbook/documentation-quality.md#ace-2-2](./playbook/documentation-quality.md#ace-2-2) |
+| ACE-2-3 | `Closes #N` は develop 向け PR では発火しない — Git Flow では Issue クローズを手動前提で設計する | process | [playbook/process.md#ace-2-3](./playbook/process.md#ace-2-3) |
 
 ## Changelog
+
+### [1.1.0] - 2026-08-15
+
+#### 追加
+
+- ACE-2-1: テンプレート文書の「もっともらしい汎用記述」が確定事項と矛盾する（Issue #1 / PR #2）
+- ACE-2-2: 未適用テンプレートの警告は索引ではなく本体に置く（Issue #1 / PR #2）
+- ACE-2-3: `Closes #N` は develop 向け PR では発火しない（Issue #1 / PR #2）
 
 ### [1.0.0] - 2026-08-15
 
