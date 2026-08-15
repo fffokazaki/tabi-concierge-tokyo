@@ -1,10 +1,11 @@
 ---
 title: "DEPLOYMENT"
-version: "1.0.0"
+version: "1.1.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-15"
+changeImpact: "low"
 ---
 
 # DEPLOYMENT.md - デプロイメント・運用ガイド
@@ -16,6 +17,8 @@ updated: "2026-08-15"
 ## 📖 構成
 
 > 下表の各ファイルは初期セット外です。必要になった時点で `${CLAUDE_PLUGIN_ROOT}/docs-template/05-operations/deployment/<ファイル名>` からコピーしてください。
+>
+> **例外**: `deployment/ace-cycle.md` は `/ace-setup` により**配置済み**（本リポジトリ向けの修正が入っているため、テンプレートからの上書きコピーをしないこと）。
 
 | ドキュメント                                | 内容                                              | 推奨読み順     |
 | ------------------------------------------- | ------------------------------------------------- | -------------- |
@@ -26,7 +29,7 @@ updated: "2026-08-15"
 | `deployment/automated-code-review.md`       | 自動コードレビュー（Claude Code + Husky）         | ⭐⭐⭐⭐ -     |
 | `deployment/agent-deletion-prevention-harness.md` | 削除事故防止ハーネス設計                     | ⭐⭐⭐⭐ -     |
 | `deployment/knowledge-management.md`        | ナレッジ体系化（マージ後・cleanup後）             | ⭐⭐⭐⭐ 3rd   |
-| `deployment/ace-cycle.md`                   | ACEサイクル（Playbook増分更新）                   | ⭐⭐⭐⭐ 3.5th |
+| `deployment/ace-cycle.md`                   | ACEサイクル（Playbook増分更新）**✅ 配置済み — コピー不要** | ⭐⭐⭐⭐ 3.5th |
 | `deployment/ace-autonomous.md`              | ACE autonomous（subagent + worktree、任意）       | ⭐⭐⭐ 3.6th   |
 | `deployment/ai-tools-integration.md`        | AIツール統合設定                                  | ⭐⭐⭐ -       |
 | `deployment/ci-cd.md`                       | CI/CDパイプライン                                 | ⭐⭐⭐ 4th     |
@@ -269,6 +272,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.1.0] - 2026-08-15
+
+#### 変更
+
+- `deployment/ace-cycle.md` を「配置済み・コピー不要」と明記（`/ace-setup` で配置し本リポジトリ向けの修正を加えているため、テンプレートからの上書きコピーで巻き戻るのを防ぐ。Issue #3）
 
 ### [1.0.0] - 2026-08-15
 
