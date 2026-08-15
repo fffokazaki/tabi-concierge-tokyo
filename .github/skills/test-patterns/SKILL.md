@@ -1,8 +1,8 @@
 ---
 name: test-patterns
 description: >-
-  Guides test implementation following the test pyramid (75% unit, 20%
-  integration, 5% E2E), Arrange-Act-Assert pattern, and project coverage
+  Guides test implementation following the test pyramid (70% unit, 20%
+  integration, 10% E2E), Arrange-Act-Assert pattern, and project coverage
   thresholds (branches 70%, functions 80%, lines 80%, statements 80%).
   Covers test naming conventions, test independence, mock and stub patterns,
   test data management with fixtures and builders, and CI integration.
@@ -23,19 +23,19 @@ TESTING.md で定義されたパターンと基準を適用する。
 
 ```
          /\
-        /E2E\        (5%)  - クリティカルパス100%
+        /E2E\        (10%)  - クリティカルパス100%
        /------\
       /統合テスト\    (20%) - 60%以上カバレッジ
      /----------\
-    /ユニットテスト\  (75%) - 80%以上カバレッジ
+    /ユニットテスト\  (70%) - 80%以上カバレッジ
    /--------------\
 ```
 
 | テスト種別     | 比率 | カバレッジ目標       | 優先度 |
 | -------------- | ---- | -------------------- | ------ |
-| ユニットテスト | 75%  | 80%以上              | 高     |
+| ユニットテスト | 70%  | 80%以上              | 高     |
 | 統合テスト     | 20%  | 60%以上              | 中     |
-| E2Eテスト      | 5%   | クリティカルパス100% | 高     |
+| E2Eテスト      | 10%  | クリティカルパス100% | 高     |
 
 ## 2. カバレッジ閾値
 

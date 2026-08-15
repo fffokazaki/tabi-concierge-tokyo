@@ -5,7 +5,6 @@ status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-15"
-changeImpact: "medium"
 ---
 
 # PATTERNS.md - 実装パターンガイド
@@ -599,6 +598,8 @@ async function fetchWithRetry(url: string) {
 ## 11. 配置判断（Decision Tree）
 
 新機能・新モジュール追加時の「どこに書くか」の判断は [DECISION_TREE.md](./DECISION_TREE.md) に委ねる。
+
+> **本プロジェクトでの注意（2026-08-15 時点）**: DECISION_TREE.md は Web API バックエンド前提のサンプルのままで未適用。固有化するまでは [MASTER.md](../MASTER.md)「ディレクトリ構造」と [ARCHITECTURE.md](../02-design/ARCHITECTURE.md) §3 を配置判断の根拠にすること。
 
 本セクションは索引であり、実体は DECISION_TREE.md 側で維持する。
 

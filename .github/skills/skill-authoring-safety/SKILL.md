@@ -169,5 +169,5 @@ temp や cleanup を扱うスキルでは、必ず「安全上の必須ルール
 
 ## 8. 関連ドキュメント
 
-- [../../../05-operations/deployment/agent-deletion-prevention-harness.md](../../../05-operations/deployment/agent-deletion-prevention-harness.md)
-- [../../../MASTER.md](../../../MASTER.md)
+- `docs/05-operations/deployment/agent-deletion-prevention-harness.md` — 本リポジトリ未導入。必要時に ff-dev-toolkit プラグインの `docs-template/05-operations/deployment/agent-deletion-prevention-harness.md` からコピーする
+- [MASTER.md](../../../docs/MASTER.md)

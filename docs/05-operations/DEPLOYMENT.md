@@ -5,7 +5,6 @@ status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-15"
-changeImpact: "low"
 ---
 
 # DEPLOYMENT.md - デプロイメント・運用ガイド

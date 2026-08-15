@@ -1,5 +1,9 @@
 # VALIDATION.md - 検証・品質保証ガイド
 
+> ⚠️ **テンプレート未具体化（本プロジェクト未適用・2026-08-15 時点）**
+> 本ファイルは ff-dev-toolkit の汎用テンプレートのままで、記述例には本プロジェクトで採用しない技術（DB・REST/GraphQL・コンテナ等）が含まれます。特に「L3: データ整合性（データベース制約・トリガー）」は、DB を使わない本プロジェクトには該当しません（[DATABASE.md](../02-design/DATABASE.md)）。
+> 本プロジェクトの確定事項は [MASTER.md](../MASTER.md)・[ARCHITECTURE.md](../02-design/ARCHITECTURE.md)・[CONSTRAINTS.md](../01-context/CONSTRAINTS.md) が SSOT。実装着手時に本ファイルを実態へ書き換えること。
+
 ## 1. 検証戦略
 
 ### 検証レベル

@@ -5,7 +5,6 @@ status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-15"
-changeImpact: "low"
 ---
 
 # AI駆動開発マスタードキュメント
@@ -146,7 +145,7 @@ AIが生成したドキュメント・コードは、以下のタイミングで
 
 - **プロジェクト名**: 旅コンシェルジュTOKYO（Tabi Concierge Tokyo）
 - **バージョン**: Frontmatter の `version` を参照
-- **使用AIツール**: Claude Code, GitHub Copilot, Cursor
+- **使用AIツール**: Claude Code（本リポジトリの主要ツール）。GitHub Copilot / Cursor は未使用（使う場合は設定ファイルとあわせて追記する）
 - **最終更新日**: Frontmatter の `updated` を参照
 - **チーム**: チームshiwata（株式会社フィールフロウ / FeelFlow Inc.）
 - **文脈**: 東京都知事杯オープンデータ・ハッカソン 2026 参加プロジェクト
@@ -254,10 +253,10 @@ tabi-concierge-tokyo/
     └── skills/           # プロジェクト固有の開発規約スキル（レビュー・エラーハンドリング・テスト）
 ```
 
-- `frontend/` `mcp-server/` `data/` は**未作成**（Phase 2 で作成する予定の構成）。実際に作成した時点で本節を実態に合わせて更新すること
+- `frontend/` `mcp-server/` `data/` は**未作成**（POC 実装時（〜2026-08-23）に作成する予定の構成）。実際に作成した時点で本節を実態に合わせて更新すること
 - 層構成ではなく「クライアント／サーバー」で分割している。この境界は ADR-003 の設計判断そのものであり、安易に跨がせない
 - 層構成の詳細は [ARCHITECTURE.md](./02-design/ARCHITECTURE.md)、テスト戦略は [TESTING.md](./04-quality/TESTING.md) を参照
-- 新規コードの配置判断は決定木で行う（詳細: [DECISION_TREE.md](./03-implementation/DECISION_TREE.md)）
+- 新規コードの配置判断は、上記のディレクトリ構造と [ARCHITECTURE.md](./02-design/ARCHITECTURE.md) §3 を根拠にする。[DECISION_TREE.md](./03-implementation/DECISION_TREE.md) は Web API バックエンド前提のサンプルのままで**本プロジェクトに未適用**のため、固有化するまで必須の判断根拠にしない
 - `docs/` 配下の詳細構造は本書の「ドキュメント構造ガイド（AIツール向け）」を参照（重複記載しない）
 
 ## コード生成ルール
@@ -266,11 +265,11 @@ tabi-concierge-tokyo/
 
 1. **型安全性**: すべての変数、関数、APIレスポンスに明示的な型定義を付与
 2. **エラーハンドリング**: try-catchブロックで適切にエラーを処理し、ユーザーフレンドリーなメッセージを表示
-3. **テストコード**: 各機能に対して単体テストを作成（カバレッジ80%以上目標）
+3. **テストコード**: 各機能に対して単体テストを作成（カバレッジ目標の内訳は `.github/skills/test-patterns/SKILL.md` を SSOT とする: branches 70% / functions・lines・statements 各 80%）
 4. **コメント**: 複雑なロジックには日本語でコメントを追加
 5. **リーダブルコード**: 単一責任の原則に従い、関数は30行以内に収める
 6. **マジックナンバー禁止**: 意味のある数値/文字列の直接埋め込みを禁止。必ず名前付き定数または設定から注入し、単位・範囲を明示（詳細は `PATTERNS.md` を参照）
-7. **配置判断**: 新機能追加時の「どこに書くか」は決定木で判断（詳細: [DECISION_TREE.md](./03-implementation/DECISION_TREE.md)）。言語別の雛形（例: TypeScript）が用意されている場合は、実装前に `${CLAUDE_PLUGIN_ROOT}/docs-template/03-implementation/templates/README.md` からコピーして使う（初期セット外・必要時にコピー。SKELETON を直接 import しない）。
+7. **配置判断**: 新機能追加時の「どこに書くか」は「ディレクトリ構造」節と [ARCHITECTURE.md](./02-design/ARCHITECTURE.md) §3 で判断する（[DECISION_TREE.md](./03-implementation/DECISION_TREE.md) は本プロジェクト未適用のサンプル。固有化後に判断根拠へ昇格させる）。言語別の雛形（例: TypeScript）が用意されている場合は、実装前に `${CLAUDE_PLUGIN_ROOT}/docs-template/03-implementation/templates/README.md` からコピーして使う（初期セット外・必要時にコピー。SKELETON を直接 import しない）。
 
 ### 命名規則
 
@@ -317,19 +316,21 @@ tabi-concierge-tokyo/
 
 詳細は [ROADMAP.md](./07-project-management/ROADMAP.md)・[TASKS.md](./07-project-management/TASKS.md) を参照。
 
-### Phase 1: MVP（提出まで / 〜2026-08-23）
+> **Phase 番号の SSOT は [ROADMAP.md](./07-project-management/ROADMAP.md)**。本節はその Phase 2 以降を実装観点で並べ直したもので、独自の採番はしない。
+
+### Phase 2: POC 実装・提出準備（〜2026-08-23）
 
 1. オープンデータをダウンロードしてアプリに組み込む（POC 実証）
 2. MCP 最小3ツール（データセット検索・集計・出典取得）とフロントからの接続
 3. 代表エリア（渋谷・上野）の画面イメージと、出典付き回答の縦貫通
 
-### Phase 2: 拡張機能（First Stage 〜 Final Stage）
+### Phase 3〜4: 拡張機能（First Stage 収録 〜 Final Stage 準備）
 
 1. 未回答ログの分類とデータ公開リクエストへの変換
 2. スキャン（画像認識＋文化ガイド）の実装
 3. 介助者モード・音声対応
 
-### Phase 3: 最適化・基盤開放
+### Final Stage 以降: 最適化・基盤開放
 
 1. 同梱データから動的取り込みへの移行判断
 2. MCP サーバーの外部公開（翌年参加者への開放）
@@ -407,7 +408,12 @@ tabi-concierge-tokyo/
 
 ## Spec Kit 運用ガイド（AI Spec Driven 拡張）
 
-本リポジトリは AI Spec Driven Development を GitHub Spec Kit 風の粒度管理で拡張し、仕様ライフサイクルとLLM利活用を統合する。
+> ⚠️ **本節は未導入（2026-08-15 時点）**
+> 本節が前提とする `docs/specs/`・`scripts/build-spec-index.mjs`・MCP ツール `spec_lookup` / `spec_search` は**本リポジトリに存在しません**。記載の手順をそのまま実行しないこと。
+> また本節に登場する MCP ツール名は Spec Kit 側の別体系であり、本プロジェクトのツール（[API.md](./02-design/API.md) の最小3つ）とは無関係です。メトリクス例（`login_success_rate` 等）も認証前提のサンプルで、本プロジェクトは POC で認証を実装しません。
+> 仕様の粒度管理が必要になった時点で `docs/specs/` を導入し、本節を有効化すること。
+
+Spec Kit 風の粒度管理で AI Spec Driven Development を拡張し、仕様ライフサイクルとLLM利活用を統合する運用ガイド（導入後に適用）。
 
 ### 目的
 
@@ -551,11 +557,11 @@ metrics:
 - [01-context/CONSTRAINTS.md](./01-context/CONSTRAINTS.md) - 制約条件（提出要件・締切・ライセンス・著作権ルール）
 - [02-design/API.md](./02-design/API.md) - MCP ツール仕様
 - [02-design/DATABASE.md](./02-design/DATABASE.md) - データ資産（DB 未使用の判断と利用オープンデータ一覧）
-- [03-implementation/CONVENTIONS.md](./03-implementation/CONVENTIONS.md) - 命名・コーディング規約
-- [03-implementation/INTEGRATIONS.md](./03-implementation/INTEGRATIONS.md) - 外部連携
-- [03-implementation/DECISION_TREE.md](./03-implementation/DECISION_TREE.md) - 新規コードの配置判断
-- [03-implementation/FALLBACK.md](./03-implementation/FALLBACK.md) - フォールバック戦略
-- [04-quality/VALIDATION.md](./04-quality/VALIDATION.md) - 検証・バリデーション方針
+- [03-implementation/CONVENTIONS.md](./03-implementation/CONVENTIONS.md) - 命名・コーディング規約（テンプレート未具体化・実装着手時に具体化）
+- [03-implementation/INTEGRATIONS.md](./03-implementation/INTEGRATIONS.md) - 外部連携（テンプレート未具体化・実装着手時に具体化）
+- [03-implementation/DECISION_TREE.md](./03-implementation/DECISION_TREE.md) - 新規コードの配置判断（Web API 前提の SAMPLE・本プロジェクト未適用）
+- [03-implementation/FALLBACK.md](./03-implementation/FALLBACK.md) - フォールバック戦略（テンプレート未具体化・実装着手時に具体化）
+- [04-quality/VALIDATION.md](./04-quality/VALIDATION.md) - 検証・バリデーション方針（テンプレート未具体化・DB 前提の記述を含む）
 - [06-reference/GLOSSARY.md](./06-reference/GLOSSARY.md) - 用語集（プロジェクト固有用語を含む）
 - [06-reference/DECISIONS.md](./06-reference/DECISIONS.md) - 設計判断記録（ADR-001〜005）
 - [07-project-management/ROADMAP.md](./07-project-management/ROADMAP.md) - ロードマップ
@@ -666,7 +672,7 @@ AI: DEPLOYMENT.md（索引）→ deployment/self-review.md を読み込み
 
 コア7文書（MASTER/PROJECT/ARCHITECTURE/DOMAIN/PATTERNS/TESTING/DEPLOYMENT）およびプロジェクトで追加した文書に以下の YAML Frontmatter を付与する。Frontmatter が文書のメタデータの正式なソースとなる。
 
-> **注**: `docs/specs/` 配下の仕様ファイルには Spec Kit 運用ガイドの Front Matter スキーマ（6ステータス: draft/review/approved/implementing/done/deprecated）を適用すること。上記 Frontmatter ルールはコア7文書および拡張文書に適用される。
+> **注**（`docs/specs/` は本リポジトリ未導入。導入後に適用）: `docs/specs/` 配下の仕様ファイルには Spec Kit 運用ガイドの Front Matter スキーマ（6ステータス: draft/review/approved/implementing/done/deprecated）を適用すること。上記 Frontmatter ルールはコア7文書および拡張文書に適用される。
 
 必須フィールド:
 

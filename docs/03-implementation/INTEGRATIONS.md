@@ -1,5 +1,9 @@
 # INTEGRATIONS.md - 統合・連携ガイド
 
+> ⚠️ **テンプレート未具体化（本プロジェクト未適用・2026-08-15 時点）**
+> 本ファイルは ff-dev-toolkit の汎用テンプレートのままで、記述例には本プロジェクトで採用しない技術（DB・REST/GraphQL・コンテナ等）が含まれます。本プロジェクトの実際の外部連携は東京都オープンデータカタログのみです（[CONSTRAINTS.md](../01-context/CONSTRAINTS.md) §6）。
+> 本プロジェクトの確定事項は [MASTER.md](../MASTER.md)・[ARCHITECTURE.md](../02-design/ARCHITECTURE.md)・[CONSTRAINTS.md](../01-context/CONSTRAINTS.md) が SSOT。実装着手時に本ファイルを実態へ書き換えること。
+
 ## 1. AI開発ツール統合
 
 ### 1.1 Claude Skills統合
@@ -393,12 +397,16 @@ class NotificationService {
         attachments: message.attachments,
       });
     } catch (error) {
-      logger.error("Failed to send Slack notification", error);
-      // Slackへの通知失敗はサイレントに処理
+      // 通知失敗でメイン処理を止めないが、握りつぶさない。
+      // 必ず構造化ログに残し、失敗回数を監視対象にする（MASTER.md「エラーハンドリング方針」）
+      logger.error("Failed to send Slack notification", { error, message });
     }
   }
 
-  async notifyError(error: Error, context: any): Promise<void> {
+  async notifyError(
+    error: Error,
+    context: Record<string, unknown>,
+  ): Promise<void> {
     await this.sendSlackNotification({
       text: "⚠️ エラーが発生しました",
       blocks: [

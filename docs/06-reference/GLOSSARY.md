@@ -1,10 +1,12 @@
 # GLOSSARY.md - 用語集
 
+> 「A」〜「Z」の節は**一般的な技術用語の辞書**であり、本プロジェクトでの採用を意味しない。本プロジェクトが実際に使う技術は [MASTER.md](../MASTER.md)「技術スタック」と [ARCHITECTURE.md](../02-design/ARCHITECTURE.md) §8 が SSOT。固有の用語は末尾の「プロジェクト固有用語」を参照。
+
 ## A
 
 ### API (Application Programming Interface)
 
-アプリケーション間でデータや機能を共有するためのインターフェース。本プロジェクトではREST APIとGraphQL APIを使用。
+アプリケーション間でデータや機能を共有するためのインターフェース。本プロジェクトの外部インターフェースは REST / GraphQL ではなく **MCP ツール**（[API.md](../02-design/API.md)）。
 
 ### API Gateway
 
@@ -16,7 +18,7 @@ JavaScriptの非同期処理を同期的に記述するための構文。Promise
 
 ### Authentication (認証)
 
-ユーザーが誰であるかを確認するプロセス。本プロジェクトではJWT/OAuth2.0を使用。
+ユーザーが誰であるかを確認するプロセス。本プロジェクトの POC では利用者認証を実装しない（[CONSTRAINTS.md](../01-context/CONSTRAINTS.md) §5）。
 
 ### Authorization (認可)
 
@@ -48,7 +50,7 @@ JavaScriptの非同期処理を同期的に記述するための構文。Promise
 
 ### Container
 
-アプリケーションとその依存関係をパッケージ化した実行環境。Dockerを使用。
+アプリケーションとその依存関係をパッケージ化した実行環境。本プロジェクトはサーバーレス（Cloudflare）のためコンテナを使用しない。
 
 ### CORS (Cross-Origin Resource Sharing)
 

@@ -1,5 +1,9 @@
 # CONVENTIONS.md - コーディング規約
 
+> ⚠️ **テンプレート未具体化（本プロジェクト未適用・2026-08-15 時点）**
+> 本ファイルは ff-dev-toolkit の汎用テンプレートのままで、記述例には本プロジェクトで採用しない技術（DB・REST/GraphQL・コンテナ等）が含まれます。コード例の言語・構成もサンプルです。
+> 本プロジェクトの確定事項は [MASTER.md](../MASTER.md)・[ARCHITECTURE.md](../02-design/ARCHITECTURE.md)・[CONSTRAINTS.md](../01-context/CONSTRAINTS.md) が SSOT。実装着手時に本ファイルを実態へ書き換えること。
+
 ## 0. ドキュメント命名規則
 
 このプロジェクトでは、AIツールが効率的に理解できるよう、統一されたドキュメント命名規則を採用しています。

@@ -70,10 +70,12 @@ graph TD
 
 ### コンポーネント間通信
 
+> ツール名は仮称（SSOT: [API.md](./API.md) §3）。
+
 ```mermaid
 graph LR
     FE[React UI] -->|MCP: search_datasets| CON[コンシェルジュ]
-    CON -->|MCP: aggregate| CON
+    CON -->|MCP: aggregate_dataset| CON
     CON -->|MCP: get_provenance| FE
     CON -->|未回答イベント| ENG[欠損検知・還元エンジン]
 ```
@@ -309,11 +311,13 @@ graph LR
 
 ### ロードマップ
 
+Phase 番号は [ROADMAP.md](../07-project-management/ROADMAP.md) に準拠する（独自採番はしない）。
+
 | フェーズ | 時期 | 追加機能/改善 |
 | -------- | ---- | ------------- |
-| Phase 1（提出） | 〜2026-08-23 | POC 実装・代表エリア画面・MCP 最小3ツール |
-| Phase 2（First Stage） | 2026-08-26〜30 | 2分プレゼン収録（ライブデモ不可） |
-| Phase 3（Final Stage） | 〜2026-10-17 | 介助者モード・音声対応、都への API 公開提案、動的取り込みの検討 |
+| Phase 2（POC 実装・提出準備） | 〜2026-08-23 | POC 実装・代表エリア画面・MCP 最小3ツール |
+| Phase 3（First Stage 収録） | 2026-08-26〜30 | 2分プレゼン収録（ライブデモ不可） |
+| Phase 4（Final Stage 準備） | 〜2026-10-17 | 介助者モード・音声対応、都への API 公開提案、動的取り込みの検討 |
 
 ## Changelog
 
