@@ -76,3 +76,40 @@ Issue があれば件名に含める: feat: #12 ...
 - 2026-08-23（日）17:00 提出締切 / 16:9 資料 / 画面キャプチャ 1600×900px / 利用オープンデータ最大10件
 - First Stage 収録は **2分厳守・ライブデモ不可**
 - BGM 不可 / Google Map のロゴ・帰属表示を隠さない / 引用は出典明記
+
+## Team & frontend working notes (Sho)
+
+> Added by Sho (frontend) as working notes. The rules above (「絶対に守ること」「Git Workflow」「技術スタックの注意」) take precedence wherever this section would otherwise conflict with them.
+
+### Team
+- **Sho (me)** — frontend development, GUI design, team coordination. Works at a directive/PM level rather than writing every line — gives Claude Code instructions and reviews/steers rather than hand-coding everything.
+- **Futoshi Okazaki** — backend development (Open Data Concierge), project proposal, presentation script. Owns the GitHub repo.
+- **Shiwata** — network/infrastructure, presentation delivery.
+- Recruiting ~1–2 more engineers.
+
+(Elsewhere in this repo's docs the team is referred to collectively as「チームshiwata」— see [docs/MASTER.md](docs/MASTER.md).)
+
+### Stack, in plain terms
+- Frontend: React. Backend: Cloudflare (free tier) + Cloudflare D1. See「技術スタックの注意」above for exact versions — that table is the source of truth, not this section.
+- Deployment: push to GitHub → auto-deploys to Cloudflare.
+- Known issue: Python isn't usable on Cloudflare in the current setup (backend-side, Okazaki's problem to solve).
+- This repo is a single repo with `src/` (frontend) + `worker/` (backend) + `docs/` — the official `@cloudflare/vite-plugin` layout (see「ディレクトリ構造」in docs/MASTER.md), not a `frontend/`/`backend/` directory split.
+
+### Design reference
+The established design source-of-truth is `public/showcase/`（see「デザインの正典」in docs/MASTER.md）. Sho also has `Design.pdf` / `Design_English.pdf` reference files not yet added to the repo — once added, they'll go in a `design/` folder. Until then, match layout/colors/copy to `public/showcase/`. [Cloudinary export to be added once shared.]
+
+### Sho's current TODOs
+- [ ] Build out frontend screens/components based on the design reference (`public/showcase/` for now; `design/Design.pdf` once added)
+- [ ] Generate a list of all API endpoints the frontend needs (request/response shape, purpose) and share with Okazaki — cross-check against [docs/02-design/API.md](docs/02-design/API.md), which already defines the MCP tool surface
+- [ ] Add Cloudinary design URL/ZIP to `design/` once available
+
+### Working conventions
+- Branch/PR workflow: already governed by「絶対に守ること」#5 and「Git Workflow」above — branch off `develop`, PR into `develop`, never commit directly to `main`/`develop`. No separate policy needed; just confirm day-to-day cadence with Okazaki as the repo owner.
+- (Add naming/style conventions here as they get established)
+
+### Working with Sho (communication style)
+Sho is the PM/frontend lead — he works at a directive level (reviews and steers) rather than hand-coding everything, and is still learning parts of the toolchain (Git, npm, terminal usage). When working with him:
+- Before running commands or making changes, briefly explain in plain English what you're about to do and why — a sentence or two, not a tutorial
+- When something fails or needs diagnosis, explain what you found and what it means, not just raw command output
+- Clearly distinguish actions that change files/state (installs, commits, pushes) from ones that just check/read something
+- Keep it concise — this is about clarity, not narrating every step
