@@ -25,6 +25,8 @@ ACE (Agentic Context Engineering) Playbook は、開発プロセスで得た知�
 
 GitHub Discussions が「人間が読むためのナラティブ（物語的記録）」であるのに対し、Playbook は「AIが参照するための構造化知見（delta方式: 差分のみを末尾追記する更新方式）」として機能します。
 
+> **本リポジトリでの ACE 実行は任意（2026-08-15 時点・[ADR-006](../06-reference/DECISIONS.md)）**: PoC 段階のため、PR ごとの ACE 実行を必須ゲートにしていない。メンテナ環境では必須運用とし、それ以外の作業者は任意とする。
+>
 > **本リポジトリでの前提（2026-08-15 時点）**: `scripts/ace/*.ts`（`check-entry-format` / `check-category-size` / `ace-reuse-report` 等）と対応する `npm run ace:*` は**未導入**。
 > 以降に登場する「機械ゲートが強制する / exit 1 でブロックする」という記述は、**導入後に有効になる規約**として読むこと。エントリが増えて自動検証が必要になった時点で、ff-dev-toolkit の `docs-template/scripts/ace/` から導入する。
 

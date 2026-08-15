@@ -1,6 +1,6 @@
 ---
 title: "MASTER"
-version: "1.1.0"
+version: "1.2.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -251,7 +251,7 @@ tabi-concierge-tokyo/
 ├── mcp-server/           # オープンデータ・コンシェルジュ（MCP サーバー。検索・集計・出典取得）
 ├── data/                 # 利用オープンデータ（最大10件）の実体とメタ情報（カタログURL・タイトル・取得日）
 └── .github/
-    └── skills/           # プロジェクト固有の開発規約スキル（レビュー・エラーハンドリング・テスト）
+    └── skills/           # プロジェクト固有の開発規約スキル4本（レビュー・エラーハンドリング・テスト・スキル作成安全性）
 ```
 
 - `frontend/` `mcp-server/` `data/` は**未作成**（POC 実装時（〜2026-08-23）に作成する予定の構成）。実際に作成した時点で本節を実態に合わせて更新すること
@@ -379,23 +379,29 @@ tabi-concierge-tokyo/
 5. デプロイ（DEPLOYMENT.md参照）
 6. 開発環境最適化（DEPLOYMENT.md「開発環境の最適化」参照）
 
-## AI仕様駆動Git Workflow
+## Git Workflow（軽量フロー）
 
-本プロジェクトでは、Git FlowをベースとしたAI開発ツール最適化ワークフローを採用しています。
+PoC 段階のため軽量な運用を採用しています（[ADR-006](./06-reference/DECISIONS.md)）。外部メンバーも作業できるよう、実行に外部プラグインを必要としません。
 
-**基本フロー**: Issue → Branch → Commit → **Self-Review** → PR → Review → Merge → Cleanup → **Knowledge (ACE + Discussions)** → Next Task
+**基本フロー**: Branch → Commit → PR → Review → Squash Merge → Cleanup
 
-詳細は [DEPLOYMENT.md](./05-operations/DEPLOYMENT.md#1-ai仕様駆動git-workflow) を参照してください。
+| 項目 | 扱い |
+| --- | --- |
+| Issue 起票 | **任意**（仕様に議論が必要なとき・作業を分担するときだけ） |
+| ブランチ | **必須**。`develop` から切る。`main` / `develop` への直接コミットは禁止 |
+| PR | **必須**。base は `develop`。本文に「何を・なぜ」を書く |
+| レビュー | 変更内容に応じて実施。設計判断・出典強制に触れる変更は必ず見る |
+| マージ | squash merge。マージ後にブランチを削除 |
+| ACE（知見記録） | **任意**（[PLAYBOOK.md](./08-knowledge/PLAYBOOK.md)）。メンテナ環境では必須運用 |
 
 **重要なポイント**:
 
-- すべての作業はIssueから開始
-- ブランチ名: `feature/{issue-number}-{description}`
-- コミットメッセージにドキュメント参照を含める（例: `docs/MASTER.md:29`）
-- **【重要】PR作成前にセルフレビューを実施** - AIツールを活用してコーディング規約・仕様整合性・テスト充実度を事前確認
-- AIがPRレビュー指摘を自動読み取り・対応
-- **【重要】マージ後にナレッジを体系化** - ACE Playbook に構造化知見を追記（AIツール向け）し、重要な知見は GitHub Discussions にも記録（人間向け）
-- ロードマップ更新と次タスク提案
+- ブランチ名: `feature/` `fix/` `chore/` `docs/` + 短い説明（Issue があれば `feature/#12-...`）
+- 「マージして」等の指示のタイミングで、ブランチ作成 → コミット → PR → マージ → クリーンアップまで**一括実行してよい**（ステップごとの確認は不要）
+- `Closes #N` はデフォルトブランチ（現在は `main`）へのマージでのみ発火するため、`develop` マージ時の Issue クローズは**手動**
+- メンテナ環境ではセルフレビュー（ローカル + クロスモデル）と AC 照合を含むフル運用を継続する
+
+外部メンバー向けの手順は [CONTRIBUTING.md](../CONTRIBUTING.md)、AI ツール向けの指示は [CLAUDE.md](../CLAUDE.md) / [AGENTS.md](../AGENTS.md) にあります。
 
 ## AIへのプロンプト補助（貼り付け用）
 
@@ -568,6 +574,12 @@ metrics:
 - [07-project-management/ROADMAP.md](./07-project-management/ROADMAP.md) - ロードマップ
 - [07-project-management/TASKS.md](./07-project-management/TASKS.md) - タスク管理
 - [07-project-management/RISKS.md](./07-project-management/RISKS.md) - リスク管理
+
+### リポジトリルートの運用ファイル
+
+- [CLAUDE.md](../CLAUDE.md) - Claude Code 向けの作業指示（単独で完結。外部プラグイン非依存）
+- [AGENTS.md](../AGENTS.md) - Codex ほか AI エージェント向けの作業指示（CLAUDE.md と同内容）
+- [CONTRIBUTING.md](../CONTRIBUTING.md) - 人間の作業者向けの手順（外部メンバー向け）
 
 ### 企画・プレゼン資料（`/init-docs` 以前から存在）
 
@@ -753,6 +765,13 @@ Changelog エントリには以下のカテゴリを使用する（[Keep a Chang
 - [ ] 定数の配置が層責務に沿っている（Domain/Application/Infrastructure）
 
 ## Changelog
+
+### [1.2.0] - 2026-08-15
+
+#### 変更
+
+- Git Workflow を軽量フロー（Issue 任意 / ブランチ・PR 必須 / ACE 任意）へ変更し、外部メンバー向けの運用ファイル（CLAUDE.md / AGENTS.md / CONTRIBUTING.md）への導線を追加（ADR-006 / Issue #7）
+- `.github/skills/` の説明を4本に修正
 
 ### [1.1.0] - 2026-08-15
 

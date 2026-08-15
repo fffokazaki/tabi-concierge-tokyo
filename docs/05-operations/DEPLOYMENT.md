@@ -1,6 +1,6 @@
 ---
 title: "DEPLOYMENT"
-version: "1.1.0"
+version: "1.2.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -72,20 +72,27 @@ gh discussion create --category "..." --title "..." --body-file knowledge.md
 
 ### 概要
 
-Git Flowベースで、**テスト・セルフレビュー（PR前）** と **ACEナレッジ体系化（マージ後・cleanup後）** を組み込んだワークフロー。
+Git Flow ベースの軽量フロー。PoC 段階のため Issue 起票と ACE を任意とし、ブランチと PR を必須としている（[ADR-006](../06-reference/DECISIONS.md)）。SSOT は [MASTER.md](../MASTER.md)「Git Workflow（軽量フロー）」。
 
-### 主要ステップ（10 ステップ）
+### 主要ステップ（既定 = 軽量フロー）
 
-1. **Issue作成** - 作業の起点
-2. **ブランチ作成** - `feature/{issue-num}-{name}`
+1. **Issue作成** - **任意**（仕様に議論が必要なとき・作業を分担するときだけ）
+2. **ブランチ作成** - **必須**。`develop` から。`feature/` `fix/` `chore/` `docs/` + 短い説明
 3. **実装・コミット** - AI駆動開発
-4. **テスト・検証** - `npm run quality:local` 等
-5. **セルフレビュー** ← 詳細: `deployment/self-review.md`
-6. **PR作成** - 構造化されたPR本文
-7. **レビュー対応** - **レビュワーへのコメント必須**（修正内容・理由・変更箇所を明記）← 詳細: `deployment/git-workflow.md`
-8. **マージ** - Squash推奨
-9. **クリーンアップ** - ブランチ削除、`git fetch --prune`
-10. **ナレッジ体系化** - マージ後・cleanup 後 ← 詳細: `deployment/knowledge-management.md` | ACE Playbook: `deployment/ace-cycle.md`
+4. **PR作成** - **必須**。base は `develop`。本文に「何を・なぜ」を書く
+5. **レビュー** - 変更内容に応じて実施。設計判断・出典強制に触れる変更は必ず見る
+6. **レビュー対応** - 指摘への対応内容をコメントで残す
+7. **マージ** - Squash 推奨。`develop` マージでは `Closes #N` が発火しないため Issue は手動クローズ
+8. **クリーンアップ** - ブランチ削除、`git fetch --prune`
+9. **ナレッジ体系化（ACE）** - **任意**。メンテナ環境では必須運用 ← ACE Playbook: `deployment/ace-cycle.md`
+
+### メンテナ環境のフル運用（参考）
+
+メンテナは上記に加えて次を実施する。外部プラグイン（ff-dev-toolkit）を前提とするため、**プラグイン非保有者には適用しない**。
+
+- Draft PR を作成してからセルフレビュー（ローカルの多観点レビュー + クロスモデルレビュー）→ 指摘を1 fix commit に束ねる → `gh pr ready`
+- マージ直前に AC 照合ゲート（Issue の受け入れ条件とチェックボックスの照合・完了報告コメント）
+- マージ後に cleanup とナレッジ抽出（ACE）
 
 ### 詳細ドキュメント
 
@@ -272,6 +279,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.2.0] - 2026-08-15
+
+#### 変更
+
+- 主要ステップを軽量フロー（Issue 任意 / ブランチ・PR 必須 / ACE 任意）へ変更し、メンテナ環境のフル運用を別枠に分離（ADR-006 / Issue #7）
 
 ### [1.1.0] - 2026-08-15
 
