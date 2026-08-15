@@ -13,12 +13,13 @@
 ### 開発環境制約
 
 - **プログラミング言語**: TypeScript。フロントエンドは React 19、Worker は workerd 上で動く（Node ではない）
-- **フレームワーク**: React 18。CDN（unpkg）依存はローカル React バンドルと JSX 事前変換でオフライン動作を確認済み
-- **データベース**: 使用しない。POC ではダウンロード済みオープンデータをアプリに同梱する（[DATABASE.md](../02-design/DATABASE.md) 参照）
+- **フレームワーク**: React 19 ＋ Vite 8。Worker 側は Hono
+- **注意**: デザインプロトタイプ（`public/showcase/`）は `fonts.googleapis.com` に依存するため**オフラインでは表示が崩れる**。収録前にネットワーク接続を確認すること
+- **データベース**: Cloudflare D1（ADR-007）。オープンデータの格納と未回答ログに用途を限定する（[DATABASE.md](../02-design/DATABASE.md) 参照）
 
 ### インフラ制約
 
-- **ホスティング環境**: 主催者提供スタック（OpenCode ＋ Cloudflare）で完結させる
+- **ホスティング環境**: Cloudflare Workers（アカウント `opendata`・PoC 用の仮アカウント）。<https://tabi-concierge-tokyo.opendata-002.workers.dev>
 - **最大同時接続数**: 未定（First Stage はライブデモ不可のため、収録時点で負荷要件なし）
 - **ストレージ容量**: 利用オープンデータは提出登録の上限に合わせ最大10件に限定
 
@@ -127,7 +128,7 @@
 | ---------- | ---- | -------- | ------ |
 | Cloudflare（Workers AI 含む） | バックエンド実行環境 | 主催者提供スタックの利用枠内で完結させる | 未定 |
 | OpenCode | バックエンド開発スタック | 同上 | 未定 |
-| unpkg（CDN） | React 等の配信 | オフライン時に取得不能。ローカルバンドル＋JSX事前変換で回避済み | ローカルバンドル（適用済み） |
+| Google Fonts | デザインプロトタイプ（`/showcase/`）のフォント | オフライン時に表示が崩れる。実装側（`src/`）はシステムフォントにフォールバックする | セルフホスト（必要時） |
 | 地図表示（OpenStreetMap 系） | 地図描画 | Google Map を使う場合はロゴ・帰属表示を隠さない | Google Maps（帰属表示必須） |
 
 ### 外部API

@@ -1,10 +1,11 @@
 ---
 title: "ARCHITECTURE"
-version: "1.0.0"
+version: "1.1.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-15"
+updated: "2026-08-16"
+changeImpact: "high"
 ---
 
 # ARCHITECTURE.md - システムアーキテクチャ設計書
@@ -29,14 +30,16 @@ updated: "2026-08-15"
 
 ```mermaid
 graph TD
-    U[訪日観光客] --> FE["📱 旅コンシェルジュTOKYO<br/>(React 18 / 5機能)"]
-    FE -->|MCP ツール呼び出し| MCP["🔌 MCP サーバー境界<br/>(最小3ツール)"]
-    MCP --> BE["🧠 オープンデータ・コンシェルジュ<br/>メタデータRAG + Text-to-SQL + 出典強制"]
-    BE --> DS[("東京都オープンデータ<br/>POC: ダウンロード済み最大10件")]
-    BE --> LOG["未回答ログ"]
+    U[訪日観光客] --> FE["📱 React SPA<br/>(ブラウザで動く)"]
+    FE -->|"HTTPS / JSON (/api/*)"| W
+    AI["🤖 Claude Desktop 等<br/>AI クライアント"] -->|"MCP (/mcp)"| W
+    W["☁️ Cloudflare Worker (workerd)<br/>Hono ルーティング"] --> CORE["worker/core/<br/>検索 + 集計 + 出典強制"]
+    CORE --> DS[("D1<br/>オープンデータ + gaps")]
+    CORE --> WAI["Workers AI"]
+    CORE --> LOG["未回答ログ (gaps)"]
     LOG -->|分類・集計| REQ["データ公開リクエスト<br/>→ 東京都 / GovTech東京"]
     REQ -.->|データが増える| DS
-    FUTURE["翌年のハッカソン参加者<br/>(別クライアント)"] -.->|同じ MCP| MCP
+    FUTURE["翌年のハッカソン参加者<br/>(別クライアント)"] -.->|同じ /mcp| W
 ```
 
 ### レイヤー構成
@@ -61,7 +64,7 @@ graph TD
 
 | コンポーネント名 | 責務 | 技術スタック | インターフェース |
 | ---------------- | ---- | ------------ | ---------------- |
-| 旅コンシェルジュTOKYO（FE） | 5機能の UI 提供、旅行者プロフィールの収集、出典リンクの表示 | React 18 ＋ dc-runtime | MCP クライアント |
+| 旅コンシェルジュTOKYO（FE） | 5機能の UI 提供、旅行者プロフィールの収集、出典リンクの表示 | React 19 ＋ Vite（ブラウザで動く） | `/api/*` を fetch |
 | MCP サーバー境界 | コンシェルジュ機能をツールとして公開する | MCP | データセット検索 / 集計 / 出典取得（[API.md](./API.md) 参照） |
 | メタデータRAG | 約9,600件のメタデータから質問に合うデータセットを特定する | OpenCode ＋ Cloudflare Workers AI | 内部呼び出し |
 | Text-to-SQL | 特定したデータセットに対しその場で集計する | 同上 | 内部呼び出し |
@@ -86,8 +89,8 @@ graph LR
 
 | データストア | 種類 | 用途 | 選定理由 |
 | ------------ | ---- | ---- | -------- |
-| 同梱オープンデータ（最大10件） | 静的ファイル（CSV / GIS） | POC のデータ源 | 2日間のスコープでフル動的取り込みを行わない判断（2026-08-15 合意） |
-| データベース | 未使用 | - | POC では永続化要件がないため。詳細は [DATABASE.md](./DATABASE.md) |
+| Cloudflare D1 | サーバーレス SQLite | オープンデータの格納（Text-to-SQL の実行基盤）と未回答ログ | ADR-007。企画が主張する Text-to-SQL を実際に成立させ、「未回答は必ず記録される」不変条件の保持先を得るため |
+| 静的アセット | Workers Static Assets | SPA と `/showcase/` の配信 | リクエストが無料・無制限で、スクリプトサイズ上限にもカウントされない |
 
 ### データフロー
 
@@ -112,12 +115,17 @@ graph LR
 ```yaml
 環境:
   開発:
-    - 構成: ローカル実行（React バンドル＋JSX事前変換によりオフライン動作を確認済み）
+    - 構成: npm run dev（Vite ＋ @cloudflare/vite-plugin）
+    - 注記: worker/ のコードは本番と同じ workerd 上で動く
   ステージング:
-    - 構成: 未定（本フェーズでは設けない）
+    - 構成: 設けない（本フェーズでは不要）
   本番:
-    - 構成: Cloudflare（主催者提供スタック）。First Stage はライブデモ不可のため常時公開は必須要件ではない
+    - 構成: Cloudflare Workers（アカウント opendata）
+    - URL: https://tabi-concierge-tokyo.opendata-002.workers.dev
+    - 注記: First Stage はライブデモ不可のため、常時公開は必須要件ではない
 ```
+
+デプロイ手順は [DEPLOYMENT.md](../05-operations/DEPLOYMENT.md) を参照。
 
 ### スケーリング戦略
 
@@ -175,16 +183,16 @@ graph LR
 
 | レイヤー | 技術 | バージョン | 選定理由 | ADR |
 | -------- | ---- | ---------- | -------- | --- |
-| Frontend | React | 18.x | UI が実装済み（2026-08-15 動作確認）。追加学習コストなしで実データ化に集中できる | ADR-003 |
-| Frontend Runtime | dc-runtime | 未確認（実装時に確定） | 既存 UI 資産がこの構成で動作しているため | - |
-| Frontend Build | JSX 事前変換 ＋ ローカル React バンドル | - | CDN（unpkg）依存を外し、オフラインでも動作させるため | - |
-| Protocol | MCP（Model Context Protocol） | 未確認（実装時に確定） | バックエンドを「旅行アプリ専用API」ではなく再利用可能な基盤として公開するため | ADR-003 |
-| Backend Stack | OpenCode | 未確認（主催者提供スタック） | 主催者公認スタックで完成度と実現性を担保するため | ADR-002 |
-| Cloud / Runtime | Cloudflare（Workers AI 含む） | マネージド | 同上 | ADR-002 |
-| Database | 使用しない | - | POC ではダウンロード済みデータを同梱するため | ADR-004 |
+| Frontend | React | 19.2.x | ブラウザで動く。workerd では動かない（SPA 構成） | ADR-008 |
+| Frontend Build | Vite ＋ @cloudflare/vite-plugin | 8.2.x / 1.52.x | dev・preview・本番のすべてで worker コードが workerd 上で動く | - |
+| Server routing | Hono | 4.13.x | Workers ネイティブ。軽量 | - |
+| Runtime（本番） | workerd | `compatibility_date: 2026-08-15` | Node ではない。バージョンは日付で固定する | - |
+| Runtime（ツール） | Node.js | 24（`.nvmrc` / `engines`） | wrangler と Vite を起動するホスト。本番には存在しない | - |
+| Protocol | MCP（`createMcpHandler`） | 未着手（Step 5） | `McpAgent` は deprecated。ステートレス実装のため Durable Objects が不要 | ADR-008 |
+| Database | Cloudflare D1 | 未着手（Step 2） | Text-to-SQL の実行基盤 ＋ 未回答ログの保持先 | ADR-007 |
+| AI | Cloudflare Workers AI | 未着手（Step 3） | `@cf/meta/llama-3.1-8b-instruct-fp8-fast`（無料枠で叩ける回数が約4倍） | ADR-002 |
+| Cloud | Cloudflare Workers | マネージド | 主催者提供スタック | ADR-002 |
 | CI/CD | 未定 | - | 提出期限までのスコープに含めない | - |
-
-> バージョンが「未確認」の項目は、POC 実装に着手した時点で実際に利用するバージョンを確認して更新すること（推測で埋めない）。
 
 ### バージョン管理方針
 
@@ -197,15 +205,15 @@ graph LR
 #### フロントエンド
 
 - **フレームワーク**: React 18.x（日本語版・英語版の2バージョンが実装済み）
-- **状態管理**: 未確認（既存 UI 実装に準ずる）
-- **UIライブラリ**: 未確認（既存 UI 実装に準ずる）
+- **状態管理**: 未導入（必要になった時点で判断）
+- **UIライブラリ**: 使用しない。プレーン CSS（`src/index.css`）でプロトタイプの oklch 配色を踏襲
 - **モックデータ**: 渋谷（ナイトライフ）・上野（浅草・家族）のシナリオが SCENARIOS として実装済み。これをオープンデータ由来の内容へ差し替えることで代表エリアの画面イメージを作成できる
 
 #### バックエンド
 
-- **言語**: 未確認（OpenCode ＋ Cloudflare 構成に準ずる）
-- **フレームワーク**: OpenCode ＋ Cloudflare Workers AI
-- **APIゲートウェイ**: MCP サーバーが外部インターフェースを兼ねる
+- **言語**: TypeScript（`worker/`）
+- **フレームワーク**: Hono。実行環境は workerd
+- **外部インターフェース**: `/api/*`（JSON）と `/mcp`（MCP）の二面（ADR-008）
 
 #### インフラ
 
@@ -320,6 +328,15 @@ Phase 番号は [ROADMAP.md](../07-project-management/ROADMAP.md) に準拠す�
 | Phase 4（Final Stage 準備） | 〜2026-10-17 | 介助者モード・音声対応、都への API 公開提案、動的取り込みの検討 |
 
 ## Changelog
+
+### [1.1.0] - 2026-08-16
+
+#### 変更
+
+- 構成図・コンポーネント表・データストア・デプロイ構成・技術スタックを、実装着手後の実態へ更新
+- D1 を採用（ADR-007）。「DB 未使用」から変更
+- `/api/*` と `/mcp` の二面公開を反映（ADR-008）
+- 「未確認」だったバージョンを実値へ確定
 
 ### [1.0.0] - 2026-08-15
 
