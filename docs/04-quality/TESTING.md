@@ -1,10 +1,11 @@
 ---
 title: "TESTING"
-version: "1.0.0"
+version: "1.1.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-15"
+changeImpact: "low"
 ---
 
 # TESTING.md - テスト戦略ガイド
@@ -703,6 +704,12 @@ test("update user", () => {
 ```
 
 ## Changelog
+
+### [1.1.0] - 2026-08-15
+
+#### 変更
+
+- 冒頭のバナー文言を共通形式「⚠️ テンプレート未具体化」へ統一（Issue #7）
 
 ### [1.0.0] - 2026-08-15
 

@@ -1,10 +1,11 @@
 ---
 title: "PATTERNS"
-version: "1.0.0"
+version: "1.1.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-15"
+changeImpact: "medium"
 ---
 
 # PATTERNS.md - 実装パターンガイド
@@ -680,6 +681,12 @@ ACE Playbook で `Helpful >= 5` に達した知見を、`/ace-refine` が蒸留�
 - 該当なし（昇格発生後に追記）
 
 ## Changelog
+
+### [1.1.0] - 2026-08-15
+
+#### 追加
+
+- 冒頭に「テンプレート未具体化」バナーを追加。MASTER.md のコード生成ルールが本ファイルを実装の判断根拠として名指ししており、バナー不在が誤認経路になっていたため（ADR-006 / Issue #7）
 
 ### [1.0.0] - 2026-08-15
 

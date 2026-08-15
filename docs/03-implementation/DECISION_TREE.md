@@ -1,10 +1,11 @@
 ---
 title: "DECISION_TREE"
-version: "1.0.0"
+version: "1.1.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-15"
+changeImpact: "low"
 ---
 
 > ⚠️ **テンプレート未具体化（本プロジェクト未適用・2026-08-15 時点）**
@@ -151,6 +152,12 @@ Q6. 横断的関心事？（Cross-cutting）
 
 - `infrastructure/` `domain/` `application/` などの配置パスを変更した際は、必ず本ファイルの Q1〜Q6 とチェックリストを同時更新する
 - 変更は Changelog に記録する
+
+### [1.1.0] - 2026-08-15
+
+#### 変更
+
+- バナー文言を「⚠️ SAMPLE — テンプレートです」から共通形式「⚠️ テンプレート未具体化」へ統一（Issue #7）
 
 ### [1.0.0] - 2026-08-15
 

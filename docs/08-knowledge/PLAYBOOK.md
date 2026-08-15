@@ -1,6 +1,6 @@
 ---
 title: "PLAYBOOK"
-version: "1.3.0"
+version: "1.4.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-15"
@@ -230,6 +230,12 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-6-2 | 文書へリンクするときは、リンク先が自分で持っている留保も一緒に運ぶ | documentation-quality | [playbook/documentation-quality.md#ace-6-2](./playbook/documentation-quality.md#ace-6-2) |
 
 ## Changelog
+
+### [1.4.0] - 2026-08-15
+
+#### 変更
+
+- 冒頭に「本リポジトリでの ACE 実行は任意（メンテナ環境では必須）」を明記（ADR-006）
 
 ### [1.3.0] - 2026-08-15
 

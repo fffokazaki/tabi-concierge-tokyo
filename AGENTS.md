@@ -32,6 +32,12 @@ PoC 段階のため軽量な運用を採用している。判断の背景は [AD
 
 コミットメッセージは Conventional Commits・日本語。
 
+## ドキュメントを変更したとき
+
+- frontmatter を持つ文書（`MASTER.md` / `PROJECT.md` / `ARCHITECTURE.md` / `DOMAIN.md` / `PATTERNS.md` / `TESTING.md` / `DEPLOYMENT.md` / `DECISION_TREE.md` / `FALLBACK.md` / `PLAYBOOK.md`）を変更したら、`version`・`updated`・`changeImpact` と末尾の Changelog を**同時に**更新する
+- `version` は SemVer。節の追加・方針変更は minor、文言修正は patch。`changeImpact` は小文字（`low` / `medium` / `high`）
+- 冒頭に「⚠️ テンプレート未具体化」の注記がある文書は、まだ本プロジェクト向けに書き換えられていない。**そこに書かれている技術（DB・REST/GraphQL・コンテナ等）を本プロジェクトの決定と誤認しない**
+
 ## 技術スタックの注意
 
 | 項目 | 実態 |
@@ -44,6 +50,10 @@ PoC 段階のため軽量な運用を採用している。判断の背景は [AD
 | コンテナ | 使用しない（サーバーレス） |
 
 冒頭に「⚠️ テンプレート未具体化」の注記がある文書は本プロジェクト向けに書き換えられていない。そこに書かれた技術を本プロジェクトの決定と誤認しないこと。
+
+## コミットメッセージ
+
+Conventional Commits を日本語で書く。Issue があれば件名に含める（`feat: #12 ...`）。
 
 ## 提出物に関わる制約
 
