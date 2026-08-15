@@ -580,13 +580,19 @@ metrics:
 - 04-quality/GUARDRAILS_THREE_LAYERS.md — ガードレール3層（仕様・自動チェック・人間レビュー）
 - 04-quality/SECURITY_REVIEW_CHECKLIST.md — セキュリティレビューチェックリスト（PR用）
 
-### ナレッジベース（初期セット外・`/ace-setup` が作成）
+### ナレッジベース
+
+本リポジトリに配置済み（`/ace-setup` により作成）:
+
+- [08-knowledge/PLAYBOOK.md](./08-knowledge/PLAYBOOK.md) - ACE Playbook（AIツール向け構造化知見。索引 + 運用ルール）
+- [05-operations/deployment/ace-cycle.md](./05-operations/deployment/ace-cycle.md) - ACE サイクル運用手順（Generate → Reflect → Curate）
+
+未導入（必要時に ff-dev-toolkit の `docs-template/` からコピー）:
 
 - 08-knowledge/LESSONS_LEARNED.md — 開発過程で得た知見・解決策
 - 08-knowledge/TROUBLESHOOTING.md — トラブルシューティング集
 - 08-knowledge/BEST_PRACTICES.md — ベストプラクティス集
 - 08-knowledge/FAQ.md — よくある質問と回答
-- 08-knowledge/PLAYBOOK.md — ACE Playbook（AIツール向け構造化知見）
 
 ### 開発プロセスガイド（初期セット外・必要時にコピー）
 
