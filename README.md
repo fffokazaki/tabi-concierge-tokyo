@@ -57,7 +57,19 @@
 
 ### Git Workflow
 
-Issue 起票 → `develop` からブランチ作成 → 実装 → Draft PR → セルフレビュー（ローカル + クロスモデル）→ ready → AC 照合 → squash merge → cleanup → ACE。
+PoC 段階のため**軽量フロー**を既定としている（[ADR-006](docs/06-reference/DECISIONS.md)。この方針は PR #8 自身から適用した）。実行に外部プラグインを必要としないので、チーム外の方もこのリポジトリだけで作業できる。
+
+```
+develop からブランチ作成 → 実装・コミット → PR 作成 → レビュー → squash merge → ブランチ削除
+```
+
+| 項目 | 扱い |
+| --- | --- |
+| Issue 起票 | **任意**（仕様に議論が必要なとき・作業を分担するときだけ） |
+| ブランチ・PR | **必須**（`main` / `develop` への直接コミットは禁止） |
+| ACE（知見記録） | **任意**。メンテナ環境では必須運用 |
+
+手順の詳細は [CONTRIBUTING.md](CONTRIBUTING.md)（人間向け）、[CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md)（AI ツール向け）にある。いずれも単独で完結しており、個人設定やプラグインに依存しない。
 
 デフォルトブランチは `main`、統合ブランチは `develop`。`Closes #N` はデフォルトブランチ（現在は `main`）へのマージでのみ発火するため、`develop` マージ時の Issue クローズは手動で行う。
 

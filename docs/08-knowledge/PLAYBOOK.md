@@ -1,6 +1,6 @@
 ---
 title: "PLAYBOOK"
-version: "1.3.0"
+version: "1.4.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-15"
@@ -25,6 +25,8 @@ ACE (Agentic Context Engineering) Playbook は、開発プロセスで得た知�
 
 GitHub Discussions が「人間が読むためのナラティブ（物語的記録）」であるのに対し、Playbook は「AIが参照するための構造化知見（delta方式: 差分のみを末尾追記する更新方式）」として機能します。
 
+> **本リポジトリでの ACE 実行は任意（2026-08-15 時点・[ADR-006](../06-reference/DECISIONS.md)）**: PoC 段階のため、PR ごとの ACE 実行を必須ゲートにしていない。メンテナ環境では必須運用とし、それ以外の作業者は任意とする。
+>
 > **本リポジトリでの前提（2026-08-15 時点）**: `scripts/ace/*.ts`（`check-entry-format` / `check-category-size` / `ace-reuse-report` 等）と対応する `npm run ace:*` は**未導入**。
 > 以降に登場する「機械ゲートが強制する / exit 1 でブロックする」という記述は、**導入後に有効になる規約**として読むこと。エントリが増えて自動検証が必要になった時点で、ff-dev-toolkit の `docs-template/scripts/ace/` から導入する。
 
@@ -228,6 +230,12 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-6-2 | 文書へリンクするときは、リンク先が自分で持っている留保も一緒に運ぶ | documentation-quality | [playbook/documentation-quality.md#ace-6-2](./playbook/documentation-quality.md#ace-6-2) |
 
 ## Changelog
+
+### [1.4.0] - 2026-08-15
+
+#### 変更
+
+- 冒頭に「本リポジトリでの ACE 実行は任意（メンテナ環境では必須）」を明記（ADR-006）
 
 ### [1.3.0] - 2026-08-15
 
