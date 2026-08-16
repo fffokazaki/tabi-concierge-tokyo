@@ -1,8 +1,10 @@
-import type { DragEvent } from "react";
+import type { DragEvent, KeyboardEvent } from "react";
 import type { Stop } from "../types";
 
 type RouteStopCardProps = {
   stop: Stop;
+  /** 表示用の時間帯ラベル。並べ替え後の位置（pos）から導出される値で、stop 自体の属性ではない。 */
+  time: string;
   selected: boolean;
   isDragOver: boolean;
   onSelect: () => void;
@@ -12,13 +14,25 @@ type RouteStopCardProps = {
   onDragEnd: () => void;
 };
 
-export function RouteStopCard({ stop, selected, isDragOver, onSelect, onDragStart, onDragOver, onDrop, onDragEnd }: RouteStopCardProps) {
+export function RouteStopCard({ stop, time, selected, isDragOver, onSelect, onDragStart, onDragOver, onDrop, onDragEnd }: RouteStopCardProps) {
   const modifier = isDragOver ? " stop-card--drag-over" : selected ? " stop-card--selected" : "";
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onSelect();
+    }
+  };
+
   return (
     <div
       className={`stop-card${modifier}`}
       draggable
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
       onClick={onSelect}
+      onKeyDown={handleKeyDown}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
@@ -36,7 +50,7 @@ export function RouteStopCard({ stop, selected, isDragOver, onSelect, onDragStar
       </div>
       <div className="stop-card__thumb" aria-hidden="true" />
       <div className="stop-card__body">
-        <div className="stop-card__time">{stop.time}</div>
+        <div className="stop-card__time">{time}</div>
         <div className="stop-card__place">{stop.place}</div>
         <div className="stop-card__note">{stop.note}</div>
       </div>

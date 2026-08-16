@@ -20,6 +20,7 @@ export function InterestChips({ label, hint, options, selected, onToggle }: Inte
             key={tag}
             type="button"
             className={`chip${selected.includes(tag) ? " chip--active" : ""}`}
+            aria-pressed={selected.includes(tag)}
             onClick={() => onToggle(tag)}
           >
             {tag}

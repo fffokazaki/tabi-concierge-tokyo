@@ -2,11 +2,14 @@ import type { Scenario } from "./types";
 
 /**
  * 仮データ。public/showcase/Japanese version.dc.html の SCENARIOS をそのまま移植したもので、
- * 東京都オープンデータではない（出典を持たない）。
+ * 東京都オープンデータではない。営業時間・料金・マナーの内容は一切検証しておらず、
+ * 実在の情報として正しいことを保証しない。
  *
- * Step 3/5（worker/core・MCP接続）で search_datasets → aggregate_dataset → get_provenance の
- * 結果に置き換える。それまでは EtiquetteTip.source を設定しないことで、
- * 出典のない内容を「出典付き回答」として表示しない（CLAUDE.md 絶対に守ること #2）。
+ * Step 5（MCP接続）が終わるまでは本番に出したままにしてはならない。このままでは
+ * search_datasets → aggregate_dataset → get_provenance の結果に置き換わっていない、
+ * ただの見た目確認用データである。EtiquetteTip.source は常に未設定にしてあるが、
+ * それだけでは「出典なしの内容を出典付きに見せない」という目的を画面上で十分に
+ * 果たせないため、PlanScreen.tsx 側にも「デモデータです」の可視ラベルを別途出している。
  */
 export const MOCK_SCENARIOS: Scenario[] = [
   {
@@ -14,9 +17,9 @@ export const MOCK_SCENARIOS: Scenario[] = [
     label: "浅草・上野+ラーメン",
     interest: "ラーメン",
     prompt: "「明日は浅草と上野、ラーメンが好き」",
+    schedule: ["午前9:00", "午前11:30", "午後1:00"],
     stops: [
       {
-        time: "午前9:00",
         place: "浅草寺（浅草）",
         note: "団体客が来る前の早い時間がおすすめです。",
         etiquette: [
@@ -25,7 +28,6 @@ export const MOCK_SCENARIOS: Scenario[] = [
         ],
       },
       {
-        time: "午前11:30",
         place: "上野公園",
         note: "春は桜の名所。年間を通じて博物館も充実しています。",
         etiquette: [
@@ -34,7 +36,6 @@ export const MOCK_SCENARIOS: Scenario[] = [
         ],
       },
       {
-        time: "午後1:00",
         place: "ラーメン二郎 上野店",
         note: "ラーメンがお好きなので — 公園から徒歩5分、濃厚な豚骨スープで地元でも人気です。",
         etiquette: [
@@ -54,9 +55,9 @@ export const MOCK_SCENARIOS: Scenario[] = [
     label: "渋谷ナイトライフ",
     interest: "ナイトライフ",
     prompt: "「夜の渋谷、ナイトライフに興味あり」",
+    schedule: ["午後6:00", "午後8:00", "午後10:00"],
     stops: [
       {
-        time: "午後6:00",
         place: "SHIBUYA SKY展望台",
         note: "日没直前が一番きれいな光になります。",
         etiquette: [
@@ -65,7 +66,6 @@ export const MOCK_SCENARIOS: Scenario[] = [
         ],
       },
       {
-        time: "午後8:00",
         place: "のんべい横丁",
         note: "小さなバーが並ぶ狭い路地。多くの店は4〜6席ほどです。",
         etiquette: [
@@ -74,7 +74,6 @@ export const MOCK_SCENARIOS: Scenario[] = [
         ],
       },
       {
-        time: "午後10:00",
         place: "ゴールデン街（新宿）",
         note: "ナイトライフに興味があるので — テーマ性のある小さなバーが数十軒。席料がかかる店もあります。",
         etiquette: [
@@ -94,9 +93,9 @@ export const MOCK_SCENARIOS: Scenario[] = [
     label: "家族でゆったり一日",
     interest: "家族向け",
     prompt: "「子連れで、落ち着いた家族の一日」",
+    schedule: ["午前10:00", "午後1:00", "午後3:30"],
     stops: [
       {
-        time: "午前10:00",
         place: "国立科学博物館（上野）",
         note: "体験型の展示が充実。恐竜コーナーは子どもたちに大人気です。",
         etiquette: [
@@ -105,7 +104,6 @@ export const MOCK_SCENARIOS: Scenario[] = [
         ],
       },
       {
-        time: "午後1:00",
         place: "上野動物園",
         note: "ジャイアントパンダがいます。ベビーカーのレンタルもあります。",
         etiquette: [
@@ -114,7 +112,6 @@ export const MOCK_SCENARIOS: Scenario[] = [
         ],
       },
       {
-        time: "午後3:30",
         place: "谷中銀座",
         note: "落ち着いた時間をご希望なので — 静かな下町の商店街で、たい焼きなど子ども向けの軽食も楽しめます。",
         etiquette: [

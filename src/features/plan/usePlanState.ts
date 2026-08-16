@@ -9,6 +9,8 @@ export type OrderedStop = {
   origIdx: number;
   pos: number;
   stop: Stop;
+  /** activeScenario.schedule[pos] 由来。pos（並べ替え後の位置）に紐づき、stop 自体には持たせない。 */
+  time: string;
   selected: boolean;
   isDragOver: boolean;
 };
@@ -42,6 +44,7 @@ export function usePlanState(scenarios: Scenario[] = MOCK_SCENARIOS) {
     origIdx,
     pos,
     stop: activeScenario.stops[origIdx],
+    time: activeScenario.schedule[pos],
     selected: selIdx === origIdx,
     isDragOver: dragPos === pos,
   }));
@@ -72,7 +75,18 @@ export function usePlanState(scenarios: Scenario[] = MOCK_SCENARIOS) {
 
   const clearStopSelection = () => setSelectedStop((s) => ({ ...s, [scenarioId]: null }));
 
+  /**
+   * ドラッグ&ドロップの並べ替え結果を反映する。呼び出し元（PlanScreen）は
+   * カスタム MIME タイプでドラッグ元を絞り込んでいるが、fromPos/toPos は外部から
+   * 渡ってくる値（dataTransfer 経由）なので、ここでも独立に整数・範囲チェックを行う。
+   * 不正な値は無視し、順序は変更しない。
+   */
   const reorderStop = (fromPos: number, toPos: number) => {
+    const isValidPos = (pos: number) => Number.isInteger(pos) && pos >= 0 && pos < order.length;
+    if (!isValidPos(fromPos) || !isValidPos(toPos)) {
+      console.warn(`reorderStop: 不正な位置を無視しました（fromPos=${fromPos}, toPos=${toPos}, 有効範囲=0-${order.length - 1}）`);
+      return;
+    }
     if (fromPos === toPos) return;
     setStopOrder((s) => {
       const currentOrder = s[scenarioId] ?? activeScenario.stops.map((_, i) => i);
@@ -117,3 +131,24 @@ export function usePlanState(scenarios: Scenario[] = MOCK_SCENARIOS) {
 }
 
 export type PlanState = ReturnType<typeof usePlanState>;
+
+/** TripSetupScreen が実際に使うフィールドだけに絞った型。全量の PlanState を渡しても構造的に満たされる。 */
+export type TripSetupState = Pick<PlanState, "trip" | "bumpCounter" | "setTrip" | "toggleInterest" | "saveTrip">;
+
+/** PlanScreen が実際に使うフィールドだけに絞った型。 */
+export type PlanScreenState = Pick<
+  PlanState,
+  | "scenarios"
+  | "activeScenario"
+  | "orderedStops"
+  | "selectedStopData"
+  | "displayedEtiquette"
+  | "etiquetteTitle"
+  | "tripSummary"
+  | "goSetup"
+  | "selectScenario"
+  | "selectStop"
+  | "clearStopSelection"
+  | "reorderStop"
+  | "setDragOverPos"
+>;

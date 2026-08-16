@@ -1,9 +1,13 @@
 import type { DragEvent } from "react";
 import { RouteStopCard } from "./components/RouteStopCard";
 import { EtiquetteList } from "./components/EtiquetteList";
-import type { PlanState } from "./usePlanState";
+import type { PlanScreenState } from "./usePlanState";
 
-export function PlanScreen({ state }: { state: PlanState }) {
+/** ルートカードの並べ替えドラッグだけを受け付けるための独自 MIME タイプ。
+ *  外部（他アプリのファイル・テキストなど）からのドロップと区別する。 */
+const STOP_DRAG_MIME_TYPE = "application/x-tabi-stop";
+
+export function PlanScreen({ state }: { state: PlanScreenState }) {
   const {
     scenarios,
     activeScenario,
@@ -22,17 +26,22 @@ export function PlanScreen({ state }: { state: PlanState }) {
 
   const handleDragStart = (pos: number) => (e: DragEvent<HTMLDivElement>) => {
     e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", String(pos));
+    e.dataTransfer.setData(STOP_DRAG_MIME_TYPE, String(pos));
   };
 
+  // ルートカード由来のドラッグだけ preventDefault してドロップ可能にする。
+  // 外部ドラッグ（ファイル等）は preventDefault しないので、ブラウザ標準の
+  // 「ドロップ不可」表示のままになる。
   const handleDragOver = (pos: number) => (e: DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes(STOP_DRAG_MIME_TYPE)) return;
     e.preventDefault();
     setDragOverPos(pos);
   };
 
   const handleDrop = (pos: number) => (e: DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes(STOP_DRAG_MIME_TYPE)) return;
     e.preventDefault();
-    const fromPos = Number(e.dataTransfer.getData("text/plain"));
+    const fromPos = Number(e.dataTransfer.getData(STOP_DRAG_MIME_TYPE));
     reorderStop(fromPos, pos);
     setDragOverPos(null);
   };
@@ -60,6 +69,7 @@ export function PlanScreen({ state }: { state: PlanState }) {
             key={scenario.id}
             type="button"
             className={`chip${scenario.id === activeScenario.id ? " chip--active" : ""}`}
+            aria-pressed={scenario.id === activeScenario.id}
             onClick={() => selectScenario(scenario.id)}
           >
             {scenario.label}
@@ -75,10 +85,17 @@ export function PlanScreen({ state }: { state: PlanState }) {
           <span className="route-panel__header-label">あなたのルート</span>
         </div>
 
-        {orderedStops.map(({ origIdx, pos, stop, selected, isDragOver }) => (
+        {/* 営業時間・料金・マナーの内容はすべて仮データで出典を持たない（EtiquetteTip.source 未設定）。
+            出典なしの内容を実データであるかのように見せないため、明示のラベルを出す。 */}
+        <p className="demo-data-notice">
+          デモデータです — 実データにはまだ接続されていません。営業時間・料金などの内容は未検証です。
+        </p>
+
+        {orderedStops.map(({ origIdx, pos, stop, time, selected, isDragOver }) => (
           <RouteStopCard
             key={origIdx}
             stop={stop}
+            time={time}
             selected={selected}
             isDragOver={isDragOver}
             onSelect={() => selectStop(origIdx)}

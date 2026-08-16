@@ -18,6 +18,7 @@ export function ChoiceGroup<T extends string>({ label, hint, options, value, onS
             key={option}
             type="button"
             className={`chip${option === value ? " chip--active" : ""}`}
+            aria-pressed={option === value}
             onClick={() => onSelect(option)}
           >
             {option}

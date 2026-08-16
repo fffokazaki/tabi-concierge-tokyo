@@ -1,10 +1,10 @@
-import { ADULTS_MAX, ADULTS_MIN, BUDGET_OPTIONS, DAYS_MAX, DAYS_MIN, INTEREST_OPTIONS, KIDS_MAX, KIDS_MIN, PACE_OPTIONS, SETTING_OPTIONS } from "./constants";
+import { BUDGET_OPTIONS, COUNTER_BOUNDS, INTEREST_OPTIONS, PACE_OPTIONS, SETTING_OPTIONS } from "./constants";
 import { Counter } from "./components/Counter";
 import { ChoiceGroup } from "./components/ChoiceGroup";
 import { InterestChips } from "./components/InterestChips";
-import type { PlanState } from "./usePlanState";
+import type { TripSetupState } from "./usePlanState";
 
-export function TripSetupScreen({ state }: { state: PlanState }) {
+export function TripSetupScreen({ state }: { state: TripSetupState }) {
   const { trip, bumpCounter, setTrip, toggleInterest, saveTrip } = state;
 
   return (
@@ -20,22 +20,22 @@ export function TripSetupScreen({ state }: { state: PlanState }) {
             label="大人"
             hint="13歳以上"
             value={trip.adults}
-            onDecrement={() => bumpCounter("adults", -1, ADULTS_MIN, ADULTS_MAX)}
-            onIncrement={() => bumpCounter("adults", 1, ADULTS_MIN, ADULTS_MAX)}
+            onDecrement={() => bumpCounter("adults", -1, COUNTER_BOUNDS.adults.min, COUNTER_BOUNDS.adults.max)}
+            onIncrement={() => bumpCounter("adults", 1, COUNTER_BOUNDS.adults.min, COUNTER_BOUNDS.adults.max)}
           />
           <Counter
             label="子ども"
             hint="ペースや行先の選び方が変わります"
             value={trip.kids}
-            onDecrement={() => bumpCounter("kids", -1, KIDS_MIN, KIDS_MAX)}
-            onIncrement={() => bumpCounter("kids", 1, KIDS_MIN, KIDS_MAX)}
+            onDecrement={() => bumpCounter("kids", -1, COUNTER_BOUNDS.kids.min, COUNTER_BOUNDS.kids.max)}
+            onIncrement={() => bumpCounter("kids", 1, COUNTER_BOUNDS.kids.min, COUNTER_BOUNDS.kids.max)}
           />
           <Counter
             label="滞在日数"
             hint="東京で過ごす日数"
             value={trip.days}
-            onDecrement={() => bumpCounter("days", -1, DAYS_MIN, DAYS_MAX)}
-            onIncrement={() => bumpCounter("days", 1, DAYS_MIN, DAYS_MAX)}
+            onDecrement={() => bumpCounter("days", -1, COUNTER_BOUNDS.days.min, COUNTER_BOUNDS.days.max)}
+            onIncrement={() => bumpCounter("days", 1, COUNTER_BOUNDS.days.min, COUNTER_BOUNDS.days.max)}
           />
         </div>
 

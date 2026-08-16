@@ -1,11 +1,11 @@
 import type { Budget, InterestTag, Pace, Setting, Trip } from "./types";
 
-export const ADULTS_MIN = 1;
-export const ADULTS_MAX = 12;
-export const KIDS_MIN = 0;
-export const KIDS_MAX = 8;
-export const DAYS_MIN = 1;
-export const DAYS_MAX = 21;
+/** 同行者カウンター（大人・子ども・滞在日数）の上下限をひとまとめにしたもの。 */
+export const COUNTER_BOUNDS = {
+  adults: { min: 1, max: 12 },
+  kids: { min: 0, max: 8 },
+  days: { min: 1, max: 21 },
+} as const;
 
 export const INTEREST_OPTIONS: InterestTag[] = [
   "ラーメン",

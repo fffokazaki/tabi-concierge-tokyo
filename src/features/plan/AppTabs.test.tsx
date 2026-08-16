@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { AppTabs } from "./AppTabs";
+import { COUNTER_BOUNDS } from "./constants";
 
 describe("AppTabs", () => {
   it("moves from 旅のプロフィール to the briefing screen after ブリーフィングを作成", () => {
@@ -22,6 +23,25 @@ describe("AppTabs", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "すべて表示" }));
     expect(screen.getByText("このルートのマナー")).toBeInTheDocument();
+  });
+
+  it("keeps counters within their configured bounds when wired into the setup screen's actual buttons", () => {
+    render(<AppTabs />);
+
+    // 子どもの初期値は下限（0）。減らそうとしても下限を割らない。
+    const kidsDecrement = screen.getByRole("button", { name: "子どもを減らす" });
+    const kidsRow = kidsDecrement.closest(".counter-row") as HTMLElement;
+    const kidsValue = () => kidsRow.querySelector(".counter-value")?.textContent;
+    expect(kidsValue()).toBe("0");
+    fireEvent.click(kidsDecrement);
+    expect(kidsValue()).toBe("0");
+
+    // 大人を上限を超えて連打しても COUNTER_BOUNDS.adults.max で止まる。
+    const adultsIncrement = screen.getByRole("button", { name: "大人を増やす" });
+    const adultsRow = adultsIncrement.closest(".counter-row") as HTMLElement;
+    const adultsValue = () => adultsRow.querySelector(".counter-value")?.textContent;
+    for (let i = 0; i < COUNTER_BOUNDS.adults.max + 5; i++) fireEvent.click(adultsIncrement);
+    expect(adultsValue()).toBe(String(COUNTER_BOUNDS.adults.max));
   });
 
   it("renders the other tabs as disabled placeholders", () => {
