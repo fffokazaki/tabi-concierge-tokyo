@@ -1,6 +1,6 @@
 ---
 title: "MASTER"
-version: "1.3.1"
+version: "1.3.2"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -589,6 +589,10 @@ metrics:
 - [07-project-management/TASKS.md](./07-project-management/TASKS.md) - タスク管理
 - [07-project-management/RISKS.md](./07-project-management/RISKS.md) - リスク管理
 
+### 追加文書（初期セット外・作業中に追加）
+
+- [02-design/API_REQUIREMENTS.md](./02-design/API_REQUIREMENTS.md) - フロントエンドが必要とするAPI要件（プラン画面）。API.md の3ツールに対する入出力の具体化提案で、ProvenanceSource の確認結果を反映済み
+
 ### リポジトリルートの運用ファイル
 
 - [CLAUDE.md](../CLAUDE.md) - Claude Code 向けの作業指示（単独で完結。外部プラグイン非依存）
@@ -779,6 +783,12 @@ Changelog エントリには以下のカテゴリを使用する（[Keep a Chang
 - [ ] 定数の配置が層責務に沿っている（Domain/Application/Infrastructure）
 
 ## Changelog
+
+### [1.3.2] - 2026-08-16
+
+#### 追加
+
+- 文書索引に [02-design/API_REQUIREMENTS.md](./02-design/API_REQUIREMENTS.md)（フロントエンドのAPI要件・確認結果反映済み）を追加
 
 ### [1.3.1] - 2026-08-16
 
