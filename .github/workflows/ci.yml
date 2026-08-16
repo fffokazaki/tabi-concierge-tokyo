@@ -1,0 +1,41 @@
+name: CI
+
+# develop / main に入る変更を、マージ前に必ず一度は実行する。
+# ローカルの node_modules には package.json が宣言していないパッケージが残ることがあり、
+# 「手元では通る」は根拠にならない。CI は npm ci（ロックファイルどおりの新規インストール）で確かめる。
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+# 同じブランチに続けて push したら、古い実行は打ち切る。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          # ツールチェーンの Node は .nvmrc で一元管理する（workerd のバージョンとは無関係）。
+          node-version-file: .nvmrc
+          cache: npm
+
+      # postinstall で workerd のバイナリが入る。これが無いと worker のテストが動かない。
+      - run: npm ci
+
+      - name: 型検査
+        run: npm run typecheck
+
+      # src/ は jsdom、worker/ は workerd。1コマンドで両方走る。
+      - name: テスト
+        run: npm test
+
+      # 型もテストも通るのにビルドで落ちる構成ミスを、デプロイ前に捕まえる。
+      - name: ビルド
+        run: npm run build
