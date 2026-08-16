@@ -26,9 +26,21 @@ GitHub の closing keyword はデフォルトブランチへのマージでの�
 
 | Category | process | Origin | PR #9 |
 | Date | 2026-08-15 |
-| Helpful | 0 | Harmful | 0 |
+| Helpful | 1 | Harmful | 0 |
 | Status | active |
 
 企画資料と docs 5箇所以上が「UI は実装済み・動作確認済み」と断定していたが、実物は API 呼び出しを組み込めない別 runtime のデザインプロトタイプで、React コードベースは存在しなかった。着手見積もりが根本から変わる種類の誤りであり、**文書間で何度も繰り返されているほど検証されていない可能性がある**（引き写しで増殖するため）。既存資産に依存する計画を立てるときは、資産のファイル一覧を実際に開いて確認してから見積もる。
+
+---
+<a id="ace-18-1"></a>
+
+### ACE-18-1: 「デフォルトブランチは main」を確認せずに前提にしない — closing keyword の挙動はそこで決まる
+
+| Category | process | Origin | PR #18 |
+| Date | 2026-08-16 |
+| Helpful | 0 | Harmful | 0 |
+| Status | active |
+
+GitHub の closing keyword がデフォルトブランチへのマージでのみ発火するのは事実だが、「デフォルト = `main`」は設定値であって既定ではなく、Git Flow を採るリポジトリでも `develop` がデフォルトのことがある。本リポジトリがまさにそれで、`Closes #N` は `develop` マージで普通に発火していたのに、逆の前提（ACE-2-3、本 PR で deprecated 化）がガバナンス文書5箇所へ引き写され、エージェントは毎回不要な手動クローズを試みていた。ブランチ運用の手順を書く前に `gh repo view --json defaultBranchRef` で確定させ、確認日を添えて記述する。
 
 ---

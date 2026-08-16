@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.6.0"
+version: "1.7.0"
 status: "approved"
 created: "2026-08-15"
-updated: "2026-08-15"
+updated: "2026-08-16"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 12
+ace_entry_count: 13
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -233,8 +233,20 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-9-1 | 「実装済み」というドキュメントの記述は、実物を開くまで信じない | process | [playbook/process.md#ace-9-1](./playbook/process.md#ace-9-1) |
 | ACE-9-2 | ランタイムの同一性は、実行中のランタイム自身に答えさせて確認する | testing | [playbook/testing.md#ace-9-2](./playbook/testing.md#ace-9-2) |
 | ACE-9-3 | ローカルに入れたスキル・リファレンスの「推奨 API」も陳腐化する — 公式ドキュメントで裏取りする | tooling | [playbook/tooling.md#ace-9-3](./playbook/tooling.md#ace-9-3) |
+| ACE-18-1 | 「デフォルトブランチは main」を確認せずに前提にしない — closing keyword の挙動はそこで決まる | process | [playbook/process.md#ace-18-1](./playbook/process.md#ace-18-1) |
 
 ## Changelog
+
+### [1.7.0] - 2026-08-16
+
+#### 追加
+
+- ACE-18-1: 「デフォルトブランチは main」を確認せずに前提にしない（PR #18）
+
+#### カウンター更新
+
+- ACE-9-1: Helpful +1（文書間の引き写しで誤りが増殖するパターンを、デフォルトブランチの誤記5箇所として再確認した）
+- ACE-2-3: Status を `deprecated` に変更（前提が本リポジトリに当てはまらないことが判明。ACE-18-1 が置き換える）
 
 ### [1.6.0] - 2026-08-15
 
