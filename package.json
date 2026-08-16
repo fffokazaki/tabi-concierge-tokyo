@@ -13,7 +13,10 @@
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "test:watch": "vitest",
+    "test:frontend": "vitest run --project frontend",
+    "test:worker": "vitest run --project worker",
+    "typecheck": "tsc -b --noEmit",
     "cf-typegen": "wrangler types",
     "prepare": "wrangler types"
   },
@@ -24,6 +27,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.52.1",
+    "@cloudflare/vitest-pool-workers": "^0.21.3",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^26.2.0",
