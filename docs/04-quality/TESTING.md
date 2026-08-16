@@ -1,11 +1,11 @@
 ---
 title: "TESTING"
-version: "1.1.0"
+version: "1.2.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-15"
-changeImpact: "low"
+updated: "2026-08-16"
+changeImpact: "medium"
 ---
 
 # TESTING.md - テスト戦略ガイド
@@ -57,6 +57,53 @@ changeImpact: "low"
 
 - 負荷・同時接続（[PROJECT.md](../01-context/PROJECT.md) §4 で要件未設定）
 - 認証・認可（POC では未実装）
+
+## テスト環境（実装の実態）
+
+> §1 以降はテンプレートの汎用ガイド（Jest・Playwright・k6 などの一般例）。
+> **実際に動いているのはこの節の構成**であり、両者が食い違う場合はこの節が正。
+
+### 実行環境を2つに分ける理由
+
+このリポジトリのコードは2つの異なるランタイムで動く。テストも同じ環境で走らせないと、
+「手元は通るが本番で落ちる」テストになる。
+
+| 対象 | 実行環境 | 設定ファイル | Vitest プロジェクト名 |
+| --- | --- | --- | --- |
+| `src/`（React） | jsdom | `vitest.frontend.config.ts` | `frontend` |
+| `worker/`（Hono） | workerd（`@cloudflare/vitest-pool-workers`） | `vitest.worker.config.ts` | `worker` |
+
+`vitest.config.ts` は上記2つを `projects` でまとめる入口。**`vite.config.ts` は使わない** —
+`cloudflare()` プラグインを含むため、vitest が読むと `resolve.external` の非互換で
+Startup Error になる（テストコード側の不備ではない）。
+
+worker 側の互換設定（`compatibility_date` / `compatibility_flags`）は `wrangler.jsonc` から
+読む。テスト設定に書き写すと本番とずれるため二重管理しない。
+
+### コマンド
+
+```bash
+npm test              # frontend + worker の両方
+npm run test:watch    # 監視モード
+npm run test:frontend # src/ のみ（jsdom）
+npm run test:worker   # worker/ のみ（workerd）
+npm run typecheck     # tsc -b --noEmit（-b が無いと1ファイルも検査されない）
+```
+
+### CI
+
+`.github/workflows/ci.yml` が `develop` / `main` への PR と push で
+`npm ci` → `typecheck` → `test` → `build` を回す。
+
+ローカルの `node_modules` には `package.json` が宣言していないパッケージが
+残ることがあるため、**手元で通ったことは根拠にならない**。CI はロックファイルどおりの
+新規インストールから検証する。
+
+### まだ無いもの（意図的）
+
+- **E2E テスト**（Playwright 等）— 画面が固まっていないため未着手
+- **カバレッジ閾値** — 目標値がプロジェクトとして未決定。§1 の 70/80/80/80 は
+  テンプレートの数値であり、本プロジェクトが合意した基準ではない
 
 ## 1. テスト戦略概要
 
@@ -704,6 +751,14 @@ test("update user", () => {
 ```
 
 ## Changelog
+
+### [1.2.0] - 2026-08-16
+
+#### 追加
+
+- 「テスト環境（実装の実態）」節を追加。2つの実行環境（jsdom / workerd）を分ける理由、
+  コマンド、CI、意図的に未着手のものを記載
+- テンプレート由来のカバレッジ閾値（70/80/80/80）は本プロジェクトの合意ではない旨を明記
 
 ### [1.1.0] - 2026-08-15
 

@@ -15,3 +15,6 @@ dist/
 
 # wrangler types が生成（npm install の prepare で再生成される）
 worker-configuration.d.ts
+
+# tsc -b（typecheck）が生成する差分ビルド情報
+*.tsbuildinfo
