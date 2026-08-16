@@ -1,6 +1,7 @@
 import type { D1Migration } from "@cloudflare/vitest-pool-workers";
 import { applyD1Migrations, env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
+import { UNANSWERED_REASONS } from "../shared/core";
 
 /**
  * TEST_MIGRATIONS は vitest.worker.config.ts がテスト時にだけ注入するバインディング。
@@ -68,8 +69,10 @@ describe("座標の取り違え防止", () => {
 });
 
 describe("未回答ログ（DOMAIN.md §8 不変条件4）", () => {
-  it("API_REQUIREMENTS.md と同じ英語の理由分類だけを受け付ける", async () => {
-    for (const reason of ["data_not_published", "insufficient_granularity", "out_of_area", "other"]) {
+  it("TypeScript 側の理由分類がすべて記録できる（列挙と CHECK 制約のドリフト検知）", async () => {
+    // 値のリストは shared/core.ts から取る。ここに書き写すと、TS 側に5つ目を足したときに
+    // 気づけない（コメントで「同一」と宣言するだけでは、実際にずれても何も壊れない）
+    for (const reason of UNANSWERED_REASONS) {
       const r = await env.DB.prepare(`INSERT INTO gaps (question, reason) VALUES (?, ?)`)
         .bind("上野でおすすめのラーメンは？", reason)
         .run();

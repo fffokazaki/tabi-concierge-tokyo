@@ -1,8 +1,10 @@
 import type {
   AggregateDatasetInput,
   AggregateDatasetOutput,
+  DatasetCandidate,
   GetProvenanceInput,
   GetProvenanceOutput,
+  NonEmpty,
   RepresentativeArea,
   SearchDatasetsInput,
   SearchDatasetsOutput,
@@ -10,7 +12,7 @@ import type {
   UnansweredReason,
 } from "../../shared/core";
 import { REPRESENTATIVE_AREAS } from "../../shared/core";
-import { CATALOG, findEntry, type CatalogEntry, type CatalogSample } from "./catalog";
+import { CATALOG, findEntry, RESTAURANT_DATASET_ID, type CatalogEntry, type CatalogSample } from "./catalog";
 
 /**
  * コア3操作のスタブ実装（Issue #22）。
@@ -24,6 +26,10 @@ import { CATALOG, findEntry, type CatalogEntry, type CatalogSample } from "./cat
  * スタブでも守ること:
  * - 返す出典は実在のカタログデータセット。固定の集計結果も原本CSVに実在する行だけを使う
  * - 答えられないものは HTTP エラーではなく `unanswered` ＋ 理由分類で返す（API.md §4）
+ * - **問われたものと違うものを返さない。** 「それらしい何か」を返すくらいなら答えない
+ *
+ * **`worker/core/` は境界（`parse.ts`）を通らずに直接呼ばれうる**（Step 5 の `/mcp`）。
+ * 入力の検査を境界任せにせず、ここでも壊れた値で不正な応答を作らないようにする。
  */
 
 /** 候補件数の既定値。フロントエンドが1ルートに3〜4停留地を想定している（API_REQUIREMENTS.md §1） */
@@ -32,12 +38,14 @@ export const DEFAULT_SEARCH_LIMIT = 4;
 export const MAX_SEARCH_LIMIT = 10;
 
 /**
- * 「ジャンル指定の飲食店」を表す語。
+ * 「ジャンル指定の飲食」を表す語。
  *
  * 飲食の店舗データは No.8（バリアフリー情報・210件）しかなく、**ジャンルの列を持たない**
  * （22列を実測。DATABASE.md「既知のデータ欠損」）。したがってジャンル単位の問いは
- * 「データ未公開」ではなく「粒度不足」として返す。代表シナリオ「ラーメンが好き」が
- * まさにこれに当たる。
+ * 「データ未公開」ではなく「粒度不足」として返す。代表シナリオ「ラーメンが好き」がこれ。
+ *
+ * 日本語は分かち書きしないため、部分一致は語の境界を見ない。素の「そば」は「〜のそば（近く）」
+ * に当たってしまい、「上野駅のそばの公園」を飲食の問いとして弾いてしまうので入れない。
  */
 const CUISINE_GENRE_TERMS = [
   "ラーメン",
@@ -47,8 +55,8 @@ const CUISINE_GENRE_TERMS = [
   "すし",
   "鮨",
   "焼肉",
-  "そば",
   "蕎麦",
+  "そば屋",
   "うどん",
   "天ぷら",
   "居酒屋",
@@ -58,11 +66,39 @@ const CUISINE_GENRE_TERMS = [
 /**
  * 代表エリア外と判定する地名。網羅ではなく、`area` を明示せず地名だけを書いた質問を
  * `out_of_area` に倒すためのスタブの簡易判定。Step 5 では住所・座標から判定する。
+ *
+ * `notWhen` は誤爆の除外。「銀座線」は浅草・上野を通る地下鉄なので、「銀座線で行けるお寺」を
+ * 対象エリア外にしてはいけない（部分一致が語の境界を見ないことへの対処）。
  */
-const NON_TARGET_AREAS = ["新宿", "池袋", "銀座", "秋葉原", "お台場", "六本木", "吉祥寺", "品川"];
+const NON_TARGET_AREAS: readonly { readonly name: string; readonly notWhen?: readonly string[] }[] = [
+  { name: "新宿" },
+  { name: "池袋" },
+  { name: "銀座", notWhen: ["銀座線"] },
+  { name: "秋葉原" },
+  { name: "お台場" },
+  { name: "六本木" },
+  { name: "吉祥寺" },
+  { name: "品川" },
+];
 
-const includesAny = (haystack: string, needles: readonly string[]): string | undefined =>
+/**
+ * 渋谷で「観光・名所・文化施設」を訊かれた場合に、実測を根拠に `data_not_published` と言える語。
+ *
+ * 渋谷区のカタログ掲載データは17件で、観光ポイント・名所・文化施設に相当するものは
+ * **1件も無い**（2026-08-16 調査・DATABASE.md「渋谷エリアの制約」）。利用中の10件に無いという
+ * 話ではなく、カタログ側に無いことを確かめてあるので、最も強い分類を使ってよい数少ない場面。
+ */
+const SHIBUYA_SIGHTSEEING_TERMS = ["観光", "名所", "史跡", "寺", "神社", "美術館", "博物館", "文化施設"];
+
+/** 最初に見つかった語を返す。どれも含まれなければ undefined */
+const findFirstTerm = (haystack: string, needles: readonly string[]): string | undefined =>
   needles.find((needle) => haystack.includes(needle));
+
+/** 対象エリア外の地名を返す。誤爆語（銀座線など）が一緒に現れる場合は判定しない */
+const findNonTargetArea = (text: string): string | undefined =>
+  NON_TARGET_AREAS.find(
+    (area) => text.includes(area.name) && !area.notWhen?.some((exclusion) => text.includes(exclusion)),
+  )?.name;
 
 const unanswered = (reason: UnansweredReason, message: string): Unanswered => ({
   status: "unanswered",
@@ -73,12 +109,20 @@ const unanswered = (reason: UnansweredReason, message: string): Unanswered => ({
 const isRepresentativeArea = (value: string): value is RepresentativeArea =>
   (REPRESENTATIVE_AREAS as readonly string[]).includes(value);
 
+/** 質問文に現れた代表エリア。複数あれば先に定義した順（上野→浅草→渋谷） */
+const findRepresentativeArea = (text: string): RepresentativeArea | undefined =>
+  REPRESENTATIVE_AREAS.find((area) => text.includes(area));
+
 type ResolvedArea =
   | { kind: "representative"; area: RepresentativeArea }
   | { kind: "out_of_area"; label: string }
   | { kind: "unspecified" };
 
-/** `area` の明示指定を優先し、無ければ質問文から代表エリア名／対象外の地名を拾う。 */
+/**
+ * `area` の明示指定を優先し、無ければ質問文から代表エリア名／対象外の地名を拾う。
+ *
+ * 質問文の中では代表エリアを対象外の地名より優先する（「新宿から上野へ行きたい」は答えられる）。
+ */
 function resolveArea(input: SearchDatasetsInput): ResolvedArea {
   const explicit = input.area?.trim();
   if (explicit) {
@@ -87,10 +131,10 @@ function resolveArea(input: SearchDatasetsInput): ResolvedArea {
       : { kind: "out_of_area", label: explicit };
   }
 
-  const fromQuery = REPRESENTATIVE_AREAS.find((area) => input.query.includes(area));
+  const fromQuery = findRepresentativeArea(input.query);
   if (fromQuery) return { kind: "representative", area: fromQuery };
 
-  const nonTarget = includesAny(input.query, NON_TARGET_AREAS);
+  const nonTarget = findNonTargetArea(input.query);
   return nonTarget ? { kind: "out_of_area", label: nonTarget } : { kind: "unspecified" };
 }
 
@@ -99,7 +143,7 @@ const scoreEntry = (entry: CatalogEntry, haystack: string): number =>
   entry.keywords.filter((keyword) => haystack.includes(keyword)).length +
   (haystack.includes(entry.title) ? 1 : 0);
 
-const toCandidate = (entry: CatalogEntry) => ({
+const toCandidate = (entry: CatalogEntry): DatasetCandidate => ({
   datasetId: entry.datasetId,
   title: entry.title,
   provider: entry.provider,
@@ -108,18 +152,33 @@ const toCandidate = (entry: CatalogEntry) => ({
 });
 
 /**
+ * 候補が1件以上あるときだけ `answered` を作る。
+ *
+ * 戻り値の型が `NonEmpty` なので、空配列から「回答あり」を作ることが**型として不可能**になる
+ * （DOMAIN.md §8 不変条件1）。以前は `limit: 0` で候補ゼロの `answered` が作れていた。
+ */
+function answeredCandidates(entries: readonly CatalogEntry[]): SearchDatasetsOutput | undefined {
+  const [first, ...rest] = entries;
+  if (!first) return undefined;
+  const candidates: NonEmpty<DatasetCandidate> = [toCandidate(first), ...rest.map(toCandidate)];
+  return { status: "answered", candidates };
+}
+
+/**
  * データセット検索。
  *
- * 判定の順番に意味がある。エリア外を先に弾き、次に「ジャンル指定の飲食」を粒度不足として
- * 分けてから、最後にエリアだけの絞り込みへ落とす。順番を変えると、答えられない問い
- * （ラーメン）に対してエリアのデータセット一覧を返してしまい、欠損が見えなくなる。
+ * 判定の順番に意味がある。エリア外を先に弾き、キーワードが当たれば候補を返す。当たらなかった
+ * ときに初めて、ジャンル指定の飲食（粒度不足）・渋谷の観光データ欠損（未公開）・分類指定の
+ * 空振りを分け、最後にエリアだけの絞り込みへ落とす。ジャンル判定をエリアのフォールバックより
+ * 後ろに回すと、答えられない問い（ラーメン）にエリアのデータセット一覧を返して欠損が消える。
  *
  * 既知の制限（スタブ）: 答えられる興味と答えられない興味を1つの質問文に混ぜた場合
- * （例「上野の美術館とラーメン」）は、答えられる候補を返す。欠損を確実に見せたい場合は
- * 興味ごとに呼ぶこと。
+ * （例「上野の美術館とラーメン」）は、答えられる候補だけを返し、ラーメン側の欠損は応答に
+ * 現れない。興味ごとに呼べば検出できる。解消方針は Issue #29。
  */
 export function searchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput {
-  const limit = input.limit ?? DEFAULT_SEARCH_LIMIT;
+  // 境界を通らない直接呼び出しでも壊れた値で応答を作らないよう、ここでも範囲に収める
+  const limit = Math.min(Math.max(Math.trunc(input.limit ?? DEFAULT_SEARCH_LIMIT), 1), MAX_SEARCH_LIMIT);
   const haystack = [input.query, input.area ?? "", input.category ?? ""].join(" ");
 
   const area = resolveArea(input);
@@ -130,84 +189,126 @@ export function searchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
     );
   }
 
-  const inArea = CATALOG.filter((entry) => area.kind === "unspecified" || entry.areas.includes(area.area));
+  const inArea = area.kind === "unspecified" ? CATALOG : CATALOG.filter((entry) => entry.areas.includes(area.area));
   const matched = inArea
     .map((entry) => ({ entry, score: scoreEntry(entry, haystack) }))
     .filter((scored) => scored.score > 0)
     .sort((a, b) => b.score - a.score || a.entry.no - b.entry.no)
     .map((scored) => scored.entry);
 
-  if (matched.length > 0) {
-    return { status: "answered", candidates: matched.slice(0, limit).map(toCandidate) };
-  }
-
-  const genre = includesAny(haystack, CUISINE_GENRE_TERMS);
-  if (genre) {
+  // ジャンル指定の飲食は、飲食店データで答えたことにしない（ジャンルの列が無いため）
+  const genre = findFirstTerm(haystack, CUISINE_GENRE_TERMS);
+  const usable = genre ? matched.filter((entry) => entry.datasetId !== RESTAURANT_DATASET_ID) : matched;
+  if (genre && usable.length === 0) {
     return unanswered(
       "insufficient_granularity",
       `該当するオープンデータがありません。飲食店の店舗データは「東京都内の飲食店のバリアフリー情報」（210件・バリアフリー対応店に限定）のみで、ジャンルの列を持たないため「${genre}」の粒度では答えられません。`,
     );
   }
 
-  // キーワードが1つも当たらなくても、エリアが分かっていればそのエリアを収録した
-  // データセットは事実として提示できる（「上野」だけの質問など）。
-  if (area.kind === "representative" && inArea.length > 0) {
-    return { status: "answered", candidates: inArea.slice(0, limit).map(toCandidate) };
+  const answered = answeredCandidates(usable.slice(0, limit));
+  if (answered) return answered;
+
+  if (area.kind === "representative" && area.area === "渋谷" && findFirstTerm(haystack, SHIBUYA_SIGHTSEEING_TERMS)) {
+    return unanswered(
+      "data_not_published",
+      "該当するオープンデータがありません。渋谷区のカタログ掲載データは17件で、観光ポイント・名所・文化施設に相当するデータは公開されていません（2026-08-16 調査）。",
+    );
   }
 
+  // 分類を明示されたのに1件も当たらなかったときは、エリアだけの一覧へ落とさない。
+  // 落とすと「神社」の問いにトイレや宿泊施設を返すことになる（指定を黙って捨てない）
+  if (input.category?.trim()) {
+    return unanswered(
+      "other",
+      `該当するオープンデータがありません。利用中の10データセットに「${input.category.trim()}」に対応するものがありません。`,
+    );
+  }
+
+  // キーワードが当たらなくても、エリアが分かっていればそのエリアを収録したデータセットは
+  // 事実として提示できる（「上野」だけの質問など）
+  const byArea = area.kind === "representative" ? answeredCandidates(inArea.slice(0, limit)) : undefined;
+  if (byArea) return byArea;
+
   return unanswered(
-    "data_not_published",
+    "other",
     "該当するオープンデータがありません。利用中の10データセットに、この条件に対応するものがありません。",
   );
 }
-
-/**
- * 集計意図にエリア名が入っていればその行を、無ければ先頭の行を返す。
- * 集計表（`samples` が空）では返せる行が無いため undefined になる。
- */
-const pickSample = (entry: CatalogEntry, intent: string): CatalogSample | undefined =>
-  entry.samples.find((sample) => intent.includes(sample.area)) ?? entry.samples.at(0);
 
 /**
  * 出典に添える「実行したクエリ」。
  *
  * スタブは SQL を実行していないので、SQL 風の文字列を返すと「実行した」という嘘になる。
  * 実際に行ったこと（どのスナップショットの何行目を固定で返したか）をそのまま書く。
+ * 行番号はヘッダを除いたデータ行の番号なので、辿る人が1行ずれないよう出力にも明記する。
  */
 const describeQuery = (entry: CatalogEntry, sample: CatalogSample): string =>
-  `固定データ抽出（スタブ）: data/${entry.datasetId}/data.csv（${entry.retrievedAt} 取得・全${entry.rowCount}行）の ${sample.sourceRow} 行目。Step 5 で Text-to-SQL に置き換える。`;
+  `固定データ抽出（スタブ）: data/${entry.datasetId}/data.csv（${entry.retrievedAt} 取得・ヘッダを除く全${entry.rowCount}行）のヘッダを除く ${sample.sourceRow} 行目。Step 5 で Text-to-SQL に置き換える。`;
 
-/** 集計・抽出。固定データから1件を返す。 */
+/**
+ * 集計・抽出。固定データから1件を返す。
+ *
+ * **エリアを指定されたら、そのエリアの行しか返さない。** 一致する行が無いときに先頭行へ
+ * フォールバックすると、「浅草の銭湯」に上野の銭湯を実在する出典つきで返すことになる。
+ * 出典が本物であるぶん誤りが見つけにくく、推測で埋めるより質が悪い（CLAUDE.md 絶対ルール #1・#2）。
+ */
 export function aggregateDataset(input: AggregateDatasetInput): AggregateDatasetOutput {
-  const entry = findEntry(input.datasetId);
+  const datasetId = input.datasetId.trim();
+  const entry = findEntry(datasetId);
   if (!entry) {
+    // オープンデータの欠損ではなく呼び出し側の指定違い。`data_not_published` に混ぜると
+    // 未回答の集計（DOMAIN.md §7）が汚れるため `other` に置く
     return unanswered(
-      "data_not_published",
-      `該当するオープンデータがありません。データセットID「${input.datasetId}」は利用中の10件に含まれていません。`,
+      "other",
+      `該当するオープンデータがありません。データセットID「${datasetId}」は利用中の10件に含まれていません。`,
     );
   }
 
-  const genre = includesAny(input.intent, CUISINE_GENRE_TERMS);
-  if (genre && entry.datasetId === "t000012d0000000063") {
+  const genre = findFirstTerm(input.intent, CUISINE_GENRE_TERMS);
+  if (genre && entry.datasetId === RESTAURANT_DATASET_ID) {
     return unanswered(
       "insufficient_granularity",
       `「${entry.title}」はジャンルの列を持たないため、「${genre}」の粒度では抽出できません。`,
     );
   }
 
-  const sample = pickSample(entry, input.intent);
-  if (!sample) {
+  if (entry.samples.length === 0) {
     return unanswered(
       "insufficient_granularity",
       `「${entry.title}」は施設一覧ではなく集計表のため、個別の地物を抽出できません。`,
     );
   }
 
-  return {
+  // エリアの判定は searchDatasets と揃える。片方だけ対象エリア外を弾くと、
+  // 検索で弾かれた問いが集計では答えられてしまう
+  const nonTarget = findNonTargetArea(input.intent);
+  if (nonTarget) {
+    return unanswered(
+      "out_of_area",
+      `「${nonTarget}」は POC の対象エリア（${REPRESENTATIVE_AREAS.join("・")}）の外です。`,
+    );
+  }
+
+  const extracted = (sample: CatalogSample): AggregateDatasetOutput => ({
     status: "answered",
     result: { name: sample.name, summary: sample.summary },
     query: describeQuery(entry, sample),
-  };
+  });
+
+  const intendedArea = findRepresentativeArea(input.intent);
+  if (!intendedArea) return extracted(entry.samples[0]);
+
+  const sample = entry.samples.find((candidate) => candidate.area === intendedArea);
+  if (sample) return extracted(sample);
+
+  return entry.areas.includes(intendedArea)
+    ? // `areas` にあるのに固定データが無い ＝ スタブ側の欠落。データそのものの欠損と混ぜない
+      unanswered(
+        "other",
+        `「${entry.title}」は「${intendedArea}」を収録していますが、スタブの固定データにその行がありません。`,
+      )
+    : unanswered("data_not_published", `「${entry.title}」は「${intendedArea}」の地物を収録していません。`);
 }
 
 /**
@@ -217,26 +318,36 @@ export function aggregateDataset(input: AggregateDatasetInput): AggregateDataset
  * 黙って落とすと、呼び出し側は「出典が揃った」と誤認したまま画面に出してしまう。
  */
 export function getProvenance(input: GetProvenanceInput): GetProvenanceOutput {
+  // 出典0件の「回答あり」は仕様違反（DOMAIN.md §8 不変条件1）。これは未回答ではなく
+  // 呼び出し側の契約違反なので、`unanswered` の統計に混ぜず例外にする（500 として記録される）
+  if (input.datasetIds.length === 0) {
+    throw new TypeError("getProvenance には1件以上の datasetIds が必要です");
+  }
+
   const resolved: CatalogEntry[] = [];
   const unknown: string[] = [];
   for (const id of input.datasetIds) {
-    const entry = findEntry(id);
+    const entry = findEntry(id.trim());
     if (entry) resolved.push(entry);
     else unknown.push(id);
   }
 
   if (unknown.length > 0) {
     return unanswered(
-      "data_not_published",
+      "other",
       `出典を生成できません。データセットID ${unknown.join("・")} は利用中の10件に含まれていません。`,
     );
   }
-  // 出典0件の「回答あり」は仕様違反（DOMAIN.md §8 不変条件1）。空配列を返さない
-  if (resolved.length === 0) {
-    return unanswered("other", "出典を生成できません。datasetIds が空です。");
+
+  // 同じデータセットを複数回渡されても出典は1つ。重複したチップを画面に出さない
+  const unique = resolved.filter((entry, index) => resolved.indexOf(entry) === index);
+  const [first, ...rest] = unique;
+  if (!first) {
+    // unknown が空かつ datasetIds が非空なら必ず1件以上ある。型の証明のための分岐
+    throw new TypeError("出典を生成できません（到達しないはずの分岐）");
   }
 
-  const sources = resolved.map((entry) => ({
+  const toSource = (entry: CatalogEntry) => ({
     datasetId: entry.datasetId,
     datasetTitle: entry.title,
     provider: entry.provider,
@@ -244,7 +355,7 @@ export function getProvenance(input: GetProvenanceInput): GetProvenanceOutput {
     url: entry.url,
     query: input.query,
     retrievedAt: entry.retrievedAt,
-  }));
+  });
 
-  return { status: "answered", sources };
+  return { status: "answered", sources: [toSource(first), ...rest.map(toSource)] };
 }

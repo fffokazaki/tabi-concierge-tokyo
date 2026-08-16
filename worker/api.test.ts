@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AggregateDatasetOutput, GetProvenanceOutput, SearchDatasetsOutput } from "../shared/core";
-import { postJson } from "./test-support";
+import { DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT } from "./core/operations";
+import { expectAnswered, expectUnanswered, postJson, postRaw, readJson, request } from "./test-support";
 
 /**
  * コア3操作の `/api/*` スタブ（Issue #22）のテスト。
@@ -9,7 +10,12 @@ import { postJson } from "./test-support";
  * 出典は**実在するカタログの値**（ID・提供元・URL・取得日）と一致することまで確かめる。
  */
 
-/** 名所・史跡（台東区）。data/t131067d0000000251/meta.json の実測値 */
+/**
+ * 名所・史跡（台東区）。data/t131067d0000000251/meta.json の実測値。
+ *
+ * `CATALOG` を import せずリテラルで書き写している。import すると catalog.ts が
+ * 自分自身と一致することを確かめるだけになり、値のドリフトを検出できなくなる。
+ */
 const MEISHO = {
   datasetId: "t131067d0000000251",
   title: "名所・史跡",
@@ -18,49 +24,59 @@ const MEISHO = {
   retrievedAt: "2026-08-16",
 } as const;
 
+/** 銭湯（台東区）。上野・浅草の両方の固定データを持つ */
+const SENTO_ID = "t131067d0000000256";
+/** 都市公園・都立公園一覧（渋谷区）。渋谷を収録する唯一のデータセット */
+const SHIBUYA_PARK_ID = "t131130d2025000003";
 /** R6国・地域別外国人旅行者行動特性調査。施設一覧ではなくクロス集計表 */
 const STATISTICS_ID = "t000012d0000000081";
 /** 東京都内の飲食店のバリアフリー情報。ジャンルの列を持たない */
 const RESTAURANT_ID = "t000012d0000000063";
 
-const readJson = async <T>(response: Response): Promise<T> => (await response.json()) as T;
+const search = async (body: unknown) => readJson<SearchDatasetsOutput>(await postJson("/api/search-datasets", body));
+const aggregate = async (body: unknown) =>
+  readJson<AggregateDatasetOutput>(await postJson("/api/aggregate-dataset", body));
+const provenance = async (body: unknown) => readJson<GetProvenanceOutput>(await postJson("/api/provenance", body));
 
 describe("POST /api/search-datasets", () => {
   it("代表エリアの質問には実在データセットの候補を返す", async () => {
     const response = await postJson("/api/search-datasets", { query: "上野の寺社をめぐりたい", area: "上野" });
     expect(response.status).toBe(200);
 
-    const body = await readJson<SearchDatasetsOutput>(response);
-    expect(body.status).toBe("answered");
-    if (body.status !== "answered") return;
-
-    expect(body.candidates.length).toBeGreaterThan(0);
-    // 質問の中心（寺社）に最も近いデータセットが先頭に来る
+    const body = expectAnswered(await readJson<SearchDatasetsOutput>(response));
     expect(body.candidates[0]).toMatchObject({
       datasetId: MEISHO.datasetId,
       title: MEISHO.title,
       provider: MEISHO.provider,
       url: MEISHO.url,
     });
-    for (const candidate of body.candidates) {
-      expect(candidate.matchReason.length).toBeGreaterThan(0);
-    }
+    expect(body.candidates[0].matchReason).toContain("45件");
   });
 
-  it("候補件数の既定は4件で、limit で狭められる", async () => {
-    const defaults = await readJson<SearchDatasetsOutput>(
-      await postJson("/api/search-datasets", { query: "上野の観光" }),
-    );
-    const limited = await readJson<SearchDatasetsOutput>(
-      await postJson("/api/search-datasets", { query: "上野の観光", limit: 2 }),
-    );
+  it("キーワードが多く当たったデータセットほど上に来る", async () => {
+    // 「寺社」で No.1 が2ヒット、「文化」で No.2・No.3 が1ヒットずつ。
+    // 同点は DATABASE.md §2 の No. 昇順で並ぶ
+    const body = expectAnswered(await search({ query: "上野の寺社と文化", area: "上野" }));
 
-    expect(defaults.status).toBe("answered");
-    expect(limited.status).toBe("answered");
-    if (defaults.status !== "answered" || limited.status !== "answered") return;
+    expect(body.candidates.map((candidate) => candidate.datasetId)).toEqual([
+      MEISHO.datasetId,
+      "t131067d0000000236",
+      "t131067d0000000393",
+      "t131067d0000000256",
+    ]);
+  });
 
-    expect(defaults.candidates.length).toBeLessThanOrEqual(4);
-    expect(limited.candidates).toHaveLength(2);
+  it("キーワードが当たらなくてもエリアが分かれば、そのエリアのデータセットを既定件数だけ返す", async () => {
+    const body = expectAnswered(await search({ query: "上野" }));
+
+    // 上野を収録するのは8件。既定値で切られることを実際の件数で確かめる
+    expect(body.candidates).toHaveLength(DEFAULT_SEARCH_LIMIT);
+  });
+
+  it("limit で件数を変えられる（上限まで指定できる）", async () => {
+    expect(expectAnswered(await search({ query: "上野", limit: 2 })).candidates).toHaveLength(2);
+    // 上野を収録するのは8件なので、上限10を指定しても8件で頭打ちになる
+    expect(expectAnswered(await search({ query: "上野", limit: MAX_SEARCH_LIMIT })).candidates).toHaveLength(8);
   });
 
   it("対象エリア外は HTTP エラーではなく unanswered(out_of_area) を返す", async () => {
@@ -68,25 +84,74 @@ describe("POST /api/search-datasets", () => {
 
     // 「データが無い」はエラーではなく正常な回答（API.md §4）
     expect(response.status).toBe(200);
-    const body = await readJson<SearchDatasetsOutput>(response);
-    expect(body.status).toBe("unanswered");
-    if (body.status !== "unanswered") return;
-
+    const body = expectUnanswered(await readJson<SearchDatasetsOutput>(response));
     expect(body.reason).toBe("out_of_area");
     expect(body.message).toContain("新宿");
+  });
+
+  it("明示した area が質問文の地名より優先される", async () => {
+    const body = expectUnanswered(await search({ query: "上野の美術館", area: "新宿" }));
+    expect(body.reason).toBe("out_of_area");
+  });
+
+  it("質問文の代表エリアは対象外の地名より優先される", async () => {
+    const body = expectAnswered(await search({ query: "新宿から上野へ行きたい" }));
+    expect(body.candidates.length).toBeGreaterThan(0);
+  });
+
+  it("銀座線は「銀座」ではない（部分一致で対象エリア外にしない）", async () => {
+    // 銀座線は浅草・上野を通る。地名の部分一致で答えられる問いを弾いてはいけない
+    const body = expectAnswered(await search({ query: "銀座線で行ける上野のお寺" }));
+    expect(body.candidates[0].datasetId).toBe(MEISHO.datasetId);
+  });
+
+  it("「駅のそば」は飲食のジャンル指定ではない", async () => {
+    // 「そば」は「近く」の意味にもなる。粒度不足に倒すと答えられる問いを握りつぶす
+    const body = expectAnswered(await search({ query: "上野駅のそばのトイレ", area: "上野" }));
+    expect(body.candidates.map((candidate) => candidate.datasetId)).toContain("t131067d0000000249");
   });
 
   it("ラーメンは未公開ではなく粒度不足として返す", async () => {
     const response = await postJson("/api/search-datasets", { query: "上野でラーメンが食べたい", area: "上野" });
 
     expect(response.status).toBe(200);
-    const body = await readJson<SearchDatasetsOutput>(response);
-    expect(body.status).toBe("unanswered");
-    if (body.status !== "unanswered") return;
-
+    const body = expectUnanswered(await readJson<SearchDatasetsOutput>(response));
     // 飲食店データ自体は存在する。ジャンルの粒度で答えられないだけ（DATABASE.md 既知のデータ欠損）
     expect(body.reason).toBe("insufficient_granularity");
     expect(body.message).toContain("ラーメン");
+  });
+
+  it("分類に飲食店を明示しても、ジャンル指定なら粒度不足で返す", async () => {
+    // 飲食店データはキーワードに当たるが、ジャンルの列が無いので答えたことにしない
+    const body = expectUnanswered(await search({ query: "上野のラーメン", area: "上野", category: "飲食店" }));
+    expect(body.reason).toBe("insufficient_granularity");
+  });
+
+  it("渋谷の観光・文化施設は、調査済みの事実として data_not_published を返す", async () => {
+    const body = expectUnanswered(await search({ query: "渋谷の美術館", area: "渋谷" }));
+
+    expect(body.reason).toBe("data_not_published");
+    expect(body.message).toContain("渋谷区");
+  });
+
+  it("渋谷の公園は答えられる（渋谷区のデータセットだけを返す）", async () => {
+    const body = expectAnswered(await search({ query: "渋谷の公園", area: "渋谷" }));
+
+    expect(body.candidates.map((candidate) => candidate.datasetId)).toEqual([SHIBUYA_PARK_ID]);
+    expect(body.candidates[0].provider).toBe("渋谷区");
+  });
+
+  it("category を明示して1件も当たらなければ、エリアの一覧に落とさない", async () => {
+    // 「神社」の問いにトイレや宿泊施設を返さない（指定を黙って捨てない）
+    const body = expectUnanswered(await search({ query: "上野", area: "上野", category: "動物園" }));
+
+    expect(body.reason).toBe("other");
+    expect(body.message).toContain("動物園");
+  });
+
+  it("エリアも分類も特定できない条件は unanswered(other) を返す", async () => {
+    const body = expectUnanswered(await search({ query: "スキー場に行きたい" }));
+    expect(body.reason).toBe("other");
   });
 
   it("query が無い場合は 400 で invalid_request を返す", async () => {
@@ -96,11 +161,30 @@ describe("POST /api/search-datasets", () => {
     await expect(response.json()).resolves.toMatchObject({ error: "invalid_request" });
   });
 
-  it("limit が範囲外なら 400 を返す（黙って丸めない）", async () => {
-    const response = await postJson("/api/search-datasets", { query: "上野の観光", limit: 0 });
+  it("空白だけの query も 400 にする", async () => {
+    expect((await postJson("/api/search-datasets", { query: "   " })).status).toBe(400);
+  });
+
+  it.each([
+    ["下限未満", 0],
+    ["上限超過", MAX_SEARCH_LIMIT + 1],
+    ["整数でない", 2.5],
+  ])("limit が%s（%s）なら 400 を返す（黙って丸めない）", async (_label, limit) => {
+    const response = await postJson("/api/search-datasets", { query: "上野の観光", limit });
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({ error: "invalid_request" });
+    const body = await readJson<{ error: string; message: string }>(response);
+    expect(body.error).toBe("invalid_request");
+    expect(body.message).toContain(String(MAX_SEARCH_LIMIT));
+  });
+
+  it("limit が数値でなければ 400 を返す", async () => {
+    expect((await postJson("/api/search-datasets", { query: "上野", limit: "2" })).status).toBe(400);
+  });
+
+  it("area・category の型違いは 400 を返す", async () => {
+    expect((await postJson("/api/search-datasets", { query: "上野", area: 1 })).status).toBe(400);
+    expect((await postJson("/api/search-datasets", { query: "上野", category: [] })).status).toBe(400);
   });
 });
 
@@ -112,26 +196,46 @@ describe("POST /api/aggregate-dataset", () => {
     });
     expect(response.status).toBe(200);
 
-    const body = await readJson<AggregateDatasetOutput>(response);
-    expect(body.status).toBe("answered");
-    if (body.status !== "answered") return;
-
-    // data/t131067d0000000251/data.csv の3行目に実在する
+    const body = expectAnswered(await readJson<AggregateDatasetOutput>(response));
+    // data/t131067d0000000251/data.csv のヘッダを除く3行目に実在する
     expect(body.result.name).toBe("寛永寺");
     expect(body.result.summary).toContain("上野桜木1丁目14番");
     // 実行クエリは省略不可（API.md §4）。どのスナップショットの何行目かを辿れること
     expect(body.query).toContain(MEISHO.datasetId);
-    expect(body.query).toContain("3 行目");
+    expect(body.query).toContain("ヘッダを除く 3 行目");
   });
 
   it("集計意図のエリアで返す行が変わる", async () => {
-    const body = await readJson<AggregateDatasetOutput>(
-      await postJson("/api/aggregate-dataset", { datasetId: MEISHO.datasetId, intent: "浅草の寺社を1件" }),
-    );
-
-    expect(body.status).toBe("answered");
-    if (body.status !== "answered") return;
+    const body = expectAnswered(await aggregate({ datasetId: MEISHO.datasetId, intent: "浅草の寺社を1件" }));
     expect(body.result.name).toBe("浅草寺");
+  });
+
+  it("指定したエリアの固定データが無いデータセットでも、別エリアの行を返さない", async () => {
+    // 台東区の銭湯は上野にも浅草にもある。浅草を指定したら浅草の行しか返してはいけない
+    const asakusa = expectAnswered(await aggregate({ datasetId: SENTO_ID, intent: "浅草の銭湯を1件" }));
+    expect(asakusa.result.name).toBe("アクアプレイス旭");
+    expect(asakusa.result.summary).toContain("浅草5-10-5");
+
+    const ueno = expectAnswered(await aggregate({ datasetId: SENTO_ID, intent: "上野の銭湯を1件" }));
+    expect(ueno.result.name).toBe("燕湯");
+  });
+
+  it("そのデータセットが収録していないエリアを指定されたら unanswered を返す", async () => {
+    // 渋谷区の公園データに上野を求める。先頭行（恵比寿東公園）を返してはいけない
+    const body = expectUnanswered(await aggregate({ datasetId: SHIBUYA_PARK_ID, intent: "上野の公園を1件" }));
+
+    expect(body.reason).toBe("data_not_published");
+    expect(body.message).toContain("上野");
+  });
+
+  it("対象エリア外の意図は search と同じく out_of_area で返す", async () => {
+    const body = expectUnanswered(await aggregate({ datasetId: MEISHO.datasetId, intent: "新宿の寺社を1件" }));
+    expect(body.reason).toBe("out_of_area");
+  });
+
+  it("エリアの指定が無ければ先頭の固定データを返す", async () => {
+    const body = expectAnswered(await aggregate({ datasetId: MEISHO.datasetId, intent: "寺社を1件" }));
+    expect(body.result.name).toBe("寛永寺");
   });
 
   it("クロス集計表からは地物を抽出できないので unanswered を返す", async () => {
@@ -141,20 +245,32 @@ describe("POST /api/aggregate-dataset", () => {
     });
 
     expect(response.status).toBe(200);
-    const body = await readJson<AggregateDatasetOutput>(response);
-    expect(body.status).toBe("unanswered");
-    if (body.status !== "unanswered") return;
+    const body = expectUnanswered(await readJson<AggregateDatasetOutput>(response));
     expect(body.reason).toBe("insufficient_granularity");
   });
 
   it("飲食店データにジャンルを求めた場合も粒度不足で返す", async () => {
-    const body = await readJson<AggregateDatasetOutput>(
-      await postJson("/api/aggregate-dataset", { datasetId: RESTAURANT_ID, intent: "上野のラーメン店を1件" }),
-    );
-
-    expect(body.status).toBe("unanswered");
-    if (body.status !== "unanswered") return;
+    const body = expectUnanswered(await aggregate({ datasetId: RESTAURANT_ID, intent: "上野のラーメン店を1件" }));
     expect(body.reason).toBe("insufficient_granularity");
+  });
+
+  it("飲食店データ以外へのジャンル指定は粒度不足にしない", async () => {
+    // ジャンル判定が飲食店データ限定であることの裏。条件が外れたら、寺社データが
+    // 「ラーメン店」の答えとして返るようになる
+    const body = expectAnswered(await aggregate({ datasetId: MEISHO.datasetId, intent: "上野のラーメン屋の近くの寺" }));
+    expect(body.result.name).toBe("寛永寺");
+  });
+
+  it("利用中の10件に無い datasetId は 400 ではなく unanswered で返す", async () => {
+    const response = await postJson("/api/aggregate-dataset", {
+      datasetId: "t000000d0000000000",
+      intent: "上野の施設を1件",
+    });
+
+    // 呼び出し経路で扱いが変わらないようにするため（API.md §4）。provenance 側と揃っている
+    expect(response.status).toBe(200);
+    const body = expectUnanswered(await readJson<AggregateDatasetOutput>(response));
+    expect(body.reason).toBe("other");
   });
 
   it("intent が無い場合は 400 を返す", async () => {
@@ -162,6 +278,11 @@ describe("POST /api/aggregate-dataset", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ error: "invalid_request" });
+  });
+
+  it("前後の空白は正規化して扱う（書式ノイズをデータ欠損にしない）", async () => {
+    const body = expectAnswered(await aggregate({ datasetId: ` ${MEISHO.datasetId} `, intent: "上野の寺社を1件" }));
+    expect(body.result.name).toBe("寛永寺");
   });
 });
 
@@ -171,10 +292,7 @@ describe("POST /api/provenance", () => {
     const response = await postJson("/api/provenance", { datasetIds: [MEISHO.datasetId], query });
     expect(response.status).toBe(200);
 
-    const body = await readJson<GetProvenanceOutput>(response);
-    expect(body.status).toBe("answered");
-    if (body.status !== "answered") return;
-
+    const body = expectAnswered(await readJson<GetProvenanceOutput>(response));
     expect(body.sources).toHaveLength(1);
     expect(body.sources[0]).toEqual({
       datasetId: MEISHO.datasetId,
@@ -188,18 +306,20 @@ describe("POST /api/provenance", () => {
   });
 
   it("知らない datasetId が混ざったら、既知のぶんだけ返さず unanswered にする", async () => {
-    const body = await readJson<GetProvenanceOutput>(
-      await postJson("/api/provenance", {
-        datasetIds: [MEISHO.datasetId, "t000000d0000000000"],
-        query: "検索条件",
-      }),
+    const body = expectUnanswered(
+      await provenance({ datasetIds: [MEISHO.datasetId, "t000000d0000000000"], query: "検索条件" }),
     );
 
     // 黙って落とすと、呼び出し側が「出典が揃った」と誤認する
-    expect(body.status).toBe("unanswered");
-    if (body.status !== "unanswered") return;
-    expect(body.reason).toBe("data_not_published");
+    expect(body.reason).toBe("other");
     expect(body.message).toContain("t000000d0000000000");
+  });
+
+  it("同じ datasetId を重ねて渡しても出典は1件にまとめる", async () => {
+    const body = expectAnswered(
+      await provenance({ datasetIds: [MEISHO.datasetId, MEISHO.datasetId], query: "検索条件" }),
+    );
+    expect(body.sources).toHaveLength(1);
   });
 
   it("query は必須。無ければ 400 を返す", async () => {
@@ -209,34 +329,53 @@ describe("POST /api/provenance", () => {
     await expect(response.json()).resolves.toMatchObject({ error: "invalid_request" });
   });
 
-  it("datasetIds が空なら 400 を返す", async () => {
-    const response = await postJson("/api/provenance", { datasetIds: [], query: "検索条件" });
+  it("datasetIds が空・要素が空文字なら 400 を返す", async () => {
+    expect((await postJson("/api/provenance", { datasetIds: [], query: "検索条件" })).status).toBe(400);
+    expect((await postJson("/api/provenance", { datasetIds: [""], query: "検索条件" })).status).toBe(400);
+    expect((await postJson("/api/provenance", { datasetIds: [1], query: "検索条件" })).status).toBe(400);
+  });
+});
+
+describe("リクエストボディの境界", () => {
+  it.each([
+    ["壊れた JSON", "{"],
+    ["空ボディ", ""],
+  ])("%s は 400 の JSON を返す", async (_label, raw) => {
+    const response = await postRaw("/api/search-datasets", raw);
 
     expect(response.status).toBe(400);
+    expect(response.headers.get("content-type")).toContain("application/json");
     await expect(response.json()).resolves.toMatchObject({ error: "invalid_request" });
+  });
+
+  it.each([
+    ["配列", []],
+    ["文字列", "上野"],
+    ["null", null],
+  ])("JSON オブジェクトでないボディ（%s）は 400 を返す", async (_label, body) => {
+    expect((await postJson("/api/search-datasets", body)).status).toBe(400);
+  });
+
+  it("定義済みパスへのメソッド違いは 404 の JSON を返す", async () => {
+    const response = await request("/api/search-datasets");
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    await expect(response.json()).resolves.toMatchObject({ error: "not_found" });
   });
 });
 
 describe("出典強制（DOMAIN.md §8 不変条件1）", () => {
   it("検索で返した候補はすべて出典を生成できる", async () => {
-    const search = await readJson<SearchDatasetsOutput>(
-      await postJson("/api/search-datasets", { query: "上野の寺社と美術館", area: "上野" }),
-    );
-    expect(search.status).toBe("answered");
-    if (search.status !== "answered") return;
+    const found = expectAnswered(await search({ query: "上野の寺社と美術館", area: "上野" }));
 
     const query = "上野の寺社と美術館（検索条件）";
-    const provenance = await readJson<GetProvenanceOutput>(
-      await postJson("/api/provenance", {
-        datasetIds: search.candidates.map((candidate) => candidate.datasetId),
-        query,
-      }),
+    const sources = expectAnswered(
+      await provenance({ datasetIds: found.candidates.map((candidate) => candidate.datasetId), query }),
     );
 
-    expect(provenance.status).toBe("answered");
-    if (provenance.status !== "answered") return;
-    expect(provenance.sources).toHaveLength(search.candidates.length);
-    for (const source of provenance.sources) {
+    expect(sources.sources).toHaveLength(found.candidates.length);
+    for (const source of sources.sources) {
       // CC BY 4.0 以外が混ざっていないこと（CLAUDE.md 絶対ルール #4）
       expect(source.license).toBe("CC BY 4.0");
       expect(source.query).toBe(query);

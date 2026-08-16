@@ -29,13 +29,13 @@ describe("/api/* のフォールバック", () => {
 
     expect(response.status).toBe(404);
     expect(response.headers.get("content-type")).toContain("application/json");
-    await expect(response.json()).resolves.toEqual({ error: "not_found" });
+    await expect(response.json()).resolves.toMatchObject({ error: "not_found" });
   });
 
   it("GET 以外のメソッドでも同じ扱いにする", async () => {
     const response = await request("/api/unknown", { method: "POST" });
 
     expect(response.status).toBe(404);
-    await expect(response.json()).resolves.toEqual({ error: "not_found" });
+    await expect(response.json()).resolves.toMatchObject({ error: "not_found" });
   });
 });

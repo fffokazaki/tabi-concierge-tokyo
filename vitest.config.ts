@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 
 /**
- * `npm test` の入口。実行環境が違う2つのテスト群をまとめて走らせる。
+ * `npm test` の入口。実行環境が違う3つのテスト群をまとめて走らせる。
  *
  * - frontend … src/（React）を jsdom で
  * - worker   … worker/（Hono）を workerd で

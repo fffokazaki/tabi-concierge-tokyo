@@ -55,15 +55,20 @@
 
 | 項目 | 内容 |
 | ---- | ---- |
-| 入力 | `{ query: string, area?: string, category?: string, limit?: number }`。`query` は必須（空文字不可） |
-| 出力（回答あり） | `{ status: "answered", candidates: Array<{ datasetId, title, provider, url, matchReason }> }` |
+| 入力 | `{ query: string, area?: string, category?: string, limit?: number }`。`query` は必須（空文字・空白のみは 400） |
+| 出力（回答あり） | `{ status: "answered", candidates: Array<{ datasetId, title, provider, url, matchReason }> }`。`candidates` は**必ず1件以上**（型でも非空を強制。DOMAIN.md §8 不変条件1） |
 | 出力（回答なし） | `{ status: "unanswered", reason, message }`（§4 参照） |
+| `area` | 代表エリア（上野・浅草・渋谷）以外も**受け付ける**。対象エリア外は 400 ではなく `unanswered("out_of_area")` で返す。未指定なら質問文から代表エリア名を拾う（明示指定が質問文より優先） |
+| `category` | **絞り込みの述語ではなくスコアリングのヒント**。ただし指定して1件も当たらない場合はエリアだけの候補へ落とさず `unanswered` を返す（指定を黙って捨てないため） |
 | `limit` | **既定 4・上限 10**。既定値はフロントエンドが1ルートに3〜4停留地を想定しているため（[API_REQUIREMENTS.md](./API_REQUIREMENTS.md) §1）。上限はデータセットが10件しかないため。範囲外は 400 で、黙って丸めない |
+| 前提 | マッチは**日本語の部分一致**。英語のクエリには当たらない（多言語対応は未着手） |
 | 未確定 | スコアリング方法（現状はキーワード一致数の単純な順位づけ。Step 5 で再設計する） |
 
-判定の順序は「対象エリア外 → ジャンル指定の飲食（粒度不足） → エリアの絞り込み」。順序に意味があり、入れ替えると答えられない問いにエリアの一覧を返して欠損が見えなくなる。
+判定の順序に意味がある。エリア外を先に弾き、キーワードが当たれば候補を返す。**当たらなかったときに初めて**、ジャンル指定の飲食（粒度不足）→ 渋谷の観光データ欠損（未公開）→ 分類指定の空振り → エリアだけの絞り込み、の順に落とす。ジャンル判定をエリアのフォールバックより後ろに回すと、答えられない問い（ラーメン）にエリアのデータセット一覧を返して欠損が消える。
 
-**既知の制限（スタブ）**: 答えられる興味と答えられない興味を1つの `query` に混ぜた場合（例「上野の美術館とラーメン」）は、答えられる候補を返す。欠損を確実に検出したい場合は興味ごとに呼ぶこと。
+日本語は分かち書きしないため、地名・ジャンル語の部分一致は語の境界を見ない。「銀座線」（浅草・上野を通る地下鉄）を「銀座」として対象エリア外にしない、「〜のそば（近く）」を飲食のジャンル指定にしない、といった除外を実装側に持っている。
+
+**既知の制限（スタブ）**: 答えられる興味と答えられない興味を1つの `query` に混ぜた場合（例「上野の美術館とラーメン」）は、答えられる候補だけを返し、ラーメン側の欠損は応答に現れない。欠損を確実に検出したい場合は興味ごとに呼ぶこと。解消方針（`answered` に部分欠損を載せる）は [Issue #29](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/29) で検討する。
 
 ### 3.2 `aggregate_dataset` — 集計（`POST /api/aggregate-dataset`・確定）
 
@@ -75,7 +80,8 @@
 | 出力（回答あり） | `{ status: "answered", result: { name, summary }, query: string }` |
 | 出力（回答なし） | `{ status: "unanswered", reason, message }` |
 | 出力語彙 | `result` は **`name` / `summary` の汎用語彙**（設計原則4）。`Stop.place` / `Stop.note` へのマッピングはフロントエンド側の責務（2026-08-17 合意） |
-| `query` | 実行したクエリ。**省略不可**（§4）。スタブは SQL を実行していないため、SQL 風の文字列ではなく「どのスナップショットの何行目を固定で返したか」を記録する |
+| `query` | 実行したクエリ。**省略不可**（§4）。スタブは SQL を実行していないため、SQL 風の文字列ではなく「どのスナップショットのヘッダを除く何行目を固定で返したか」を記録する |
+| `intent` のエリア | **指定されたエリアの地物しか返さない。** 一致する行が無ければ `unanswered`（そのデータセットが当該エリアを収録していなければ `data_not_published`）。対象エリア外の地名は `search_datasets` と同じく `out_of_area`。別エリアの行で代替すると、本物の出典がついた誤答になる |
 | 未確定 | 対応する集計操作の範囲（Step 5 で確定）、`result` に集計値そのもの（件数・平均等）を載せる形 |
 
 ### 3.3 `get_provenance` — 出典取得（`POST /api/provenance`・確定）
@@ -85,9 +91,9 @@
 | 項目 | 内容 |
 | ---- | ---- |
 | 入力 | `{ datasetIds: string[], query: string }`。`datasetIds` は1件以上、`query` は必須（集計を経た場合は実行クエリ、検索のみの経路では検索条件） |
-| 出力（回答あり） | `{ status: "answered", sources: ProvenanceSource[] }`。`ProvenanceSource` は `datasetId` / `datasetTitle` / `provider` / `license: "CC BY 4.0"` / `url` / `query` / `retrievedAt` の7フィールド（§4 の必須項目と同一） |
+| 出力（回答あり） | `{ status: "answered", sources: ProvenanceSource[] }`。`ProvenanceSource` は `datasetId` / `datasetTitle` / `provider` / `license: "CC BY 4.0"` / `url` / `query` / `retrievedAt` の7フィールド（§4 の必須項目と同一）。`sources` は**必ず1件以上** |
 | 出力（回答なし） | `{ status: "unanswered", reason, message }` |
-| 複数データセット横断 | 入力の `query` を各 source に同じ値で複写する（source ごとに別のクエリを持たせない）。**知らない `datasetId` が1件でも混ざったら、既知のぶんだけ返さず全体を `unanswered` にする**（黙って落とすと呼び出し側が「出典が揃った」と誤認するため） |
+| 複数データセット横断 | 入力の `query` を各 source に同じ値で複写する（source ごとに別のクエリを持たせない）。同じ `datasetId` を重ねて渡されても出典は1件にまとめる。**知らない `datasetId` が1件でも混ざったら、既知のぶんだけ返さず全体を `unanswered` にする**（黙って落とすと呼び出し側が「出典が揃った」と誤認するため） |
 | 未確定 | 複数ソースを画面上でどう並べるか（表示ルールはフロントエンド側の決定事項） |
 
 ### 3.4 追加候補（未実装）
@@ -134,10 +140,12 @@
 
 | `reason` | 使う場面 |
 | -------- | -------- |
-| `data_not_published` | カタログに該当データが存在しない |
+| `data_not_published` | カタログに該当データが存在しないことを**確かめられた**場合（例: 渋谷区は観光・名所・文化施設のデータを公開していない）。最も強い主張なので、迷ったら使わない |
 | `insufficient_granularity` | データはあるが問いに答えられる粒度ではない（例: 飲食店データにジャンルの列が無い） |
 | `out_of_area` | POC の対象エリア（上野・浅草・渋谷）の外 |
-| `other` | 上記のいずれにも当てはまらない |
+| `other` | 上記のいずれにも当てはまらない。**利用中の10件では答えられない**（カタログ全体に無いとは言えない）場合もここ |
+
+「利用中の10件に無いデータセットID」は `other` に分類する。これはオープンデータの欠損ではなく呼び出し側の指定違いなので、`data_not_published` に混ぜると未回答の集計（[DOMAIN.md](./DOMAIN.md) §7 のデータ公開リクエスト）が汚れる。
 
 「根拠情報」の必須項目は操作の性質で決まる。
 
@@ -155,16 +163,18 @@
 エラーは「**入力の形が仕様を満たさない**」場合だけに使う（2026-08-17 確定・Issue #22）。
 
 ```ts
-{ error: "invalid_request" | "not_found"; message?: string }
+{ error: "invalid_request" | "not_found" | "internal_error"; message?: string }
 ```
 
 | HTTP | `error` | 発生条件 |
 | ---- | ------- | -------- |
-| 400 | `invalid_request` | ボディが JSON オブジェクトでない／必須項目の欠落・空文字／`limit` が 1〜10 の整数でない |
+| 400 | `invalid_request` | ボディが JSON として読めない／JSON オブジェクトでない／必須項目の欠落・空文字／`limit` が 1〜10 の整数でない |
 | 404 | `not_found` | 未定義の `/api/*` パス（定義済みパスに別メソッドで来た場合もここに落ちる） |
+| 500 | `internal_error` | 想定外の例外。Hono の既定応答（`text/plain`）に落とさず JSON を返す（未定義パスを 404 の JSON にしているのと同じ理由）。原因は `console.error` に記録する |
 
 - 「データが見つからない」は**エラーではなく正常な回答なし**（`unanswered`・HTTP 200）として区別すること。混ぜると、データ欠損が入力ミスに紛れて集計できなくなる
-- 「利用中の10件に無いデータセットID」は入力エラーではなく `unanswered`（`data_not_published`）として返す。呼び出し経路によって扱いが変わらないようにするため
+- 「利用中の10件に無いデータセットID」は入力エラーではなく `unanswered`（`other`）として返す。呼び出し経路によって扱いが変わらないようにするため
+- 文字列の入力は境界で trim する。転送時の書式ノイズ（`"t131067d0000000251\n"` など）が「データが無い」として未回答の統計に積み上がるのを防ぐため
 - `/mcp` は MCP のエラー表現に合わせるが、エラー分類は `worker/core/` で共通化する（未実装）
 
 ### ページネーション

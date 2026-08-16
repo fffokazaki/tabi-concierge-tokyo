@@ -1,3 +1,5 @@
+import type { ProvenanceSource } from "../../../shared/core";
+
 export type Pace = "ゆったり" | "バランス型" | "しっかり";
 export type Setting = "屋外中心" | "どちらも" | "屋内中心";
 export type Budget = "節約" | "中間価格帯" | "ぜいたく";
@@ -19,10 +21,8 @@ export type Trip = {
  *
  * 定義は `shared/core.ts` に移した（Issue #22）。同じ型を worker 側の実装と
  * 画面側で二重に書くと、片方だけ直したときに気づけないため、ここでは再エクスポートに留める。
- * 画面上は Step 5 で接続するまで常に未設定（出典なしの回答を作らないため）。
+ * 画面が `/api/provenance` に接続するまでは常に未設定（出典なしの回答を作らないため）。
  */
-import type { ProvenanceSource } from "../../../shared/core";
-
 export type { ProvenanceSource };
 
 export type EtiquetteTip = {

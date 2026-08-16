@@ -13,6 +13,8 @@
     "types": ["vite/client"]
   },
   // shared/ はコア3操作の入出力型（worker とブラウザの共有）。
-  // include に入れないと、src から参照していても型検査の対象にならない
+  // src から import されたファイルは include が無くても検査されるが、まだどこからも
+  // import されていないファイルは検査対象に入らない（実測: include を外すと未 import の
+  // ファイルに型エラーを入れても tsc -b が 0 件で通る）。shared/ 全体を常に検査するため入れる
   "include": ["src", "shared"]
 }

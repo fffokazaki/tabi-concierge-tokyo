@@ -37,7 +37,7 @@
   query: string;        // trip.interests・trip.notes から組み立てた自然文の質問
   area?: string;        // POC対象の代表エリア（例: "上野"、"渋谷"）
   category?: string;    // 例: "神社", "飲食店", "公共交通機関"
-  limit?: number;       // 候補件数の上限 ※API.md で未確定
+  limit?: number;       // 候補件数の上限。既定 4・上限 10（API.md §3.1 で確定）
 }
 ```
 
@@ -55,13 +55,14 @@
   }>;
 } | {
   status: "unanswered";
-  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | string;
+  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | "other";  // 閉じた列挙（API.md §4）
+  message: string;   // 画面に出せる日本語。何が無くて答えられなかったのか
 }
 ```
 
 ### 備考
 - API.md §4 のとおり、このツールは「実行クエリ」を持たない。出典には検索条件（`query`/`area`/`category`）をそのまま使う想定。
-- `limit` はまだ API.md でも未確定。フロントエンドとしては1ルートあたり3〜4停留地を想定しているので、候補は少なくともその数以上返る形が扱いやすい（要相談）。
+- `limit` は **既定 4・上限 10 で確定**（API.md §3.1）。既定値は「1ルートあたり3〜4停留地」という本書の想定に合わせたもの。範囲外は 400 で、黙って丸められない。
 
 ---
 
@@ -95,7 +96,8 @@
   query: string;       // 実行したクエリ。出典に必須（API.md §4）
 } | {
   status: "unanswered";
-  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | string;
+  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | "other";  // 閉じた列挙（API.md §4）
+  message: string;   // 画面に出せる日本語。何が無くて答えられなかったのか
 }
 ```
 
@@ -139,7 +141,8 @@
   }>;
 } | {
   status: "unanswered";
-  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | string;
+  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | "other";  // 閉じた列挙（API.md §4）
+  message: string;   // 画面に出せる日本語。何が無くて答えられなかったのか
 }
 ```
 
@@ -179,5 +182,7 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 | ---- | ---- |
 | `aggregate_dataset` の出力語彙 | `name` / `summary` の汎用語彙。`Stop.place` / `Stop.note` へのマッピングはフロントエンド側（§2 参照） |
 | `search_datasets` の `limit` | 既定 4・上限 10。範囲外は 400（黙って丸めない）。既定値は1ルート3〜4停留地という本書 §1 の想定に合わせた |
-| エラーレスポンスの形 | `{ error: "invalid_request" \| "not_found", message?: string }`。400 は**入力の形の違反だけ**に使い、「データが無い」は `unanswered` ＋ HTTP 200（API.md §4） |
-| 複数データセット横断時の `query` の対応関係 | 入力の `query` を各 source に同じ値で複写する。知らない `datasetId` が混ざったら既知のぶんだけ返さず全体を `unanswered` にする（画面上の並べ方はフロントエンド側の決定事項として残る） |
+| エラーレスポンスの形 | `{ error: "invalid_request" \| "not_found" \| "internal_error", message?: string }`。400 は**入力の形の違反だけ**に使い、「データが無い」は `unanswered` ＋ HTTP 200（API.md §4）。500 も JSON で返るので、画面は常に JSON として読んでよい |
+| 複数データセット横断時の `query` の対応関係 | 入力の `query` を各 source に同じ値で複写する。同じ ID を重ねても出典は1件にまとまる。知らない `datasetId` が混ざったら既知のぶんだけ返さず全体を `unanswered` にする（画面上の並べ方はフロントエンド側の決定事項として残る） |
+| `category` の意味 | 絞り込みの述語ではなく**スコアリングのヒント**。ただし指定して1件も当たらなければ `unanswered` になる（無関係な候補は返らない） |
+| `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物しか返らない。** 無ければ `unanswered`。別エリアの施設で代替されることはないので、画面は返ってきた `name` をそのまま信用してよい |
