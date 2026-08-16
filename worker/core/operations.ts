@@ -244,7 +244,7 @@ export function searchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
  * 行番号はヘッダを除いたデータ行の番号なので、辿る人が1行ずれないよう出力にも明記する。
  */
 const describeQuery = (entry: CatalogEntry, sample: CatalogSample): string =>
-  `固定データ抽出（スタブ）: data/${entry.datasetId}/data.csv（${entry.retrievedAt} 取得・ヘッダを除く全${entry.rowCount}行）のヘッダを除く ${sample.sourceRow} 行目。Step 5 で Text-to-SQL に置き換える。`;
+  `固定データ抽出（スタブ）: data/${entry.datasetId}/data.csv（${entry.retrievedAt} 取得・全${entry.rowCount}行）のヘッダを除く ${sample.sourceRow} 行目。Step 5 で Text-to-SQL に置き換える。`;
 
 /**
  * 集計・抽出。固定データから1件を返す。

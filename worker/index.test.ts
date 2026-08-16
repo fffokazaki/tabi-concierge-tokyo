@@ -18,8 +18,9 @@ describe("/api/health", () => {
 
     // 値そのもの（"Cloudflare-Workers"）は互換設定で変わりうるため固定しない。
     // 「Node ではない実行環境の値が入っている」ことだけを担保する。
-    expect(runtime).toBeTypeOf("string");
+    // 型と長さだけを見る形にすると、何が入っていても通ってしまい主張と手段が噛み合わない。
     expect(runtime.length).toBeGreaterThan(0);
+    expect(runtime).not.toMatch(/^Node/);
   });
 });
 
