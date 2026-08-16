@@ -15,7 +15,7 @@
 | Category | process | Origin | PR #2 |
 | Date | 2026-08-15 |
 | Helpful | 0 | Harmful | 0 |
-| Status | active |
+| Status | deprecated |
 
 GitHub の closing keyword はデフォルトブランチへのマージでのみ発動するため、base が `develop` の PR では `Closes #N` を書いても Issue は閉じず、`closingIssuesReferences` も空を返す（`/close-issue` の Issue 自動検出もこれに依存するため空振りする）。Git Flow を採るリポジトリでは毎回起きる。AC 照合はマージ前に済ませ、クローズはマージ直後の手動実行か `main` 昇格時に回す前提で運用する。
 
