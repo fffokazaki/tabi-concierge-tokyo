@@ -28,7 +28,7 @@ PoC 段階のため軽量な運用を採用している。判断の背景は [AD
 - **ブランチと PR は必須**。base は `develop`
 - **ACE（知見記録）は任意**（[docs/08-knowledge/PLAYBOOK.md](docs/08-knowledge/PLAYBOOK.md)）
 - ユーザーが「マージして」等と言ったタイミングで、ブランチ〜マージ〜クリーンアップまで**一括で実行してよい**
-- `develop` へのマージでは `Closes #N` が発火しない（デフォルトブランチは `main`）ため、Issue は手動でクローズする
+- デフォルトブランチは `develop`（確認日: 2026-08-16）なので、`develop` へのマージで `Closes #N` が発火し Issue は自動クローズされる。手動クローズは不要
 
 コミットメッセージは Conventional Commits・日本語。
 

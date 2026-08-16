@@ -1,11 +1,11 @@
 ---
 title: "MASTER"
-version: "1.3.0"
+version: "1.3.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-15"
-changeImpact: "medium"
+updated: "2026-08-16"
+changeImpact: "low"
 ---
 
 # AI駆動開発マスタードキュメント
@@ -412,7 +412,7 @@ PoC 段階のため軽量な運用を採用しています（[ADR-006](./06-refe
 
 - ブランチ名: `feature/` `fix/` `chore/` `docs/` + 短い説明（Issue があれば `feature/#12-...`）
 - 「マージして」等の指示のタイミングで、ブランチ作成 → コミット → PR → マージ → クリーンアップまで**一括実行してよい**（ステップごとの確認は不要）
-- `Closes #N` はデフォルトブランチ（現在は `main`）へのマージでのみ発火するため、`develop` マージ時の Issue クローズは**手動**
+- デフォルトブランチは **`develop`**（確認日: 2026-08-16）。`Closes #N` は `develop` へのマージで発火し、Issue は**自動的にクローズされる**
 - メンテナ環境ではセルフレビュー（ローカル + クロスモデル）と AC 照合を含むフル運用を継続する
 
 外部メンバー向けの手順は [CONTRIBUTING.md](../CONTRIBUTING.md)、AI ツール向けの指示は [CLAUDE.md](../CLAUDE.md) / [AGENTS.md](../AGENTS.md) にあります。
@@ -779,6 +779,12 @@ Changelog エントリには以下のカテゴリを使用する（[Keep a Chang
 - [ ] 定数の配置が層責務に沿っている（Domain/Application/Infrastructure）
 
 ## Changelog
+
+### [1.3.1] - 2026-08-16
+
+#### 修正
+
+- デフォルトブランチの記述を実態（`develop`）へ訂正。`main` としていたため「`Closes #N` は発火しないので手動クローズ」という誤った手順が書かれていた（PR #15 のマージで Issue #14 が自動クローズされたことで判明）
 
 ### [1.3.0] - 2026-08-15
 

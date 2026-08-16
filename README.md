@@ -71,7 +71,7 @@ develop からブランチ作成 → 実装・コミット → PR 作成 → レ
 
 手順の詳細は [CONTRIBUTING.md](CONTRIBUTING.md)（人間向け）、[CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md)（AI ツール向け）にある。いずれも単独で完結しており、個人設定やプラグインに依存しない。
 
-デフォルトブランチは `main`、統合ブランチは `develop`。`Closes #N` はデフォルトブランチ（現在は `main`）へのマージでのみ発火するため、`develop` マージ時の Issue クローズは手動で行う。
+デフォルトブランチは `develop`（確認日: 2026-08-16）。`Closes #N` はデフォルトブランチへのマージで発火するため、`develop` へマージした時点で Issue は自動的にクローズされる。
 
 ## ディレクトリ構成
 
