@@ -22,7 +22,7 @@
 - CC BY 4.0の出典表示義務を設計レベルで自動達成
 - 答えられなかった質問は「データ公開リクエスト」として都へ自動還元
 
-設計の詳細は [ARCHITECTURE.md](docs/02-design/ARCHITECTURE.md)、MCP ツールの仕様は [API.md](docs/02-design/API.md) を参照。
+設計の詳細は [ARCHITECTURE.md](docs/02-design/ARCHITECTURE.md)、フロントエンドが呼ぶ `/api/*` の仕様は [API.md](docs/02-design/API.md)、AI クライアント向け `/mcp`（MCP ツール）の仕様は [MCP.md](docs/02-design/MCP.md) を参照（単一 Worker の二面公開・ADR-008）。
 
 ## 開発の進め方 — AI仕様駆動開発
 
@@ -36,7 +36,7 @@
 | --- | --- |
 | 何を作るのか知りたい | [PROJECT.md](docs/01-context/PROJECT.md) — ビジョン・対象ユーザー・5機能・KPI・スコープ |
 | 守るべき制約を知りたい | [CONSTRAINTS.md](docs/01-context/CONSTRAINTS.md) — 提出要件・締切・CC BY 4.0・著作権ルール |
-| 設計を知りたい | [ARCHITECTURE.md](docs/02-design/ARCHITECTURE.md) / [DOMAIN.md](docs/02-design/DOMAIN.md) / [API.md](docs/02-design/API.md) / [DATABASE.md](docs/02-design/DATABASE.md) |
+| 設計を知りたい | [ARCHITECTURE.md](docs/02-design/ARCHITECTURE.md) / [DOMAIN.md](docs/02-design/DOMAIN.md) / [API.md](docs/02-design/API.md) / [MCP.md](docs/02-design/MCP.md) / [DATABASE.md](docs/02-design/DATABASE.md) |
 | なぜそう決めたか知りたい | [DECISIONS.md](docs/06-reference/DECISIONS.md) — 設計判断記録（ADR） |
 | 用語を確認したい | [GLOSSARY.md](docs/06-reference/GLOSSARY.md) — A〜Z 節は一般的な技術用語の辞書。本プロジェクト固有の用語は末尾の節 |
 | 何を作業するか知りたい | [TASKS.md](docs/07-project-management/TASKS.md) / [ROADMAP.md](docs/07-project-management/ROADMAP.md) / [RISKS.md](docs/07-project-management/RISKS.md) |

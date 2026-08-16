@@ -1,6 +1,6 @@
 ---
 title: "MASTER"
-version: "1.3.2"
+version: "1.3.3"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -241,7 +241,7 @@ AIツールがランタイム・依存のバージョンを選定する際は、
 - [ ] Event-Driven Architecture
 - [ ] Microservices
 - [ ] Monolithic
-- [x] その他: **クライアント／MCP サーバー分離** — フロントエンド（旅行アプリ）とバックエンド（オープンデータ・コンシェルジュ）を MCP で接続し、バックエンドを再利用可能な基盤として独立させる（ADR-003）
+- [x] その他: **クライアント／コンシェルジュ分離＋二面公開** — フロントエンド（旅行アプリ）とバックエンド（オープンデータ・コンシェルジュ）を分離し、バックエンドは単一 Worker が `/api/*`（React 向け JSON）と `/mcp`（AI クライアント向け MCP）の二面で公開して再利用可能な基盤として独立させる（ADR-003 / ADR-008）
 - [x] その他: **出典強制（Provenance by Design）** — 全回答経路が出典生成を通過し、出典を作れない場合は回答を生成しない（ADR-005）
 
 ## ディレクトリ構造
@@ -431,7 +431,7 @@ PoC 段階のため軽量な運用を採用しています（[ADR-006](./06-refe
 
 > ⚠️ **本節は未導入（2026-08-15 時点）**
 > 本節が前提とする `docs/specs/`・`scripts/build-spec-index.mjs`・MCP ツール `spec_lookup` / `spec_search` は**本リポジトリに存在しません**。記載の手順をそのまま実行しないこと。
-> また本節に登場する MCP ツール名は Spec Kit 側の別体系であり、本プロジェクトのツール（[API.md](./02-design/API.md) の最小3つ）とは無関係です。メトリクス例（`login_success_rate` 等）も認証前提のサンプルで、本プロジェクトは POC で認証を実装しません。
+> また本節に登場する MCP ツール名は Spec Kit 側の別体系であり、本プロジェクトのツール（[MCP.md](./02-design/MCP.md) の最小3つ。スキーマは [API.md](./02-design/API.md) §3）とは無関係です。メトリクス例（`login_success_rate` 等）も認証前提のサンプルで、本プロジェクトは POC で認証を実装しません。
 > 仕様の粒度管理が必要になった時点で `docs/specs/` を導入し、本節を有効化すること。
 
 Spec Kit 風の粒度管理で AI Spec Driven Development を拡張し、仕様ライフサイクルとLLM利活用を統合する運用ガイド（導入後に適用）。
@@ -576,7 +576,7 @@ metrics:
 コア7以外に、`/init-docs` の初期セットとして次の13文書が本リポジトリに存在する。
 
 - [01-context/CONSTRAINTS.md](./01-context/CONSTRAINTS.md) - 制約条件（提出要件・締切・ライセンス・著作権ルール）
-- [02-design/API.md](./02-design/API.md) - MCP ツール仕様
+- [02-design/API.md](./02-design/API.md) - フロントエンド ↔ バックエンドの `/api/*` API 仕様（コア3操作のスキーマ SSOT）
 - [02-design/DATABASE.md](./02-design/DATABASE.md) - データ資産（DB 未使用の判断と利用オープンデータ一覧）
 - [03-implementation/CONVENTIONS.md](./03-implementation/CONVENTIONS.md) - 命名・コーディング規約（テンプレート未具体化・実装着手時に具体化）
 - [03-implementation/INTEGRATIONS.md](./03-implementation/INTEGRATIONS.md) - 外部連携（テンプレート未具体化・実装着手時に具体化）
@@ -591,7 +591,8 @@ metrics:
 
 ### 追加文書（初期セット外・作業中に追加）
 
-- [02-design/API_REQUIREMENTS.md](./02-design/API_REQUIREMENTS.md) - フロントエンドが必要とするAPI要件（プラン画面）。API.md の3ツールに対する入出力の具体化提案で、ProvenanceSource の確認結果を反映済み
+- [02-design/API_REQUIREMENTS.md](./02-design/API_REQUIREMENTS.md) - フロントエンドが必要とするAPI要件（プラン画面）。API.md のコア3操作に対する入出力の具体化提案で、ProvenanceSource の確認結果を反映済み
+- [02-design/MCP.md](./02-design/MCP.md) - MCP設計書（`/mcp` 基盤開放面。ADR-008 の二面公開のうち AI クライアント向けの面。スキーマは API.md を参照で運び二重定義しない）
 
 ### リポジトリルートの運用ファイル
 
@@ -783,6 +784,12 @@ Changelog エントリには以下のカテゴリを使用する（[Keep a Chang
 - [ ] 定数の配置が層責務に沿っている（Domain/Application/Infrastructure）
 
 ## Changelog
+
+### [1.3.3] - 2026-08-16
+
+#### 修正
+
+- API 文書の二面分割（ADR-008 反映）に追随: API.md の説明を「MCP ツール仕様」から「`/api/*` API 仕様」へ訂正し、[02-design/MCP.md](./02-design/MCP.md)（`/mcp` 基盤開放面）を索引に追加
 
 ### [1.3.2] - 2026-08-16
 
