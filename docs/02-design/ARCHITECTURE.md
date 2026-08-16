@@ -1,6 +1,6 @@
 ---
 title: "ARCHITECTURE"
-version: "1.2.0"
+version: "1.2.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -190,7 +190,7 @@ graph LR
 | Runtime（本番） | workerd | `compatibility_date: 2026-08-15` | Node ではない。バージョンは日付で固定する | - |
 | Runtime（ツール） | Node.js | 24（`.nvmrc` / `engines`） | wrangler と Vite を起動するホスト。本番には存在しない | - |
 | Protocol | MCP（`createMcpHandler`） | 未着手（Step 5） | `McpAgent` は deprecated。ステートレス実装のため Durable Objects が不要 | ADR-008 |
-| Database | Cloudflare D1 | 未着手（Step 2） | Text-to-SQL の実行基盤 ＋ 未回答ログの保持先 | ADR-007 |
+| Database | Cloudflare D1 | **導入済み**（`tabi-concierge-tokyo`・APAC） | Text-to-SQL の実行基盤 ＋ 未回答ログの保持先。スキーマは `migrations/0001_init.sql`（datasets / spots / gaps） | ADR-007 |
 | AI | Cloudflare Workers AI | 未着手（Step 3） | `@cf/meta/llama-3.1-8b-instruct-fp8-fast`（無料枠で叩ける回数が約4倍） | ADR-002 |
 | Cloud | Cloudflare Workers | マネージド | 主催者提供スタック | ADR-002 |
 | CI/CD | 未定 | - | 提出期限までのスコープに含めない | - |
@@ -332,6 +332,13 @@ Phase 番号は [ROADMAP.md](../07-project-management/ROADMAP.md) に準拠す�
 | Phase 4（Final Stage 準備） | 〜2026-10-17 | 介助者モード・音声対応、都への API 公開提案、動的取り込みの検討 |
 
 ## Changelog
+
+### [1.2.1] - 2026-08-16
+
+#### 変更
+
+- D1 の状態を「未着手（Step 2）」から「導入済み」へ更新（Issue #24）。データベース `tabi-concierge-tokyo` を作成し、スキーマ（datasets / spots / gaps）と確定10件の取り込み（1,645 spots）を完了。詳細は [DATABASE.md](./DATABASE.md) §2
+
 
 ### [1.2.0] - 2026-08-16
 

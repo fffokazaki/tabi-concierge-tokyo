@@ -1,0 +1,13 @@
+{
+  "datasetId": "t000012d0000000081",
+  "title": "R6国・地域別外国人旅行者行動特性調査",
+  "publisher": "東京都産業労働局",
+  "license": "CC BY 4.0",
+  "catalogUrl": "https://catalog.data.metro.tokyo.lg.jp/dataset/t000012d0000000081",
+  "resourceUrl": "https://www.opendata.metro.tokyo.lg.jp/sangyouroudou/behavioral_characteristics_survey/R6behavioral_characteristics_survey1.csv",
+  "retrievedAt": "2026-08-16",
+  "updateFrequency": "年1回",
+  "sourceEncoding": "shift_jis",
+  "metadataModified": "2025-12-12T07:23:21.835203",
+  "rows": 22
+}

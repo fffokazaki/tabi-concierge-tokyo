@@ -5,12 +5,17 @@ import { defineConfig } from "vitest/config";
  *
  * - frontend … src/（React）を jsdom で
  * - worker   … worker/（Hono）を workerd で
+ * - scripts  … scripts/（データ取り込みツール）を Node で
  *
  * 実行環境が違うので1つの設定には混ぜられない。片方だけ走らせたいときは
  * `npm run test:frontend` / `npm run test:worker` を使う。
  */
 export default defineConfig({
   test: {
-    projects: ["vitest.frontend.config.ts", "vitest.worker.config.ts"],
+    projects: [
+      "vitest.frontend.config.ts",
+      "vitest.worker.config.ts",
+      "vitest.scripts.config.ts",
+    ],
   },
 });

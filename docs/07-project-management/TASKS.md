@@ -21,7 +21,7 @@
 | UI 実装 | 🔄 着手（骨組みのみ。プラン画面はこれから） |
 | Cloudflare 基盤 | ✅ Worker ＋ SPA ＋ showcase をデプロイ済み（<https://tabi-concierge-tokyo.opendata-002.workers.dev>） |
 | データ（D1） | ✅ 利用データ10件を確定（[Issue #10](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/10)・[DATABASE.md](../02-design/DATABASE.md) §2）。ブロック解消 |
-| データ組み込み | ⬜ 未着手 |
+| データ組み込み | ✅ 完了（1,645 spots・エリア分類済み。[Issue #24](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/24)） |
 | MCP 接続 | ⬜ 未着手 |
 | 提出物（資料・キャプチャ・動画） | ⬜ 未着手 |
 
@@ -30,7 +30,7 @@
 ### 🔴 優先度: Critical（提出締切に直結）
 
 - [x] **利用オープンデータの確定（[Issue #10](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/10)）** — 台東区7件＋都2件＋渋谷区1件の計10件を実データ検証のうえ確定（[DATABASE.md](../02-design/DATABASE.md) §2）
-- [ ] オープンデータを D1 へ取り込む（スキーマ設計 ＋ シード）
+- [x] **オープンデータを D1 へ取り込む（スキーマ設計 ＋ シード）** — [Issue #24](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/24)。datasets/spots/gaps の3テーブル、1,645 spots を投入済み
 - [ ] 上野・浅草を軸にした画面イメージを作成（既存 UI の SCENARIOS をオープンデータ由来の内容へ差し替え。渋谷は観光データが無いため面のみ）
 - [ ] 提出用画面キャプチャ（1600×900px・1〜3点）の切り出し
 - [ ] 提出資料（16:9・必須4項目を含む）の完成

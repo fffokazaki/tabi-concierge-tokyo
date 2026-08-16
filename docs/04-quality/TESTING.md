@@ -1,6 +1,6 @@
 ---
 title: "TESTING"
-version: "1.2.0"
+version: "1.3.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -63,22 +63,37 @@ changeImpact: "medium"
 > §1 以降はテンプレートの汎用ガイド（Jest・Playwright・k6 などの一般例）。
 > **実際に動いているのはこの節の構成**であり、両者が食い違う場合はこの節が正。
 
-### 実行環境を2つに分ける理由
+### 実行環境を3つに分ける理由
 
-このリポジトリのコードは2つの異なるランタイムで動く。テストも同じ環境で走らせないと、
+このリポジトリのコードは3つの異なるランタイムで動く。テストも同じ環境で走らせないと、
 「手元は通るが本番で落ちる」テストになる。
 
 | 対象 | 実行環境 | 設定ファイル | Vitest プロジェクト名 |
 | --- | --- | --- | --- |
 | `src/`（React） | jsdom | `vitest.frontend.config.ts` | `frontend` |
 | `worker/`（Hono） | workerd（`@cloudflare/vitest-pool-workers`） | `vitest.worker.config.ts` | `worker` |
+| `scripts/`（データ取り込み） | Node | `vitest.scripts.config.ts` | `scripts` |
 
-`vitest.config.ts` は上記2つを `projects` でまとめる入口。**`vite.config.ts` は使わない** —
+`vitest.config.ts` は上記3つを `projects` でまとめる入口。**`vite.config.ts` は使わない** —
 `cloudflare()` プラグインを含むため、vitest が読むと `resolve.external` の非互換で
 Startup Error になる（テストコード側の不備ではない）。
 
 worker 側の互換設定（`compatibility_date` / `compatibility_flags`）は `wrangler.jsonc` から
 読む。テスト設定に書き写すと本番とずれるため二重管理しない。
+
+### D1 を使うテスト
+
+workerd のテスト用 D1 は**空**で立ち上がる。スキーマは自動適用されないため、
+`migrations/` を読んでテストへ渡し、テスト側で適用する。これを忘れると
+`no such table` になる（原因が分かりにくい典型）。
+
+- `vitest.worker.config.ts` が `readD1Migrations("./migrations")` で読み、
+  **`cloudflareTest()` の引数の `miniflare.bindings`** で注入する
+  （旧 API の `test.poolOptions.workers.miniflare` は現行版では読まれず、
+  バインディングが `undefined` のまま起動する。型では気づけない）
+- テスト側は `applyD1Migrations(env.DB, env.TEST_MIGRATIONS)` を `beforeAll` で呼ぶ
+- `TEST_MIGRATIONS` はテスト専用のため、本番の `Env` 型には足さず
+  テストファイル内で局所的に型を広げる（`worker/schema.test.ts` 参照）
 
 ### コマンド
 
@@ -87,8 +102,13 @@ npm test              # frontend + worker の両方
 npm run test:watch    # 監視モード
 npm run test:frontend # src/ のみ（jsdom）
 npm run test:worker   # worker/ のみ（workerd）
+npm run test:scripts  # scripts/ のみ（Node）
 npm run typecheck     # tsc -b --noEmit（-b が無いと1ファイルも検査されない）
 ```
+
+> `tsc -b` は **references に入っているプロジェクトしか見ない**。ディレクトリを増やしたら
+> `tsconfig.<name>.json` を作って `tsconfig.json` の `references` に追加する。
+> 追加を忘れると、そのディレクトリは型検査を素通りしたまま静かに通る。
 
 ### CI
 
@@ -751,6 +771,15 @@ test("update user", () => {
 ```
 
 ## Changelog
+
+### [1.3.0] - 2026-08-16
+
+#### 追加
+
+- `scripts`（Node）テストプロジェクトを追加し、実行環境の表を3つへ更新（Issue #24）
+- D1 を使うテストの手順を追加（マイグレーションの適用と、`cloudflareTest()` 引数へのバインディング注入）
+- `tsc -b` は references に入れたプロジェクトしか検査しない旨を明記
+
 
 ### [1.2.0] - 2026-08-16
 

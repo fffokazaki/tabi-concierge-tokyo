@@ -1,0 +1,13 @@
+{
+  "datasetId": "t131067d0000000251",
+  "title": "名所・史跡",
+  "publisher": "台東区",
+  "license": "CC BY 4.0",
+  "catalogUrl": "https://catalog.data.metro.tokyo.lg.jp/dataset/t131067d0000000251",
+  "resourceUrl": "https://www.city.taito.lg.jp/kusei/online/opendata/seikatu/shisethutizujouhou.files/sisetu_30.csv",
+  "retrievedAt": "2026-08-16",
+  "updateFrequency": "年1回",
+  "sourceEncoding": "shift_jis",
+  "metadataModified": "2025-12-12T08:11:21.377227",
+  "rows": 45
+}

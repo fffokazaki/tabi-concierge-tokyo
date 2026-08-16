@@ -35,7 +35,7 @@
 
 - [x] Cloudflare 上に骨組みをデプロイ（Worker ＋ SPA ＋ `/showcase/`）
 - [x] 利用オープンデータの確定（[Issue #10](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/10)）← 2026-08-16 完了。[DATABASE.md](../02-design/DATABASE.md) §2 に確定版10件
-- [ ] オープンデータを D1 へ取り込む（POC 実証）
+- [x] オープンデータを D1 へ取り込む（POC 実証）← 2026-08-16 完了（Issue #24）
 - [ ] コンシェルジュを MCP サーバーとして最小実装（データセット検索・集計・出典取得）し、フロントから接続
 - [ ] 上野・浅草を軸にした画面イメージ作成（既存 UI の SCENARIOS をオープンデータ由来の内容へ差し替え）
 - [ ] 提出直前に確定10件のカタログURL が生きていることを再確認する
