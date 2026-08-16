@@ -9,7 +9,9 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
-    "types": ["node"]
+    // vitest-pool-workers の types は `cloudflare:test`（テスト専用モジュール）の型を足す。
+    // worker/ にテストを同居させているため、ここで一緒に読ませる。
+    "types": ["node", "@cloudflare/vitest-pool-workers/types"]
   },
   // worker-configuration.d.ts は `wrangler types` が生成する（Env と workerd の型）。
   // 手書きしないこと。wrangler.jsonc を変更したら再生成する。
