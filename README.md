@@ -112,9 +112,14 @@ npm install     # Node 24（.nvmrc）
 npm run dev     # Vite + workerd。http://localhost:5173
 npm run build
 npm run deploy  # Cloudflare へデプロイ
+
+npm test        # src/ を jsdom、worker/ を workerd で。両方まとめて
+npm run typecheck
 ```
 
 `npm run dev` は `worker/` のコードを**本番と同じ workerd 上で**実行する。`/api/health` の `runtime` が `Cloudflare-Workers` を返すことで確認できる。
+
+テストも同じ考え方で、`worker/` は本番と同じ workerd 上で走らせる。設定を2つに分けている理由と、片方だけ走らせるコマンドは [TESTING.md](docs/04-quality/TESTING.md)「テスト環境（実装の実態）」にある。
 
 ## 資料
 
