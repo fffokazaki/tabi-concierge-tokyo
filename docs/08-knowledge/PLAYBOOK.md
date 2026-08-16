@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.8.0"
+version: "1.9.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-16"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 14
+ace_entry_count: 15
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -235,8 +235,15 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-9-3 | ローカルに入れたスキル・リファレンスの「推奨 API」も陳腐化する — 公式ドキュメントで裏取りする | tooling | [playbook/tooling.md#ace-9-3](./playbook/tooling.md#ace-9-3) |
 | ACE-18-1 | 「デフォルトブランチは main」を確認せずに前提にしない — closing keyword の挙動はそこで決まる | process | [playbook/process.md#ace-18-1](./playbook/process.md#ace-18-1) |
 | ACE-19-1 | 同じ規定を文書内の2箇所に書くと、片方だけ読んだ読み手が「明記なし」と誤認する — 一元化するか「§Xと同一」と参照で書く | documentation-quality | [playbook/documentation-quality.md#ace-19-1](./playbook/documentation-quality.md#ace-19-1) |
+| ACE-20-1 | リポジトリ外で受け取った仕様関連文書は、確認・更新した時点でリポジトリ取り込みまでを完了条件にする | process | [playbook/process.md#ace-20-1](./playbook/process.md#ace-20-1) |
 
 ## Changelog
+
+### [1.9.0] - 2026-08-16
+
+#### 追加
+
+- ACE-20-1: リポジトリ外で受け取った仕様関連文書はリポジトリ取り込みまでを完了条件にする（PR #20）
 
 ### [1.8.0] - 2026-08-16
 
