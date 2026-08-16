@@ -1,6 +1,6 @@
 ---
 title: "MASTER"
-version: "1.3.3"
+version: "1.3.4"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -337,7 +337,7 @@ tabi-concierge-tokyo/
 
 1. オープンデータをダウンロードしてアプリに組み込む（POC 実証）
 2. MCP 最小3ツール（データセット検索・集計・出典取得）とフロントからの接続
-3. 代表エリア（渋谷・上野）の画面イメージと、出典付き回答の縦貫通
+3. 代表エリア（上野・浅草）の画面イメージと、出典付き回答の縦貫通（利用データは [DATABASE.md](./02-design/DATABASE.md) §2 で確定済み）
 
 ### Phase 3〜4: 拡張機能（First Stage 収録 〜 Final Stage 準備）
 
@@ -784,6 +784,12 @@ Changelog エントリには以下のカテゴリを使用する（[Keep a Chang
 - [ ] 定数の配置が層責務に沿っている（Domain/Application/Infrastructure）
 
 ## Changelog
+
+### [1.3.4] - 2026-08-16
+
+#### 修正
+
+- Phase 2 の代表エリア記述を「渋谷・上野」から「上野・浅草」へ訂正（Issue #10）。渋谷区のカタログ掲載データは17件で観光データが無いことが判明したため、縦貫通は台東区（上野・浅草）で構成する。利用データの確定版は [02-design/DATABASE.md](./02-design/DATABASE.md) §2
 
 ### [1.3.3] - 2026-08-16
 
