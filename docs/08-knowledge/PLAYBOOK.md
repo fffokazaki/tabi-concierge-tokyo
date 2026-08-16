@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.11.0"
+version: "1.12.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-16"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 18
+ace_entry_count: 20
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -239,8 +239,19 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-21-1 | ADR を承認したら、その旧前提で書かれた既存文書を grep で洗い出して同時に追随させる | documentation-quality | [playbook/documentation-quality.md#ace-21-1](./playbook/documentation-quality.md#ace-21-1) |
 | ACE-23-1 | 外部カタログのメタデータは自己申告 — 採否は「実体を取得できるか」で決める | tooling | [playbook/tooling.md#ace-23-1](./playbook/tooling.md#ace-23-1) |
 | ACE-23-2 | ステータスコードを根拠にする前に、対照群でそのコードの意味を確かめる | testing | [playbook/testing.md#ace-23-2](./playbook/testing.md#ace-23-2) |
+| ACE-25-1 | 外部データの写像は列名ではなく「値の集合」を見てから書く | data-processing | [playbook/data-processing.md#ace-25-1](./playbook/data-processing.md#ace-25-1) |
+| ACE-25-2 | 新しいディレクトリは references に入れるまで `tsc -b` の検査を素通りする | data-processing | [playbook/data-processing.md#ace-25-2](./playbook/data-processing.md#ace-25-2) |
 
 ## Changelog
+
+### [1.12.0] - 2026-08-16
+
+#### 追加
+
+- ACE-25-1: 外部データの写像は列名ではなく「値の集合」を見てから書く（Issue #24 / PR #25）
+- ACE-25-2: 新しいディレクトリは references に入れるまで `tsc -b` の検査を素通りする（Issue #24 / PR #25）
+- カテゴリ `data-processing` を新設（`playbook/data-processing.md`）
+
 
 ### [1.11.0] - 2026-08-16
 
