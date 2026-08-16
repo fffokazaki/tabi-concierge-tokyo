@@ -15,32 +15,15 @@ export type Trip = {
 };
 
 /**
- * オープンデータ・コンシェルジュの `get_provenance`（docs/02-design/API.md §3.3）が
- * 返す想定の出典構造。Step 5 で `/api/*` 接続するまでは常に未設定（出典なしの回答を作らないため）。
+ * `POST /api/provenance`（docs/02-design/API.md §3.3）が返す出典構造。
  *
- * 2026-08-16 Okazaki 確認済み: `datasetId` / `license` / `query` の3フィールドとも
- * ドラフトどおりで確定（docs/02-design/API_REQUIREMENTS.md「ProvenanceSource フィールド確認結果」）。
- * エンドポイント自体はまだ実装されていないため、実装時に最終的な出力と突き合わせること。
+ * 定義は `shared/core.ts` に移した（Issue #22）。同じ型を worker 側の実装と
+ * 画面側で二重に書くと、片方だけ直したときに気づけないため、ここでは再エクスポートに留める。
+ * 画面上は Step 5 で接続するまで常に未設定（出典なしの回答を作らないため）。
  */
-export type ProvenanceSource = {
-  /** カタログ上のデータセットID。 */
-  datasetId: string;
-  datasetTitle: string;
-  provider: string;
-  /**
-   * 二次利用が許されるのは CC BY 4.0 のカタログ掲載データのみ（CLAUDE.md 絶対に守ること #4）。
-   * リテラル型にすることで、カタログ外のデータを誤って組み込もうとした場合に型エラーになる。
-   */
-  license: "CC BY 4.0";
-  url: string;
-  /**
-   * 集計を伴う経路（aggregate_dataset）では実行クエリ、検索のみの経路（search_datasets）では
-   * 検索条件を入れる（docs/02-design/API.md §4）。どちらの経路でも必須で、
-   * 「実行クエリが無いから省略する」は仕様違反として扱う。
-   */
-  query: string;
-  retrievedAt: string;
-};
+import type { ProvenanceSource } from "../../../shared/core";
+
+export type { ProvenanceSource };
 
 export type EtiquetteTip = {
   text: string;

@@ -12,13 +12,13 @@
 
 ## 2. ツール一覧
 
-ツール名はコア操作名と同一（**仮称・未確定**。API.md §3 と同時に確定させる）。
+ツール名はコア操作名と同一。3操作とも **2026-08-17 に確定**（Issue #22。スキーマは API.md §3 が SSOT で、ここには二重定義しない）。`/mcp` 面自体はまだ未実装（Step 5）だが、公開するのは下表のツール名・スキーマになる。
 
 | ツール | コア操作 | スキーマの参照先 |
 | ------ | -------- | ---------------- |
-| `search_datasets`（仮称） | データセット検索 | [API.md §3.1](./API.md) |
-| `aggregate_dataset`（仮称） | 集計 | [API.md §3.2](./API.md) |
-| `get_provenance`（仮称） | 出典取得 | [API.md §3.3](./API.md) |
+| `search_datasets` | データセット検索 | [API.md §3.1](./API.md) |
+| `aggregate_dataset` | 集計 | [API.md §3.2](./API.md) |
+| `get_provenance` | 出典取得 | [API.md §3.3](./API.md) |
 
 追加候補（`recommend_spots` / `report_gap`）も API.md §3.4 に従う。
 

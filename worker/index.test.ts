@@ -1,16 +1,5 @@
-import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
-// env は "cloudflare:test" からも取れるが非推奨。本番コードと同じ入口から取る。
-import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import app from "./index";
-
-/** Worker を1回叩いて応答を返す。ExecutionContext の後始末まで面倒をみる。 */
-async function request(path: string, init?: RequestInit): Promise<Response> {
-  const ctx = createExecutionContext();
-  const response = await app.fetch(new Request(`https://example.com${path}`, init), env, ctx);
-  await waitOnExecutionContext(ctx);
-  return response;
-}
+import { request } from "./test-support";
 
 describe("/api/health", () => {
   it("疎通確認の3項目を返す", async () => {

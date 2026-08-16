@@ -47,7 +47,7 @@
 
 - [ ] 8/15 ミーティングの文字起こしをチーム全員に共有（担当: 岡崎）
 - [ ] スライド内タイムコード（右上）の非表示化（本番書き出し前）
-- [ ] コア3操作の引数スキーマ確定と [API.md](../02-design/API.md)（スキーマ SSOT）・[MCP.md](../02-design/MCP.md) への反映
+- [x] コア3操作の引数スキーマ確定と [API.md](../02-design/API.md)（スキーマ SSOT）・[MCP.md](../02-design/MCP.md) への反映（2026-08-17・Issue #22。`/api/*` は `worker/core/` の固定データによるスタブで稼働。中身の本実装は Step 5）
 - [ ] [ARCHITECTURE.md](../02-design/ARCHITECTURE.md) §8 の「未確認」バージョンを実値へ更新
 
 ### 🟢 優先度: Low（Final Stage 以降）
