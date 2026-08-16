@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
+import { AppTabs } from "./features/plan/AppTabs";
 
 type Health = { status: string; service: string; runtime: string };
 
-/**
- * Step 1 の骨組み。
- * 目的は「ブラウザの React → Worker の /api/* が繋がっている」ことを
- * 実際の応答で確認できるようにすること。
- */
 export function App() {
+  return (
+    <>
+      <AppTabs />
+      {import.meta.env.DEV && <DevNotes />}
+    </>
+  );
+}
+
+/** 開発時のみ表示する疎通確認パネル。本番ビルドではマウントされず、/api/health も呼ばれない。 */
+function DevNotes() {
   const [health, setHealth] = useState<Health | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,13 +28,8 @@ export function App() {
   }, []);
 
   return (
-    <main>
-      <p className="eyebrow">旅コンシェルジュTOKYO</p>
-      <h1>9,600のオープンデータを、旅の相棒に。</h1>
-      <p className="lead">
-        東京都オープンデータカタログを出典付きで届けるAI旅行ガイド。
-        現在は骨組みのみで、旅程生成はこれから実装します。
-      </p>
+    <main className="dev-notes">
+      <p className="eyebrow">開発メモ</p>
 
       <section className="card">
         <h2>API 疎通</h2>
