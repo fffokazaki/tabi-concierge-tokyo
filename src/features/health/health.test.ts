@@ -48,6 +48,14 @@ describe("fetchHealth", () => {
     expect(result).toHaveProperty("body", '{"error":"not_found"}');
   });
 
+  it("statusText が空でも http として扱う（本番の HTTP/2 は理由句を持たない）", async () => {
+    const result = await fetchHealth({
+      fetchImpl: respondWith(JSON.stringify({ error: "not_found" }), { status: 404 }),
+    });
+
+    expect(result).toMatchObject({ kind: "http", status: 404, statusText: "" });
+  });
+
   it("2xx でも JSON として読めなければ parse とし、network と混同しない", async () => {
     const html = "<!doctype html><html><body>proxy interstitial</body></html>";
 

@@ -74,8 +74,10 @@ function HealthStatus({ result }: { result: DisplayableResult | null }) {
  *
  * 「接続できません」に寄せないこと。サーバーが応答している失敗（parse / shape）を
  * ネットワーク障害として見せると、原因と逆方向へデバッグを誘導する。
+ *
+ * テストから直接呼べるよう export している（レンダリングには DOM が要るため）。
  */
-function describeFailure(result: Exclude<DisplayableResult, { kind: "ok" }>): FailureView {
+export function describeFailure(result: Exclude<DisplayableResult, { kind: "ok" }>): FailureView {
   switch (result.kind) {
     case "network":
       return {
