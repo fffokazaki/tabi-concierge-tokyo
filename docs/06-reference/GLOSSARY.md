@@ -6,7 +6,7 @@
 
 ### API (Application Programming Interface)
 
-アプリケーション間でデータや機能を共有するためのインターフェース。本プロジェクトの外部インターフェースは REST / GraphQL ではなく **MCP ツール**（[API.md](../02-design/API.md)）。
+アプリケーション間でデータや機能を共有するためのインターフェース。本プロジェクトの外部インターフェースは `/api/*`（JSON、[API.md](../02-design/API.md)）と `/mcp`（MCP ツール、[MCP.md](../02-design/MCP.md)）の二面（ADR-008）。REST 風の汎用 API や GraphQL は採用しない。
 
 ### API Gateway
 
@@ -456,7 +456,7 @@ Webフック。イベント発生時に外部サービスに通知する仕組�
 
 ### MCP（Model Context Protocol）
 
-フロントエンドとバックエンドを接続するプロトコル。本プロジェクトでは最小3ツール（データセット検索・集計・出典取得）を公開する。詳細は [API.md](../02-design/API.md)。
+AI クライアントがツールを選んで呼ぶためのプロトコル。本プロジェクトでは基盤開放面 `/mcp` として最小3ツール（データセット検索・集計・出典取得）を公開する（詳細は [MCP.md](../02-design/MCP.md)、スキーマは [API.md](../02-design/API.md) §3）。フロントエンド ⇄ バックエンドの接続には使わない — React アプリは `/api/*`（JSON）を呼ぶ（ADR-008）。
 
 ### メタデータRAG
 
