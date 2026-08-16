@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    // Node 24 の type stripping で直接実行する（tsx 等を挟まない）ため、
+    // import は拡張子つき（"./lib/csv.ts"）で書く。それを型側でも許可する。
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "types": ["node"]
+  },
+  // データ取り込みツール。workerd でも jsdom でもなく Node で動く
+  "include": ["scripts"]
+}

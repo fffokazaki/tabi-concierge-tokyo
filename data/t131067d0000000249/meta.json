@@ -1,0 +1,13 @@
+{
+  "datasetId": "t131067d0000000249",
+  "title": "トイレ情報",
+  "publisher": "台東区",
+  "license": "CC BY 4.0",
+  "catalogUrl": "https://catalog.data.metro.tokyo.lg.jp/dataset/t131067d0000000249",
+  "resourceUrl": "https://www.city.taito.lg.jp/kusei/online/opendata/seikatu/shisethutizujouhou.files/20250314_koshu_koen_toilet.csv",
+  "retrievedAt": "2026-08-16",
+  "updateFrequency": "年1回",
+  "sourceEncoding": "utf-8",
+  "metadataModified": "2025-12-12T08:11:19.267953",
+  "rows": 69
+}

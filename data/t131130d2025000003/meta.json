@@ -1,0 +1,13 @@
+{
+  "datasetId": "t131130d2025000003",
+  "title": "都市公園・都立公園一覧",
+  "publisher": "渋谷区",
+  "license": "CC BY 4.0",
+  "catalogUrl": "https://catalog.data.metro.tokyo.lg.jp/dataset/t131130d2025000003",
+  "resourceUrl": "https://www.opendata.metro.tokyo.lg.jp/shibuya/131130_shibuyaku_toshitoritukouen.csv",
+  "retrievedAt": "2026-08-16",
+  "updateFrequency": "随時",
+  "sourceEncoding": "utf-8",
+  "metadataModified": "2026-03-30T14:14:52.179963",
+  "rows": 123
+}

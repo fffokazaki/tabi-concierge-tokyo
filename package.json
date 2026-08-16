@@ -18,7 +18,14 @@
     "test:worker": "vitest run --project worker",
     "typecheck": "tsc -b --noEmit",
     "cf-typegen": "wrangler types",
-    "prepare": "wrangler types"
+    "prepare": "wrangler types",
+    "test:scripts": "vitest run --project scripts",
+    "data:fetch": "node scripts/fetch-data.ts",
+    "db:migrate:local": "wrangler d1 migrations apply tabi-concierge-tokyo --local",
+    "db:migrate": "wrangler d1 migrations apply tabi-concierge-tokyo --remote",
+    "db:seed:local": "node scripts/seed.ts && wrangler d1 execute tabi-concierge-tokyo --local --file=db/seed.generated.sql",
+    "db:seed": "node scripts/seed.ts && wrangler d1 execute tabi-concierge-tokyo --remote --file=db/seed.generated.sql",
+    "db:reset:local": "npm run db:migrate:local && npm run db:seed:local"
   },
   "dependencies": {
     "hono": "^4.13.2",

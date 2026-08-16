@@ -62,7 +62,7 @@ Issue があれば件名に含める: feat: #12 ...
 | デプロイ先 | Cloudflare Workers（アカウント `opendata`）。<https://tabi-concierge-tokyo.opendata-002.workers.dev> |
 | デプロイ方法 | **手動**。`npm run deploy`（= `wrangler deploy`）をローカルから実行する。`.github/workflows/ci.yml` は検証（typecheck / test / build）だけを行い、**デプロイはしない**。push 時の自動デプロイは未設定（確認日: 2026-08-16） |
 | 接続 | MCP は `createMcpHandler`（ステートレス。**Durable Objects は使わない**）※Step 5 |
-| データベース | Cloudflare D1 ※Step 2 で導入 |
+| データベース | Cloudflare D1（`tabi-concierge-tokyo`・導入済み）。スキーマは `migrations/`、取り込みは `scripts/`。開発は `npm run db:reset:local` |
 | Python 実行環境 | **未確認**。「現状の構成では Cloudflare 上で Python が使えない」という報告があるが、本リポジトリ内に検証記録はなく未確認（実装で Python を前提にする前に要確認） |
 | 認証 | **実装しない**（POC 段階） |
 | コンテナ | 使用しない（サーバーレス） |

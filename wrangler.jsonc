@@ -24,9 +24,24 @@
 
   "observability": {
     "enabled": true
-  }
+  },
+
+  // オープンデータの格納（Text-to-SQL の実行基盤）と未回答ログ。
+  // 用途はこの2つに限定する（ADR-007）。スキーマは migrations/0001_init.sql。
+  //
+  // database_id は秘密情報ではない（`wrangler d1 create` の出力そのまま。
+  // アクセスには Cloudflare の認証が別途必要）。
+  //
+  // 開発中は --local を付けてローカル D1（miniflare）を使う。
+  // リモートは書き込み 100k 行/日の無料枠があり、再取り込みを繰り返すと当たる。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tabi-concierge-tokyo",
+      "database_id": "5086ea0f-1868-476e-86ac-8070d9b353f9"
+    }
+  ]
 
   // 以降のステップで追加するバインディング:
-  //   "ai": { "binding": "AI" }                                   … Workers AI（Step 3）
-  //   "d1_databases": [{ "binding": "DB", "database_name": "...", "database_id": "..." }]  … D1（Step 2）
+  //   "ai": { "binding": "AI" }   … Workers AI（Step 3）
 }

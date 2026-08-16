@@ -18,3 +18,6 @@ worker-configuration.d.ts
 
 # tsc -b（typecheck）が生成する差分ビルド情報
 *.tsbuildinfo
+
+# シードSQLは生成物（data/ と scripts/seed.ts から再生成できる）
+db/seed.generated.sql
