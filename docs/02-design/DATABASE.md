@@ -44,6 +44,17 @@ node scripts/fetch-data.ts   # カタログAPIから10件を取得（npm run dat
 npm run db:reset:local       # マイグレーション適用 → シード投入（ローカル D1）
 ```
 
+リモート（本番 D1）へ反映するときは、**マイグレーションを先に適用する**。シードだけ流しても
+テーブルが無いため失敗する。
+
+```bash
+npm run db:migrate           # リモートへスキーマ適用（--remote）
+npm run db:seed              # リモートへシード投入（--remote）
+```
+
+- デプロイと同じく**手動実行**。push で自動反映はしない（[CLAUDE.md](../../CLAUDE.md) の技術スタック表）
+- 2026-08-16 時点でリモートへのシードは未実施（ローカル D1 のみ）
+
 - `scripts/fetch-data.ts` はリソースURLをハードコードせず、毎回カタログ API から解決する。**カタログの値（タイトル・提供元・更新頻度・ライセンス・公開状態）が `scripts/lib/datasets.ts` の宣言とズレたら失敗する**ので、古い前提のまま黙って取り込むことがない
 - `scripts/seed.ts` が CSV から `db/seed.generated.sql` を生成する。生成物のため Git 管理しない（`data/` と scripts から再生成できる）
 

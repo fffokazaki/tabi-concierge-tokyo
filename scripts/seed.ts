@@ -12,6 +12,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseCsvRecords } from "./lib/csv.ts";
 import { resolveArea, resolveAreaFromName } from "./lib/area.ts";
+import { isCircleYes } from "./lib/flags.ts";
 import { DATASETS, catalogUrl, type DatasetDef } from "./lib/datasets.ts";
 
 interface Spot {
@@ -114,11 +115,13 @@ function toSpot(def: DatasetDef, rec: Record<string, string>, rowNo: number): Sp
       const name = rec["店名"];
       if (!name) return null;
       const address = rec["住所"] ?? "";
-      // 訪日客に効く項目だけを拾う（バリアフリー22項目すべては持ち込まない）
-      const foreign = rec["英語等外国語のメニューがある"] === "○" ? "外国語メニューあり" : "";
-      const halal = rec["事前申請によるハラール対応が可能"] === "○" ? "ハラール対応可" : "";
-      const vegan =
-        rec["事前申請によるベジタリアンまたはヴィーガン対応が可能"] === "○" ? "ベジタリアン対応可" : "";
+      // 訪日客に効く項目だけを拾う（バリアフリー22項目すべては持ち込まない）。
+      // 丸印は U+3007 と U+25CB が見分けられないため isCircleYes に集約する
+      const foreign = isCircleYes(rec["英語等外国語のメニューがある"]) ? "外国語メニューあり" : "";
+      const halal = isCircleYes(rec["事前申請によるハラール対応が可能"]) ? "ハラール対応可" : "";
+      const vegan = isCircleYes(rec["事前申請によるベジタリアンまたはヴィーガン対応が可能"])
+        ? "ベジタリアン対応可"
+        : "";
       return {
         ...base,
         name,
