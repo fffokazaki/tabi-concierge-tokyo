@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.10.0"
+version: "1.11.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-16"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 16
+ace_entry_count: 18
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -237,8 +237,22 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-19-1 | 同じ規定を文書内の2箇所に書くと、片方だけ読んだ読み手が「明記なし」と誤認する — 一元化するか「§Xと同一」と参照で書く | documentation-quality | [playbook/documentation-quality.md#ace-19-1](./playbook/documentation-quality.md#ace-19-1) |
 | ACE-20-1 | リポジトリ外で受け取った仕様関連文書は、確認・更新した時点でリポジトリ取り込みまでを完了条件にする | process | [playbook/process.md#ace-20-1](./playbook/process.md#ace-20-1) |
 | ACE-21-1 | ADR を承認したら、その旧前提で書かれた既存文書を grep で洗い出して同時に追随させる | documentation-quality | [playbook/documentation-quality.md#ace-21-1](./playbook/documentation-quality.md#ace-21-1) |
+| ACE-23-1 | 外部カタログのメタデータは自己申告 — 採否は「実体を取得できるか」で決める | tooling | [playbook/tooling.md#ace-23-1](./playbook/tooling.md#ace-23-1) |
+| ACE-23-2 | ステータスコードを根拠にする前に、対照群でそのコードの意味を確かめる | testing | [playbook/testing.md#ace-23-2](./playbook/testing.md#ace-23-2) |
 
 ## Changelog
+
+### [1.11.0] - 2026-08-16
+
+#### 追加
+
+- ACE-23-1: 外部カタログのメタデータは自己申告 — 採否は「実体を取得できるか」で決める（Issue #10 / PR #23）
+- ACE-23-2: ステータスコードを根拠にする前に、対照群でそのコードの意味を確かめる（Issue #10 / PR #23）
+
+#### カウンター更新
+
+- ACE-9-1: Helpful +1（「format=CSV」というメタデータ記述を実体取得まで信じない、という同型の教訓が再現した）
+
 
 ### [1.10.0] - 2026-08-16
 
