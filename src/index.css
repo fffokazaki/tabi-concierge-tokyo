@@ -63,7 +63,24 @@ dt { font-size: 0.8rem; color: var(--muted); }
 dd { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; word-break: break-all; }
 
 .muted { color: var(--muted); font-size: 0.85rem; margin: 0; }
-.error { color: oklch(50% 0.18 25); }
+.error { color: oklch(50% 0.18 25); margin: 0 0 0.25rem; }
+
+/* 障害の切り分けに使う補足。原因と、次に疑う場所を書く。 */
+.error-note { margin: 0 0 0.5rem; }
+
+/* サーバーが実際に返した本文。HTML が差し込まれた場合も読めるよう折り返す。 */
+.error-body {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
 a { color: var(--accent); }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
