@@ -1,0 +1,173 @@
+# フロントエンドが必要とするAPI要件（プラン画面）
+
+**作成**: Sho（フロントエンド） → Okazaki 向けの共有ドラフト
+**更新**: 2026-08-16 Okazaki 確認結果を反映（ProvenanceSource 3フィールド確定・`get_provenance` の `query` を必須化・API.md は PR #19 で §3.3 を修正済み）
+**位置づけ**: [API.md](./API.md)（Okazaki 作成のMCPツール仕様、正式なSSOT）に対する、フロントエンド実装から見た具体化の提案。API.md を置き換えるものではなく、そこで「仮称・未確定」とされている3ツールに対して、実際に画面が必要とする入出力の形を提案するものです。
+
+**現状**: `src/features/plan/` に「旅のプロフィール→プラン」画面は実装済みですが、**まだこの3ツールを呼んでいません**。`mockScenarios.ts` の静的な仮データで動いています（Step 3/5 でMCP接続予定）。このドキュメントは、接続する時にツールの入出力がどう見えてほしいかを、実装済みの型から逆算したものです。
+
+**✅ 全体注記（確認済み）**: `ProvenanceSource` の3フィールド（`datasetId` / `license` / `query`）は Okazaki 確認済み（2026-08-16）。**3フィールドともドラフトの想定どおりで確定**。根拠は本書末尾の「ProvenanceSource フィールド確認結果」を参照。あわせて `get_provenance` の入力 `query` は optional から**必須**に修正した（API.md §4）。
+
+---
+
+## 対応する画面
+
+🗺️ プラン（`src/features/plan/PlanScreen.tsx`）。API.md の「フロントエンド5機能とツールの対応」表どおり、`search_datasets` → `aggregate_dataset` → `get_provenance` の3ツールを使います。
+👤 旅のプロフィール（`TripSetupScreen.tsx`）はツール呼び出しなし（`Trip` はクライアント側のコンテキストとして保持するのみ）なので、本書には含めません。
+
+---
+
+## 1. `search_datasets` — データセット検索
+
+### 目的
+ユーザーの興味・エリアから、ルートの停留地候補になりうるデータセットを検索する。
+
+### フロントエンドからの呼び出しタイミング
+- 「ブリーフィングを作成」クリック時（`旅のプロフィール` → `プラン` 遷移）
+- シナリオチップの切り替え時（別の興味・エリアで再検索）
+
+### 提案する入力
+
+```ts
+{
+  query: string;        // trip.interests・trip.notes から組み立てた自然文の質問
+  area?: string;        // POC対象の代表エリア（例: "上野"、"渋谷"）
+  category?: string;    // 例: "神社", "飲食店", "公共交通機関"
+  limit?: number;       // 候補件数の上限 ※API.md で未確定
+}
+```
+
+### 提案する出力
+
+```ts
+{
+  status: "answered";
+  candidates: Array<{
+    datasetId: string;
+    title: string;
+    provider: string;
+    url: string;
+    matchReason: string;   // 適合理由
+  }>;
+} | {
+  status: "unanswered";
+  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | string;
+}
+```
+
+### 備考
+- API.md §4 のとおり、このツールは「実行クエリ」を持たない。出典には検索条件（`query`/`area`/`category`）をそのまま使う想定。
+- `limit` はまだ API.md でも未確定。フロントエンドとしては1ルートあたり3〜4停留地を想定しているので、候補は少なくともその数以上返る形が扱いやすい（要相談）。
+
+---
+
+## 2. `aggregate_dataset` — 集計・抽出
+
+### 目的
+候補データセットから、実際にルート停留地として表示する具体的な情報（場所名・特徴の一文など）を抽出する。
+
+### フロントエンドからの呼び出しタイミング
+`search_datasets` の候補の中からルートに組み込む停留地を決めるたびに（1ルートにつき3〜4回程度）。
+
+### 提案する入力
+
+```ts
+{
+  datasetId: string;
+  intent: string;   // 例: "上野エリアのラーメン店を1件、営業時間の傾向つきで"
+}
+```
+
+### 提案する出力
+
+```ts
+{
+  status: "answered";
+  result: {
+    place: string;   // Stop.place にそのまま入る想定
+    note: string;     // Stop.note にそのまま入る想定
+    // その他の集計結果フィールドは要検討（例: 営業時間の生データ、混雑度など）
+  };
+  query: string;       // 実行したクエリ。出典に必須（API.md §4）
+} | {
+  status: "unanswered";
+  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | string;
+}
+```
+
+### 備考
+- `query`（実行クエリ）は出典に必須。省略不可（API.md §4「実行クエリの不在を理由に出典を省略してはならない」）。
+- `result` の中身は、フロントエンドの `Stop`（`place` / `note`）に何が対応するかまだ握れていない部分がある。実データの粒度を見ながら詰めたい。
+- **未対応**: `Stop.time`（表示用の時刻ラベル）は現在 `Scenario.schedule[position]` としてフロントエンド側で保持しており、データセット由来ではない（並べ替えても時刻が逆行しないための設計）。この集計結果に時刻情報を含める必要はありません。
+
+---
+
+## 3. `get_provenance` — 出典取得
+
+### 目的
+`EtiquetteTip.source`（出典チップ）を表示するための構造化データを取得する。CLAUDE.md の絶対ルール「出典なしの回答を作らない」を満たすため、表示前に必ず呼ぶ想定。
+
+### フロントエンドからの呼び出しタイミング
+`aggregate_dataset` の結果を画面に出す直前（集計を経ない検索のみの経路がある場合は `search_datasets` の直後）。
+
+### 提案する入力
+
+```ts
+{
+  datasetIds: string[];   // 複数可
+  query: string;           // 集計を経た場合は実行クエリ、検索のみの場合は検索条件。必須（API.md §4「実行クエリの不在を理由に出典を省略してはならない」— 検索のみの経路でも検索条件が必ず入るため optional にしない）
+}
+```
+
+### 提案する出力（`ProvenanceSource` に対応）
+
+```ts
+{
+  status: "answered";
+  sources: Array<{
+    datasetId: string;         // ✅ 確認済み（下記参照）
+    datasetTitle: string;
+    provider: string;
+    license: "CC BY 4.0";      // ✅ 確認済み（下記参照）
+    url: string;
+    query: string;              // ✅ 確認済み（下記参照）
+    retrievedAt: string;
+  }>;
+} | {
+  status: "unanswered";
+  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | string;
+}
+```
+
+---
+
+## ProvenanceSource フィールド確認結果（✅ 確認済み 2026-08-16 / Okazaki）
+
+3フィールドとも**ドラフトの想定どおりで確定**。フロントエンドの型 `src/features/plan/types.ts` の `ProvenanceSource` はこのまま使える。
+
+| フィールド | 確定内容 | 根拠 |
+| --- | --- | --- |
+| `datasetId` | **出力に含まれる**。フロントエンド側で入力時の ID を別途保持して突き合わせる必要はない | API.md §4「根拠情報として必須」の表に `get_provenance` の必須項目として明記。§3.3 の出力欄に書かれていなかったのは §4 との記述ゆれで、PR #19 で §3.3 にも追記し解消済み |
+| `license` | **`"CC BY 4.0"` リテラル型のまま維持**（カタログ外データを型レベルで弾く設計を維持） | CONSTRAINTS.md §3「カタログ掲載データは CC BY 4.0」（2026-08-15 チーム合意・事務局資料で確認）。加えて POC の利用データセットは最大10件をチームが選定するため、万一の例外ライセンスも選定段階で除外できる |
+| `query` | **兼用1フィールドで確定**。`executedQuery` / `searchCondition` に分けない | API.md §4 が「実行クエリの**代わりに**検索条件を根拠情報とする」という同一スロット差し替えのモデルで書かれており、分けるとかえって仕様から乖離する |
+
+---
+
+## その他、実装未着手のツール（本書の対象外）
+
+API.md §3.4 に記載のある以下は、対応する画面（📷 スキャン・✨ あなたへ）自体がまだフロントエンドに実装されていないため、本書では要件化していません。実装に着手する段階で改めて要件を出します。
+
+- `recommend_spots`（仮称） — 「あなたへ」画面用
+- `report_gap`（仮称） — 未回答のデータ公開リクエスト化用
+
+---
+
+## 前提として確認したいこと（API.md 側で未定の項目）
+
+以下は API.md 自体が「未定」としている項目で、フロントエンドとして今すぐ必要というわけではありませんが、Step 5 の接続に向けて早めに握っておきたいものです。
+
+- MCPエンドポイントのURL・プロトコルバージョン
+- `search_datasets` の候補件数上限（`limit`）とスコアリング方法
+- エラーレスポンスの形（MCPのエラー表現に合わせる、とのことですが具体形は未定）
+- 複数データセット横断時の出典表記ルール（`get_provenance` が複数ソースを返す場合の画面表示をどう組み立てるか）。本書の提案入力は `datasetIds: string[]` に対し `query` が1つだが、出力は source ごとに `query` を持つ形になっており、この対応関係も横断ルールと合わせて要決定
+- **`aggregate_dataset` の出力語彙（Okazaki からの逆提案）**: `result: { place, note }` のように `Stop` のフィールド名をツール出力に持ち込む形は、API.md 設計原則4「アプリ固有の語彙を持ち込まない」と緊張関係にある。ツール側は `name` / `summary` のような汎用語彙で返し、`Stop.place` / `Stop.note` へのマッピングはフロントエンド側で行う形を検討したい（翌年参加者への基盤開放のため）
