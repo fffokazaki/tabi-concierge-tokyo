@@ -1,6 +1,6 @@
 ---
 title: "DATABASE"
-version: "1.2.0"
+version: "1.3.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -62,16 +62,10 @@ npm run db:migrate           # リモートへスキーマ適用（--remote）
 npm run db:seed              # リモートへシード投入（--remote）
 ```
 
-- デプロイと同じく**手動実行**。push で自動反映はしない（[CLAUDE.md](../../CLAUDE.md) の技術スタック表）
-- **2026-08-17 時点でリモート D1 は空**（`_cf_KV` のみで `datasets` / `spots` / `gaps` が存在しない）。実測で確認済み
+- デプロイと同じく**手動実行**。push で自動反映はしない（[CLAUDE.md](../../CLAUDE.md) の技術スタック表）。**いつ実行するかは [DEPLOYMENT.md](../05-operations/DEPLOYMENT.md) §3 で契機を定めた**
+- **リモート D1 は 2026-08-17 に初回反映済み**（`datasets` 10 行 / `spots` 1,645 行）。それまでは `_cf_KV` のみの空で、`gaps` テーブルが無いため**未回答の記録が本番でだけ機能していなかった**（[Issue #46](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/46)）
 
-  ```
-  $ npx wrangler d1 execute tabi-concierge-tokyo --remote \
-      --command "SELECT name FROM sqlite_master WHERE type='table'"
-  [{ "results": [ { "name": "_cf_KV" } ], "success": true }]
-  ```
-
-  コア3操作は `worker/core/catalog.ts` の固定データで答えるため D1 を引かないが、**未回答の記録（`gaps`）だけは本番で機能しない**。対応は [Issue #46](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/46)
+  コア3操作は `worker/core/catalog.ts` の固定データで答えるため D1 を引かない。したがって D1 が空でも旅程は返るが、`gaps` への記録だけが静かに失われる。**画面でも API でも気づけない**ため、反映後は必ず `gaps` に行が増えることまで確認する（DEPLOYMENT.md §3 の確認手順4項目）
 
 - `scripts/fetch-data.ts` はリソースURLをハードコードせず、毎回カタログ API から解決する。**カタログの値（タイトル・提供元・更新頻度・ライセンス・公開状態）が `scripts/lib/datasets.ts` の宣言とズレたら失敗する**ので、古い前提のまま黙って取り込むことがない
 - `scripts/seed.ts` が CSV から `db/seed.generated.sql` を生成する。生成物のため Git 管理しない（`data/` と scripts から再生成できる）
@@ -271,6 +265,12 @@ No.9「R6国・地域別外国人旅行者行動特性調査」はクロス集�
 - アクセス制御・暗号化の要件は現時点で該当なし（[CONSTRAINTS.md](../01-context/CONSTRAINTS.md) §5）
 
 ## Changelog
+
+### [1.3.0] - 2026-08-17
+
+#### 修正
+
+- §2「取り込みの手順」を実測値へ更新（[Issue #46](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/46)）。リモート D1 は 2026-08-17 に初回反映済み（`datasets` 10 行 / `spots` 1,645 行）。反映の契機は DEPLOYMENT.md §3 に定めた
 
 ### [1.2.0] - 2026-08-17
 

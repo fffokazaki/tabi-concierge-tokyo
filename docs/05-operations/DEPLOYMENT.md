@@ -1,10 +1,10 @@
 ---
 title: "DEPLOYMENT"
-version: "1.3.0"
+version: "1.4.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-16"
+updated: "2026-08-17"
 changeImpact: "high"
 ---
 
@@ -82,9 +82,10 @@ Git Flow ベースの軽量フロー。PoC 段階のため Issue 起票と ACE �
 4. **PR作成** - **必須**。base は `develop`。本文に「何を・なぜ」を書く
 5. **レビュー** - 変更内容に応じて実施。設計判断・出典強制に触れる変更は必ず見る
 6. **レビュー対応** - 指摘への対応内容をコメントで残す
-7. **マージ** - Squash 推奨。`develop` マージでは `Closes #N` が発火しないため Issue は手動クローズ
+7. **マージ** - Squash 推奨。**`Closes #N` は発火する**（このリポジトリのデフォルトブランチが `develop` のため。ADR-009）。手動クローズは不要
 8. **クリーンアップ** - ブランチ削除、`git fetch --prune`
-9. **ナレッジ体系化（ACE）** - **任意**。メンテナ環境では必須運用 ← ACE Playbook: `deployment/ace-cycle.md`
+9. **デプロイ** - `worker/` `shared/` `migrations/` `src/` を変更したときは §3「いつデプロイするか」に従って反映する
+10. **ナレッジ体系化（ACE）** - **任意**。メンテナ環境では必須運用 ← ACE Playbook: `deployment/ace-cycle.md`
 
 ### メンテナ環境のフル運用（参考）
 
@@ -102,23 +103,31 @@ Git Flow ベースの軽量フロー。PoC 段階のため Issue 起票と ACE �
 - **AIツール統合**: `deployment/ai-tools-integration.md`
 - **削除事故防止**: `deployment/agent-deletion-prevention-harness.md`
 
-### ブランチ戦略（Git Flow準拠）
+### ブランチ戦略（PoC 期間・[ADR-009](../06-reference/DECISIONS.md)）
+
+**`develop` が唯一の統合ブランチ。`main` の運用は未定で、使っていない。**
 
 ```
-main/master    ← 本番リリース（常時デプロイ可能）
+develop       ← 唯一の統合ブランチ。デフォルトブランチ・PR の base・デプロイ元
   ↑
-develop       ← 開発統合（次期リリース）
-  ↑
-feature/*     ← 機能開発（Issueベース）
-hotfix/*      ← 緊急修正
-release/*     ← リリース準備
+feature/*     ← 機能追加
+fix/*         ← 不具合修正
+chore/*       ← 雑務
+docs/*        ← 文書のみの変更
+knowledge/*   ← ACE エントリの追記
+
+main          ← 用途未定。develop から乖離したまま放置している（直接コミットは禁止）
 ```
 
-**命名規則**:
+> **`main` は本番ではない。** ブランチ名から「本番リリース」を連想しがちだが、本プロジェクトは `main` を経由せず **`develop` の内容を直接 Cloudflare へ手動反映**している。位置づけは提出（2026-08-23）後に決める（ADR-009）。
 
-- `feature/{issue-number}-{description}` 例: `feature/123-user-auth`
-- `hotfix/{issue-number}-{description}` 例: `hotfix/456-security-patch`
-- `release/{version}` 例: `release/1.2.0`
+**使わないもの**: `release/*` / `hotfix/*`。リリース列が1本しか無いため分ける意味が無い。
+
+**命名規則**: `<種別>/#{issue番号}-{内容}`（Issue があるとき）または `<種別>/{内容}`。
+
+- `feature/#31-connect-plan-to-api`
+- `fix/#30-megurin-area-detection`
+- `docs/43-etiquette-catalog-survey`
 
 ## 2. CI/CDパイプライン
 
@@ -173,6 +182,31 @@ npm run dev     # ローカル（workerd）で確認
 npm run deploy  # vite build → wrangler deploy
 ```
 
+#### いつデプロイするか（[Issue #46](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/46)）
+
+**CI は検証（typecheck / test / build）だけを行い、デプロイしない。** `npm run deploy` の手動実行が唯一の反映経路である。
+
+この「手動」という設計自体は維持するが、**契機を決めていなかったために本番が 43 コミット分・データセット3テーブル分まるごと遅れる事故が起きた**（2026-08-17 に発覚。`/api/search-datasets` が 404、リモート D1 は空）。以下を契機とする。
+
+| 契機 | 実行するもの |
+| --- | --- |
+| **`worker/` または `shared/` を変更する PR をマージしたとき** | `npm run deploy` |
+| **`migrations/` を変更する PR をマージしたとき** | `npm run db:migrate` → `npm run deploy` |
+| **`data/` または `scripts/` を変更してデータの中身が変わるとき** | `npm run db:seed` |
+| 提出直前（2026-08-23） | 3つすべて＋下記の確認 |
+
+`src/`（フロントエンド）だけの変更もデプロイしないと画面に出ない点に注意する。
+
+> **リモートへ反映する順番**: マイグレーション → シード → デプロイ。シードだけ流してもテーブルが無いため失敗する（[DATABASE.md](../02-design/DATABASE.md) §2）。
+
+#### デプロイ記録
+
+「今デプロイされているもの」は `main` では辿れない（ADR-009）。反映したらここに記録する。
+
+| 日時 | Version ID | 内容 | 確認 |
+| --- | --- | --- | --- |
+| 2026-08-17 | `fa5f556b-675b-43ea-9553-aedc2de4c361` | コア3操作（#22）・未回答記録（#27）・部分欠損（#29）・エリア判定修正（#30）・プラン画面の API 接続（#31）を一括反映。あわせてリモート D1 を初回マイグレーション＋シード（`datasets` 10 / `spots` 1,645） | 下記のとおり全項目 OK |
+
 ### デプロイ後の確認
 
 ```bash
@@ -184,6 +218,32 @@ curl -s -o /dev/null -w '%{http_code}\n' $U/api/nope    # 404（SPA に倒れな
 ```
 
 `/api/health` の `runtime` は、**ローカルと本番が同じランタイムで動いているか**を実測するために置いている。設定ファイルの読み合わせでは確認できない。
+
+**疎通だけでは足りない。** 2026-08-17 の事故は `/api/health` が正常に応答したまま起きた（古い Worker にも health はある）。コア3操作と D1 まで実際に叩く。
+
+```bash
+U=https://tabi-concierge-tokyo.opendata-002.workers.dev
+
+# 1. コア3操作が生きている（404 でない）
+curl -s -X POST $U/api/search-datasets -H 'content-type: application/json' \
+  -d '{"query":"上野の寺社をめぐりたい","area":"上野"}'
+
+# 2. 対象エリア外は HTTP 200 の unanswered（エラーにしない）
+curl -s -X POST $U/api/search-datasets -H 'content-type: application/json' \
+  -d '{"query":"新宿の美術館に行きたい","category":"美術館"}'
+
+# 3. 上の呼び出しが gaps に記録されている（DOMAIN.md §8 不変条件4 が本番でも成立）
+npx wrangler d1 execute tabi-concierge-tokyo --remote \
+  --command "SELECT question, area, category, reason FROM gaps ORDER BY id DESC LIMIT 3"
+
+# 4. データが入っている
+npx wrangler d1 execute tabi-concierge-tokyo --remote \
+  --command "SELECT COUNT(*) FROM spots"   # 1645
+```
+
+**3 が最重要。** `gaps` テーブルが無くても未回答の応答は 200 で正常に返り、記録の失敗は `console.error` に出るだけなので、**画面を見ても API を叩いても気づけない**（[Issue #27](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/27) でテストを2通り書いて捕まえた失敗モードそのもの）。
+
+2026-08-17 の反映後、4項目すべてが期待どおりであることを確認済み。`gaps` には `out_of_area`（area=新宿・category=美術館）と `insufficient_granularity`（area=上野）が**解決後のエリアつきで**記録された。
 
 ### 静的アセットの挙動（注意）
 
@@ -334,6 +394,19 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.4.0] - 2026-08-17
+
+#### 修正
+
+- §1 主要ステップ7 の「`develop` マージでは `Closes #N` が発火しない」を訂正。デフォルトブランチが `develop` のため**発火する**（手動クローズは不要）
+- §1 のブランチ戦略を実態へ書き換え（[ADR-009](../06-reference/DECISIONS.md)）。テンプレート由来の Git Flow（`main` / `release/*` / `hotfix/*`）が残っており、**実際には使っていない `main` を「本番リリース」と読ませる状態**だった
+
+#### 追加
+
+- §3 に「いつデプロイするか」を追加（[Issue #46](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/46)）。手動デプロイという設計は維持しつつ、契機を決めていなかったために本番が43コミット遅れる事故が起きたため
+- §3 にデプロイ記録の表を追加。`main` を使わない以上、「今デプロイされているもの」は Cloudflare の Version ID でしか辿れない
+- §3 のデプロイ後確認を4項目へ拡充。`/api/health` は古い Worker でも応答するため疎通だけでは足りない。**`gaps` に行が増えることまで確認する**（記録の失敗は画面でも API でも気づけない）
 
 ### [1.3.0] - 2026-08-16
 
