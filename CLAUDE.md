@@ -49,7 +49,8 @@ Issue があれば件名に含める: feat: #12 ...
 
 ## ドキュメントを変更したとき
 
-- frontmatter を持つ文書（`MASTER.md` / `PROJECT.md` / `ARCHITECTURE.md` / `DOMAIN.md` / `PATTERNS.md` / `TESTING.md` / `DEPLOYMENT.md` ほか）を変更したら、`version`・`updated`・`changeImpact` と末尾の Changelog を同時に更新する
+- **`docs/` 配下の文書はすべて frontmatter を持つ**（例外は `docs/08-knowledge/playbook/*.md`。あれは `/ace-curate` が追記する子ファイルで、メタデータは親の `PLAYBOOK.md` が持つ）。変更したら `version`・`updated`・`changeImpact` と末尾の Changelog を同時に更新する
+- 新しく `docs/` に文書を足すときも frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を付ける
 - 冒頭に「⚠️ テンプレート未具体化」の注記がある文書は、まだ本プロジェクト向けに書き換えられていない。**そこに書かれている技術（DB・REST/GraphQL・コンテナ等）を本プロジェクトの決定と誤認しない**
 
 ## 技術スタックの注意

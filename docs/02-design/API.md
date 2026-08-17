@@ -1,3 +1,13 @@
+---
+title: "API"
+version: "1.0.0"
+status: "draft"
+owner: "@fffokazaki"
+created: "2026-08-15"
+updated: "2026-08-17"
+changeImpact: "low"
+---
+
 # API.md - API設計書（フロントエンド ↔ バックエンド `/api/*`）
 
 > 本システムのバックエンドは、単一の Cloudflare Worker が2つの入口を持つ（[ADR-008](../06-reference/DECISIONS.md)）。本書はそのうち **React アプリが呼ぶ `/api/*`（JSON / Hono）** の設計書である。もう1つの入口 `/mcp`（AI クライアント向けの MCP ツール公開・基盤開放面）は [MCP.md](./MCP.md) を参照。
@@ -209,3 +219,12 @@
 - **SDK**: 提供しない（フロントエンドは `fetch` で呼ぶ。AI クライアント向けは MCP クライアント実装に準ずる — [MCP.md](./MCP.md)）
 - **APIドキュメント**: 本書がその役割を担う。フロントエンドからの要件は [API_REQUIREMENTS.md](./API_REQUIREMENTS.md)
 - **サンドボックス環境**: 未定
+
+## Changelog
+
+### [1.0.0] - 2026-08-17
+
+#### 追加
+
+- frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を導入し、コア文書と書式を揃えた。本文の変更はない
+- `created` は Git の初回コミット日（実測）。この版より前の変更履歴は Git ログを参照する

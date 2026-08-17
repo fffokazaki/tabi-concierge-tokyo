@@ -1,3 +1,13 @@
+---
+title: "DATABASE"
+version: "1.0.0"
+status: "draft"
+owner: "@fffokazaki"
+created: "2026-08-15"
+updated: "2026-08-17"
+changeImpact: "low"
+---
+
 # DATABASE.md - データベース設計書
 
 > **本プロジェクトは Cloudflare D1 を使用する**（[ADR-007](../06-reference/DECISIONS.md)・2026-08-16）。用途は「オープンデータの格納（Text-to-SQL の実行基盤）」と「未回答ログ」の2つに限定する。
@@ -194,3 +204,12 @@ No.9「R6国・地域別外国人旅行者行動特性調査」はクロス集�
 
 - 取り扱うのは公開済みオープンデータのみ。秘匿情報・個人情報は保持しない
 - アクセス制御・暗号化の要件は現時点で該当なし（[CONSTRAINTS.md](../01-context/CONSTRAINTS.md) §5）
+
+## Changelog
+
+### [1.0.0] - 2026-08-17
+
+#### 追加
+
+- frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を導入し、コア文書と書式を揃えた。本文の変更はない
+- `created` は Git の初回コミット日（実測）。この版より前の変更履歴は Git ログを参照する

@@ -1,3 +1,13 @@
+---
+title: "API_REQUIREMENTS"
+version: "1.0.0"
+status: "draft"
+owner: "@fffokazaki"
+created: "2026-08-16"
+updated: "2026-08-17"
+changeImpact: "low"
+---
+
 # フロントエンドが必要とするAPI要件（プラン画面）
 
 **作成**: Sho（フロントエンド） → Okazaki 向けの共有ドラフト
@@ -186,3 +196,12 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 | 複数データセット横断時の `query` の対応関係 | 入力の `query` を各 source に同じ値で複写する。同じ ID を重ねても出典は1件にまとまる。知らない `datasetId` が混ざったら既知のぶんだけ返さず全体を `unanswered` にする（画面上の並べ方はフロントエンド側の決定事項として残る） |
 | `category` の意味 | 絞り込みの述語ではなく**スコアリングのヒント**。ただし指定して1件も当たらなければ `unanswered` になる（無関係な候補は返らない） |
 | `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物しか返らない。** 無ければ `unanswered`。別エリアの施設で代替されることはないので、画面は返ってきた `name` をそのまま信用してよい |
+
+## Changelog
+
+### [1.0.0] - 2026-08-17
+
+#### 追加
+
+- frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を導入し、コア文書と書式を揃えた。本文の変更はない
+- `created` は Git の初回コミット日（実測）。この版より前の変更履歴は Git ログを参照する

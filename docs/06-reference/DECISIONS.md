@@ -1,3 +1,13 @@
+---
+title: "DECISIONS"
+version: "1.0.0"
+status: "draft"
+owner: "@fffokazaki"
+created: "2026-08-15"
+updated: "2026-08-17"
+changeImpact: "low"
+---
+
 # DECISIONS.md - アーキテクチャ決定記録（ADR）
 
 > 本プロジェクトの設計判断を記録する。決定の一次情報は Notion のミーティングノート（[PROJECT.md](../01-context/PROJECT.md) §1 参照）にあり、本書はそれを ADR 形式で構造化したもの。
@@ -409,3 +419,12 @@ AIツール（Claude Code、GitHub Copilot 等）の知識カットオフによ�
 | ADR-006 | PoC 期間の軽量 Git Workflow と運用ルールのリポジトリ内移設 | 2026-08-15 | 承認済み | チームshiwata |
 | ADR-007 | Cloudflare D1 の採用（ADR-004 の限定解除） | 2026-08-16 | 承認済み | チームshiwata |
 | ADR-008 | 単一 Worker で `/api/*` と `/mcp` を二面公開 | 2026-08-15 | 承認済み | チームshiwata |
+
+## Changelog
+
+### [1.0.0] - 2026-08-17
+
+#### 追加
+
+- frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を導入し、コア文書と書式を揃えた。本文の変更はない
+- `created` は Git の初回コミット日（実測）。この版より前の変更履歴は Git ログを参照する

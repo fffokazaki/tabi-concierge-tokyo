@@ -1,10 +1,10 @@
 ---
 title: "MASTER"
-version: "1.3.4"
+version: "1.3.5"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-16"
+updated: "2026-08-17"
 changeImpact: "low"
 ---
 
@@ -577,14 +577,14 @@ metrics:
 
 - [01-context/CONSTRAINTS.md](./01-context/CONSTRAINTS.md) - 制約条件（提出要件・締切・ライセンス・著作権ルール）
 - [02-design/API.md](./02-design/API.md) - フロントエンド ↔ バックエンドの `/api/*` API 仕様（コア3操作のスキーマ SSOT）
-- [02-design/DATABASE.md](./02-design/DATABASE.md) - データ資産（DB 未使用の判断と利用オープンデータ一覧）
+- [02-design/DATABASE.md](./02-design/DATABASE.md) - データベース設計（Cloudflare D1 のスキーマと利用オープンデータ一覧）
 - [03-implementation/CONVENTIONS.md](./03-implementation/CONVENTIONS.md) - 命名・コーディング規約（テンプレート未具体化・実装着手時に具体化）
 - [03-implementation/INTEGRATIONS.md](./03-implementation/INTEGRATIONS.md) - 外部連携（テンプレート未具体化・実装着手時に具体化）
 - [03-implementation/DECISION_TREE.md](./03-implementation/DECISION_TREE.md) - 新規コードの配置判断（Web API 前提の SAMPLE・本プロジェクト未適用）
 - [03-implementation/FALLBACK.md](./03-implementation/FALLBACK.md) - フォールバック戦略（テンプレート未具体化・実装着手時に具体化）
 - [04-quality/VALIDATION.md](./04-quality/VALIDATION.md) - 検証・バリデーション方針（テンプレート未具体化・DB 前提の記述を含む）
 - [06-reference/GLOSSARY.md](./06-reference/GLOSSARY.md) - 用語集（プロジェクト固有用語を含む）
-- [06-reference/DECISIONS.md](./06-reference/DECISIONS.md) - 設計判断記録（ADR-001〜005）
+- [06-reference/DECISIONS.md](./06-reference/DECISIONS.md) - 設計判断記録（ADR-001〜008）
 - [07-project-management/ROADMAP.md](./07-project-management/ROADMAP.md) - ロードマップ
 - [07-project-management/TASKS.md](./07-project-management/TASKS.md) - タスク管理
 - [07-project-management/RISKS.md](./07-project-management/RISKS.md) - リスク管理
@@ -784,6 +784,13 @@ Changelog エントリには以下のカテゴリを使用する（[Keep a Chang
 - [ ] 定数の配置が層責務に沿っている（Domain/Application/Infrastructure）
 
 ## Changelog
+
+### [1.3.5] - 2026-08-17
+
+#### 修正
+
+- 文書索引の陳腐化を2件訂正。DATABASE.md の説明を「DB 未使用の判断」から「Cloudflare D1 のスキーマ」へ（ADR-007 で判断が変わっていた）、DECISIONS.md の説明を「ADR-001〜005」から「ADR-001〜008」へ
+- 初期セット13文書と追加文書に frontmatter が無かったため、コア7文書と書式を揃えて一括付与した（本文の変更なし）。`docs/08-knowledge/playbook/*.md` は `/ace-curate` が追記する子ファイルで、エントリ追加のたびに version が黙って陳腐化するため対象外とした（親の PLAYBOOK.md が frontmatter を持つ）
 
 ### [1.3.4] - 2026-08-16
 

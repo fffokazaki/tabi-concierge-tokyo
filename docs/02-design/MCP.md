@@ -1,3 +1,13 @@
+---
+title: "MCP"
+version: "1.0.0"
+status: "draft"
+owner: "@fffokazaki"
+created: "2026-08-16"
+updated: "2026-08-17"
+changeImpact: "low"
+---
+
 # MCP.md - MCP設計書（基盤開放面 `/mcp`）
 
 > 本書は単一 Worker の二面公開（[ADR-008](../06-reference/DECISIONS.md)）のうち、**AI クライアント向けの MCP（Model Context Protocol）面 `/mcp`** の設計書である。React アプリが呼ぶ `/api/*` は [API.md](./API.md) を参照。
@@ -47,3 +57,12 @@
 ## 6. バージョニング
 
 - ツール名・スキーマの破壊的変更は [DECISIONS.md](../06-reference/DECISIONS.md) に記録する（API.md §8 と同じ運用）
+
+## Changelog
+
+### [1.0.0] - 2026-08-17
+
+#### 追加
+
+- frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を導入し、コア文書と書式を揃えた。本文の変更はない
+- `created` は Git の初回コミット日（実測）。この版より前の変更履歴は Git ログを参照する
