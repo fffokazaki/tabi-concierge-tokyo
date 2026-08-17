@@ -1,3 +1,13 @@
+---
+title: "RISKS"
+version: "1.0.0"
+status: "draft"
+owner: "@fffokazaki"
+created: "2026-08-15"
+updated: "2026-08-17"
+changeImpact: "low"
+---
+
 # RISKS.md - リスク管理
 
 ## 1. リスク管理概要
@@ -95,3 +105,12 @@ R-06・R-07。出典強制の設計（ADR-005）が R-06 の構造的な防御�
 - [x] 10件リストを旅行アプリ主体の企画に合わせて確定する（R-05・2026-08-16 完了）
 - [ ] 台本の読み上げ時間を実測する（R-01）
 - [ ] 提出直前チェックリストを作る（URL 最新化・著作権ルール・必須4項目）（R-07・R-09）
+
+## Changelog
+
+### [1.0.0] - 2026-08-17
+
+#### 追加
+
+- frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を導入し、コア文書と書式を揃えた。本文の変更はない
+- `created` は Git の初回コミット日（実測）。この版より前の変更履歴は Git ログを参照する

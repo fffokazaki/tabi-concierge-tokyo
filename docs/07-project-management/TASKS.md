@@ -1,3 +1,13 @@
+---
+title: "TASKS"
+version: "1.0.0"
+status: "draft"
+owner: "@fffokazaki"
+created: "2026-08-15"
+updated: "2026-08-17"
+changeImpact: "low"
+---
+
 # TASKS.md - タスク管理
 
 > 本書は提出締切（2026-08-23 17:00）までの実作業を管理する。粒度の細かい進行管理は GitHub Issues を SSOT とし、本書は全体像とブロッカーを俯瞰するために使う。
@@ -113,3 +123,12 @@ MCP 最小実装 ─────────────────────
 - フェーズ全体像: [ROADMAP.md](./ROADMAP.md)
 - リスクと対応: [RISKS.md](./RISKS.md)
 - 制約（締切・提出要件・著作権ルール）: [CONSTRAINTS.md](../01-context/CONSTRAINTS.md)
+
+## Changelog
+
+### [1.0.0] - 2026-08-17
+
+#### 追加
+
+- frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を導入し、コア文書と書式を揃えた。本文の変更はない
+- `created` は Git の初回コミット日（実測）。この版より前の変更履歴は Git ログを参照する

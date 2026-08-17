@@ -1,3 +1,13 @@
+---
+title: "GLOSSARY"
+version: "1.0.0"
+status: "draft"
+owner: "@fffokazaki"
+created: "2026-08-15"
+updated: "2026-08-17"
+changeImpact: "low"
+---
+
 # GLOSSARY.md - 用語集
 
 > 「A」〜「Z」の節は**一般的な技術用語の辞書**であり、本プロジェクトでの採用を意味しない。本プロジェクトが実際に使う技術は [MASTER.md](../MASTER.md)「技術スタック」と [ARCHITECTURE.md](../02-design/ARCHITECTURE.md) §8 が SSOT。固有の用語は末尾の「プロジェクト固有用語」を参照。
@@ -538,3 +548,12 @@ POC の対象として絞り込んだエリア（渋谷・上野・浅草など�
 | UUID  | Universally Unique Identifier                | 汎用一意識別子                     |
 | XML   | eXtensible Markup Language                   | 拡張可能マークアップ言語           |
 | XSS   | Cross-Site Scripting                         | クロスサイトスクリプティング       |
+
+## Changelog
+
+### [1.0.0] - 2026-08-17
+
+#### 追加
+
+- frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を導入し、コア文書と書式を揃えた。本文の変更はない
+- `created` は Git の初回コミット日（実測）。この版より前の変更履歴は Git ログを参照する

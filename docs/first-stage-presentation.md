@@ -1,3 +1,13 @@
+---
+title: "first-stage-presentation"
+version: "1.0.0"
+status: "draft"
+owner: "@fffokazaki"
+created: "2026-08-15"
+updated: "2026-08-17"
+changeImpact: "low"
+---
+
 # First Stageプレゼン｜2分スライド構成＋台本
 
 - 収録: 8/26–30（**2分厳守・ライブデモ不可**）
@@ -32,3 +42,12 @@
 - スライド内のタイムコード（右上）はペース配分用。本番書き出し前に非表示化可
 - 動画埋め込みは #3〜#5（UI操作の画面収録）
 - 提出用キャプチャ（1600×900px・1〜3点）は #3・#4・#5 から切り出し推奨
+
+## Changelog
+
+### [1.0.0] - 2026-08-17
+
+#### 追加
+
+- frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を導入し、コア文書と書式を揃えた。本文の変更はない
+- `created` は Git の初回コミット日（実測）。この版より前の変更履歴は Git ログを参照する
