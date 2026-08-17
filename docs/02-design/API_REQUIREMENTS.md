@@ -45,7 +45,9 @@ changeImpact: "medium"
 
 ### フロントエンドからの呼び出しタイミング
 - 「ブリーフィングを作成」クリック時（`旅のプロフィール` → `プラン` 遷移）
-- シナリオチップの切り替え時（別の興味・エリアで再検索）
+- 障害表示の「再試行」クリック時（同じプロフィールで叩き直す）
+
+> 旧版に書いていた「シナリオチップの切り替え時」は削除した。シナリオチップは `mockScenarios.ts` の仮データを切り替えるための足場で、[Issue #31](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/31) の API 接続とともに画面から消えている。
 
 ### 提案する入力
 
@@ -241,6 +243,7 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 #### 修正
 
 - 冒頭の「現状」を更新（[Issue #31](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/31)）。プラン画面は3操作へ接続済みで、`mockScenarios.ts` は削除された。組み立ては `buildPlan.ts`、通信と障害分類は `src/api/coreOperations.ts`
+- §1 の呼び出しタイミングから「シナリオチップの切り替え時」を削除し「再試行クリック時」へ。シナリオチップは仮データの足場で、画面から消えている
 
 #### 追加
 
