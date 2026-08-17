@@ -1,10 +1,18 @@
 import { useId, useState, type ReactNode, type SyntheticEvent } from "react";
+import type { DatasetCandidate } from "../../../shared/core";
 import {
   callOperation,
   peekAnswerStatus,
   type ConsoleOperation,
   type ConsoleResult,
 } from "./apiRequest";
+
+/**
+ * 候補チップに使うフィールド。`shared/core.ts` の `DatasetCandidate` から導出する
+ * （応答型を書き写すとスキーマ変更に気づけない）。応答全体の検証は意図的にしない —
+ * コンソールは仕様外の応答をそのまま見せる道具なので、生 JSON の表示は `unknown` のまま扱う。
+ */
+type CandidateChip = Pick<DatasetCandidate, "datasetId" | "title">;
 
 /** submit イベントの型。React 19 の型定義では `FormEvent` が deprecated のためこちらを使う */
 type SubmitEvent = SyntheticEvent<HTMLFormElement>;
@@ -310,12 +318,12 @@ function ResultShell({ headline, tone, body }: { headline: string; tone: "ok" | 
 const pretty = (value: unknown): string => JSON.stringify(value, null, 2);
 
 /** 検索の `answered` 応答から候補を取り出す。形が仕様外なら空（表示は生 JSON 側に任せる） */
-function extractCandidates(result: ConsoleResult | null): { datasetId: string; title: string }[] {
+function extractCandidates(result: ConsoleResult | null): CandidateChip[] {
   if (result?.kind !== "ok" || peekAnswerStatus(result.body) !== "answered") return [];
   const candidates = (result.body as { candidates?: unknown }).candidates;
   if (!Array.isArray(candidates)) return [];
   return candidates.filter(
-    (candidate): candidate is { datasetId: string; title: string } =>
+    (candidate): candidate is CandidateChip =>
       typeof candidate === "object" &&
       candidate !== null &&
       typeof (candidate as { datasetId?: unknown }).datasetId === "string" &&
