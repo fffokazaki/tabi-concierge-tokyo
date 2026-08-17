@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.14.0"
+version: "1.15.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-17"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 27
+ace_entry_count: 33
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -248,8 +248,25 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-28-5 | 同期のスタブを Hono に載せるときは、戻り値の型と `await` で「後から async にする」に備える | tooling | [playbook/tooling.md#ace-28-5](./playbook/tooling.md#ace-28-5) |
 | ACE-34-1 | デバッグ用の画面は「検証しないこと」が仕様 — 通常のフォームの作法を持ち込まない | tooling | [playbook/tooling.md#ace-34-1](./playbook/tooling.md#ace-34-1) |
 | ACE-34-2 | レビューツールの規約指摘は、そのリポジトリの実績と照合してから採否を決める | process | [playbook/process.md#ace-34-2](./playbook/process.md#ace-34-2) |
+| ACE-37-1 | 名称からエリアを引くとき、括弧書きは「その地物の所在地」ではない | data-processing | [playbook/data-processing.md#ace-37-1](./playbook/data-processing.md#ace-37-1) |
+| ACE-38-1 | 「A / B / C ほか」で終わる規則は取りこぼす — 判定可能な条件に書き換える | documentation-quality | [playbook/documentation-quality.md#ace-38-1](./playbook/documentation-quality.md#ace-38-1) |
+| ACE-39-1 | 「他が当たらなかったときだけ発火する判定」を「当たっても報告する」に変えると、誤検知の性質が変わる | architecture | [playbook/architecture.md#ace-39-1](./playbook/architecture.md#ace-39-1) |
+| ACE-39-2 | `git stash` を使った「戻して落ちるか」検証は HEAD 基準 — ベース基準で見たいなら checkout する | testing | [playbook/testing.md#ace-39-2](./playbook/testing.md#ace-39-2) |
+| ACE-40-1 | 書き込みの副作用は「読み戻すテスト」と「無効化して落ちるか」の二段で確かめる | testing | [playbook/testing.md#ace-40-1](./playbook/testing.md#ace-40-1) |
+| ACE-44-1 | 「本番から落ちる」前提を持つモジュールは、置き場所そのものが契約になっている | architecture | [playbook/architecture.md#ace-44-1](./playbook/architecture.md#ace-44-1) |
 
 ## Changelog
+
+### [1.15.0] - 2026-08-17
+
+#### 追加
+
+- ACE-37-1: 名称からエリアを引くとき、括弧書きは「その地物の所在地」ではない（PR #37 / Issue #30）
+- ACE-38-1: 「A / B / C ほか」で終わる規則は取りこぼす — 判定可能な条件に書き換える（PR #38）
+- ACE-39-1: 「他が当たらなかったときだけ発火する判定」を「当たっても報告する」に変えると、誤検知の性質が変わる（PR #39 / Issue #29）
+- ACE-39-2: `git stash` を使った「戻して落ちるか」検証は HEAD 基準 — ベース基準で見たいなら checkout する（PR #39 / Issue #29）
+- ACE-40-1: 書き込みの副作用は「読み戻すテスト」と「無効化して落ちるか」の二段で確かめる（PR #40 / Issue #27）
+- ACE-44-1: 「本番から落ちる」前提を持つモジュールは、置き場所そのものが契約になっている（PR #44 / Issue #31）
 
 ### [1.14.0] - 2026-08-17
 
