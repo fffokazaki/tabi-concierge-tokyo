@@ -1,7 +1,9 @@
 import type { DragEvent } from "react";
-import { RouteStopCard } from "./components/RouteStopCard";
-import { EtiquetteList } from "./components/EtiquetteList";
 import { DataGapCard } from "./components/DataGapCard";
+import { EtiquetteList } from "./components/EtiquetteList";
+import { ProvenanceChip } from "./components/ProvenanceChip";
+import { RouteStopCard } from "./components/RouteStopCard";
+import type { PlanFailure } from "./buildPlan";
 import type { PlanScreenState } from "./usePlanState";
 
 /** ルートカードの並べ替えドラッグだけを受け付けるための独自 MIME タイプ。
@@ -10,15 +12,14 @@ const STOP_DRAG_MIME_TYPE = "application/x-tabi-stop";
 
 export function PlanScreen({ state }: { state: PlanScreenState }) {
   const {
-    scenarios,
-    activeScenario,
+    request,
     orderedStops,
     selectedStopData,
     displayedEtiquette,
     etiquetteTitle,
     tripSummary,
     goSetup,
-    selectScenario,
+    requestPlan,
     selectStop,
     clearStopSelection,
     reorderStop,
@@ -64,21 +65,7 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
       <div className="screen-header__title">現地の知識で明日を計画しよう。</div>
       <p className="screen-header__lead">ご予定と興味を教えてください。マナーの解説付きでルートを作成します。</p>
 
-      <div className="scenario-chips">
-        {scenarios.map((scenario) => (
-          <button
-            key={scenario.id}
-            type="button"
-            className={`chip${scenario.id === activeScenario.id ? " chip--active" : ""}`}
-            aria-pressed={scenario.id === activeScenario.id}
-            onClick={() => selectScenario(scenario.id)}
-          >
-            {scenario.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="chat-bubble">{activeScenario.prompt}</div>
+      {request.status === "ready" && <div className="chat-bubble">「{request.query}」</div>}
 
       <div className="route-panel">
         <div className="route-panel__header">
@@ -86,45 +73,96 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
           <span className="route-panel__header-label">あなたのルート</span>
         </div>
 
-        {/* 営業時間・案内文・マナーの内容はすべて仮データで出典を持たない（EtiquetteTip.source 未設定）。
-            出典なしの内容を実データであるかのように見せないため、明示のラベルを出す。
-            場所・住所が確認済み（placesFromOpenData）かどうかでシナリオごとに文言を出し分ける
-            ―― 確認済みでも note・etiquette・dataGap.requestCount 等は引き続き未検証のため、
-            「営業時間・案内文・マナー解説は未検証」の一文はどちらの文言にも残す。 */}
-        <p className="demo-data-notice">
-          {activeScenario.placesFromOpenData
-            ? "場所・住所は東京都オープンデータで確認済みです。営業時間・案内文・マナー解説は未検証の仮データです。"
-            : "デモデータです — 実データにはまだ接続されていません。営業時間・料金などの内容は未検証です。"}
-        </p>
+        {request.status === "loading" && (
+          <p className="route-status" role="status">
+            オープンデータを探しています…
+          </p>
+        )}
 
-        {orderedStops.map(({ origIdx, pos, stop, time, selected, isDragOver }) => (
-          <RouteStopCard
-            key={origIdx}
-            stop={stop}
-            time={time}
-            selected={selected}
-            isDragOver={isDragOver}
-            onSelect={() => selectStop(origIdx)}
-            onDragStart={handleDragStart(pos)}
-            onDragOver={handleDragOver(pos)}
-            onDrop={handleDrop(pos)}
-            onDragEnd={() => setDragOverPos(null)}
-          />
-        ))}
+        {request.status === "idle" && (
+          <p className="route-status">旅のプロフィールから「ブリーフィングを作成」を押してください。</p>
+        )}
 
-        {activeScenario.dataGap && <DataGapCard gap={activeScenario.dataGap} />}
+        {/* 「該当するオープンデータがありません」は正常な結果。エラー表示にしない（API.md §4） */}
+        {request.status === "unanswered" && (
+          <div className="route-empty" role="status">
+            <p className="route-empty__title">該当するオープンデータがありません</p>
+            <p className="route-empty__message">{request.message}</p>
+            <p className="route-empty__reason">分類: {request.reason}</p>
+          </div>
+        )}
 
-        <div className="route-divider" />
-        <div className="route-panel__section-header">
-          <span className="route-panel__section-title">{etiquetteTitle}</span>
-          {selectedStopData && (
-            <button type="button" className="route-panel__clear" onClick={clearStopSelection}>
-              すべて表示
-            </button>
-          )}
-        </div>
-        <EtiquetteList tips={displayedEtiquette} />
+        {request.status === "failed" && <FailureNotice failure={request.failure} onRetry={() => void requestPlan()} />}
+
+        {request.status === "ready" && (
+          <>
+            {request.gaps.length > 0 && <DataGapCard gaps={request.gaps} />}
+
+            {orderedStops.map(({ origIdx, pos, stop, source, positionLabel, selected, isDragOver }) => (
+              <div key={origIdx} className="route-stop">
+                <RouteStopCard
+                  stop={stop}
+                  time={positionLabel}
+                  selected={selected}
+                  isDragOver={isDragOver}
+                  onSelect={() => selectStop(origIdx)}
+                  onDragStart={handleDragStart(pos)}
+                  onDragOver={handleDragOver(pos)}
+                  onDrop={handleDrop(pos)}
+                  onDragEnd={() => setDragOverPos(null)}
+                />
+                {/* 出典は停留地ごとに必ず1つ。出典の取れなかった内容は buildPlan が落としている */}
+                <ProvenanceChip source={source} />
+              </div>
+            ))}
+
+            <div className="route-divider" />
+            <div className="route-panel__section-header">
+              <span className="route-panel__section-title">{etiquetteTitle}</span>
+              {selectedStopData && (
+                <button type="button" className="route-panel__clear" onClick={clearStopSelection}>
+                  すべて表示
+                </button>
+              )}
+            </div>
+            {displayedEtiquette.length > 0 ? (
+              <EtiquetteList tips={displayedEtiquette} />
+            ) : (
+              /* 仮のマナー文を出すのは出典なしの回答にあたる（CLAUDE.md 絶対ルール #2）。
+                 出典のあるデータを確保するまでは、無いことをそのまま書く。Issue #43 */
+              <p className="route-status">
+                出典のあるマナー情報はまだありません。カタログに該当データを確認できていないためです。
+              </p>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
 }
+
+/** 障害の表示。`unanswered`（データが無い）とは見た目から区別する。 */
+function FailureNotice({ failure, onRetry }: { failure: PlanFailure; onRetry: () => void }) {
+  return (
+    <div className="route-failure" role="alert">
+      <p className="route-failure__title">{FAILURE_TITLES[failure.kind]}</p>
+      <p className="route-failure__detail">{failure.detail}</p>
+      {failure.kind !== "input" && (
+        <button type="button" className="route-failure__retry" onClick={onRetry}>
+          再試行
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 障害の種別ごとの見出し。まとめて「エラーが発生しました」にすると、原因と逆方向へ
+ * 利用者を誘導する（health.ts / Issue #14 と同じ方針）。
+ */
+const FAILURE_TITLES: Record<PlanFailure["kind"], string> = {
+  input: "入力が足りません",
+  network: "サーバーに接続できませんでした",
+  http: "サーバーがエラーを返しました",
+  parse: "応答を読み取れませんでした",
+};

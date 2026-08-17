@@ -1,3 +1,13 @@
+---
+title: "MCP"
+version: "1.0.0"
+status: "draft"
+owner: "@fffokazaki"
+created: "2026-08-16"
+updated: "2026-08-17"
+changeImpact: "low"
+---
+
 # MCP.md - MCP設計書（基盤開放面 `/mcp`）
 
 > 本書は単一 Worker の二面公開（[ADR-008](../06-reference/DECISIONS.md)）のうち、**AI クライアント向けの MCP（Model Context Protocol）面 `/mcp`** の設計書である。React アプリが呼ぶ `/api/*` は [API.md](./API.md) を参照。
@@ -12,13 +22,13 @@
 
 ## 2. ツール一覧
 
-ツール名はコア操作名と同一（**仮称・未確定**。API.md §3 と同時に確定させる）。
+ツール名はコア操作名と同一。3操作とも **2026-08-17 に確定**（Issue #22。スキーマは API.md §3 が SSOT で、ここには二重定義しない）。`/mcp` 面自体はまだ未実装（Step 5）だが、公開するのは下表のツール名・スキーマになる。
 
 | ツール | コア操作 | スキーマの参照先 |
 | ------ | -------- | ---------------- |
-| `search_datasets`（仮称） | データセット検索 | [API.md §3.1](./API.md) |
-| `aggregate_dataset`（仮称） | 集計 | [API.md §3.2](./API.md) |
-| `get_provenance`（仮称） | 出典取得 | [API.md §3.3](./API.md) |
+| `search_datasets` | データセット検索 | [API.md §3.1](./API.md) |
+| `aggregate_dataset` | 集計 | [API.md §3.2](./API.md) |
+| `get_provenance` | 出典取得 | [API.md §3.3](./API.md) |
 
 追加候補（`recommend_spots` / `report_gap`）も API.md §3.4 に従う。
 
@@ -47,3 +57,12 @@
 ## 6. バージョニング
 
 - ツール名・スキーマの破壊的変更は [DECISIONS.md](../06-reference/DECISIONS.md) に記録する（API.md §8 と同じ運用）
+
+## Changelog
+
+### [1.0.0] - 2026-08-17
+
+#### 追加
+
+- frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を導入し、コア文書と書式を揃えた。本文の変更はない
+- `created` は Git の初回コミット日（実測）。この版より前の変更履歴は Git ログを参照する

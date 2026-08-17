@@ -1,13 +1,31 @@
+---
+title: "API_REQUIREMENTS"
+version: "1.3.0"
+status: "draft"
+owner: "@fffokazaki"
+created: "2026-08-16"
+updated: "2026-08-17"
+changeImpact: "medium"
+---
+
 # フロントエンドが必要とするAPI要件（プラン画面）
 
 **作成**: Sho（フロントエンド） → Okazaki 向けの共有ドラフト
 **更新**: 2026-08-16 Okazaki 確認結果を反映（ProvenanceSource 3フィールド確定・`get_provenance` の `query` を必須化・API.md は PR #19 で §3.3 を修正済み）。同日、ADR-008 の二面公開を反映（下記注記参照）
 **更新**: 2026-08-17 Sho が `aggregate_dataset` の出力語彙について Okazaki の逆提案（`name`/`summary` の汎用語彙）に合意。§2 の入出力例を更新し、`Stop.place`/`Stop.note` へのマッピングはフロントエンド側の責務であることを明記
-**位置づけ**: [API.md](./API.md)（フロントエンド ↔ バックエンドの `/api/*` API 仕様、正式なSSOT）に対する、フロントエンド実装から見た具体化の提案。API.md を置き換えるものではなく、そこで「仮称・未確定」とされている3操作に対して、実際に画面が必要とする入出力の形を提案するものです。
+**更新**: 2026-08-17 コア3操作の `/api/*` スタブを実装（Issue #22）。本書の提案はほぼそのまま採用され、エンドポイントパスと入出力スキーマは [API.md](./API.md) §3 で**確定**した。本書は「提案」から「確定した仕様に対するフロントエンド側の視点」に位置づけが変わっている
+**位置づけ**: [API.md](./API.md)（フロントエンド ↔ バックエンドの `/api/*` API 仕様、正式なSSOT）に対する、フロントエンド実装から見た具体化。API.md を置き換えるものではありません。**入出力で食い違いがあれば API.md が正**です。
 
 **呼び出し経路の注記（ADR-008）**: フロントエンドが呼ぶのは **`/api/*`（JSON）** であり、MCP を直接話すことはありません（React 側に MCP クライアントを実装するのは ADR-008 で禁止）。本書で `search_datasets` 等と呼んでいるのは `worker/core/` の**コア操作名**で、`/mcp`（[MCP.md](./MCP.md)、AI クライアント向け開放面）でも同名ツールとして公開されます。本書の入出力提案は経路によらずコア操作のスキーマに対するものなので、内容はそのまま有効です。
 
-**現状**: `src/features/plan/` に「旅のプロフィール→プラン」画面は実装済みですが、**まだこの3ツールを呼んでいません**。`mockScenarios.ts` の静的な仮データで動いています（Step 3/5 でMCP接続予定）。このドキュメントは、接続する時にツールの入出力がどう見えてほしいかを、実装済みの型から逆算したものです。
+**現状**: プラン画面は **2026-08-17 に3操作へ接続済み**（[Issue #31](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/31)）。`mockScenarios.ts` の静的な仮データは削除し、`search_datasets` → `aggregate_dataset` → `get_provenance` の応答から旅程と出典チップを組み立てています。組み立ては `src/features/plan/buildPlan.ts`、通信と障害分類は `src/api/coreOperations.ts`。
+
+バックエンドは `worker/core/` の固定データによるスタブのままですが、**入出力の形は本実装（Step 5）でも変えません**。
+
+**この接続で分かったこと2点**:
+
+1. **エリアを指定する入力欄が無い。** `Trip` に `area` フィールドが無いため、`search_datasets` の `area` は送っていません。代表エリアを狙うには「その他のご希望」（`trip.notes`）に地名を書く経路しかなく、書かれた地名は質問文の一部として渡ります（実測で効くことを確認済み）。専用の入力欄は [Issue #42](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/42)
+2. **マナー解説が空になった。** `mockScenarios.ts` のマナー文は出典を持たない仮データだったため、API 接続経路に残せませんでした（CLAUDE.md 絶対ルール #2）。出典のあるデータの確保は [Issue #43](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/43)
 
 **✅ 全体注記（確認済み）**: `ProvenanceSource` の3フィールド（`datasetId` / `license` / `query`）は Okazaki 確認済み（2026-08-16）。**3フィールドともドラフトの想定どおりで確定**。根拠は本書末尾の「ProvenanceSource フィールド確認結果」を参照。あわせて `get_provenance` の入力 `query` は optional から**必須**に修正した（API.md §4）。
 
@@ -27,7 +45,9 @@
 
 ### フロントエンドからの呼び出しタイミング
 - 「ブリーフィングを作成」クリック時（`旅のプロフィール` → `プラン` 遷移）
-- シナリオチップの切り替え時（別の興味・エリアで再検索）
+- 障害表示の「再試行」クリック時（同じプロフィールで叩き直す）
+
+> 旧版に書いていた「シナリオチップの切り替え時」は削除した。シナリオチップは `mockScenarios.ts` の仮データを切り替えるための足場で、[Issue #31](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/31) の API 接続とともに画面から消えている。
 
 ### 提案する入力
 
@@ -36,9 +56,11 @@
   query: string;        // trip.interests・trip.notes から組み立てた自然文の質問
   area?: string;        // POC対象の代表エリア（例: "上野"、"渋谷"）
   category?: string;    // 例: "神社", "飲食店", "公共交通機関"
-  limit?: number;       // 候補件数の上限 ※API.md で未確定
+  limit?: number;       // 候補件数の上限。既定 4・上限 10（API.md §3.1 で確定）
 }
 ```
+
+> **`trip.interests` は ASCII の識別子**（`"ramen"` / `"culture"` …）になった（[Issue #17](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/17)）。`query` を組み立てるときは `src/features/plan/labels.ts` の `INTEREST_LABELS` で日本語ラベルに変換する。バックエンドのマッチは日本語の部分一致なので、識別子をそのまま繋ぐと1件も当たらない。
 
 ### 提案する出力
 
@@ -52,15 +74,44 @@
     url: string;
     matchReason: string;   // 適合理由
   }>;
+  gaps?: Array<{          // 答えられなかった側面（Issue #29）。無いときはキーごと省かれる
+    status: "unanswered";
+    reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | "other";
+    message: string;
+  }>;
 } | {
   status: "unanswered";
-  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | string;
+  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | "other";  // 閉じた列挙（API.md §4）
+  message: string;   // 画面に出せる日本語。何が無くて答えられなかったのか
 }
 ```
 
 ### 備考
 - API.md §4 のとおり、このツールは「実行クエリ」を持たない。出典には検索条件（`query`/`area`/`category`）をそのまま使う想定。
-- `limit` はまだ API.md でも未確定。フロントエンドとしては1ルートあたり3〜4停留地を想定しているので、候補は少なくともその数以上返る形が扱いやすい（要相談）。
+- `limit` は **既定 4・上限 10 で確定**（API.md §3.1）。既定値は「1ルートあたり3〜4停留地」という本書の想定に合わせたもの。範囲外は 400 で、黙って丸められない。
+
+### 🔴 未合意: `gaps`（部分欠損）の画面での出し方
+
+本書 §1 の想定どおり、フロントエンドは `trip.interests` を**1つの自然文にまとめて送る**。すると「上野の美術館とラーメン」のように、答えられる興味と答えられない興味が1つの `query` に混ざる。以前はこの場合、答えられる候補だけが返り、**ラーメン側の欠損は応答のどこにも現れなかった**。
+
+[Issue #29](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/29) で、`answered` に `gaps` を載せるようにした（バックエンド実装済み）。**画面での出し方はまだ Sho と合意していない。** 以下は Okazaki からの提案で、確定ではない。
+
+載るのは**求めているデータの種類**を指す語から判定できる2つだけ。ジャンル指定の飲食（`insufficient_granularity`）と、渋谷の観光データ未公開（`data_not_published`）。対象エリア外の地名は**載せない**（「新宿のホテルから上野の美術館へ」の新宿は出発地であって、新宿のデータを求めてはいないため）。
+
+**提案する扱い**:
+
+| 状況 | 画面 |
+| --- | --- |
+| `gaps` が無い | 今までどおり。何も足さない |
+| `gaps` がある | ルートは通常どおり表示し、**その下に「この興味には答えられませんでした」の注記**を `message` つきで出す |
+| `status: "unanswered"` | 従来どおり「該当するオープンデータがありません」＋ `message`。エラー表示にはしない |
+
+**提案の意図**: `gaps` をエラー扱いにしたくない。データが無いことは本プロジェクトでは**正常な出力**（DOMAIN.md §8 不変条件4）で、むしろ「どのデータが公開されていないか」を利用者に見せることが企画の芯の半分にあたる（DOMAIN.md §7 の「未回答 → データ公開リクエスト」）。赤いエラーバナーにすると、この意味が伝わらない。
+
+**Sho に確認したいこと**:
+1. 上記の「ルートの下に注記」で良いか。それとも興味チップ側に印を付けるほうが自然か
+2. `message` はバックエンドが返す日本語をそのまま出す前提でよいか（英語表示は Issue #17 の多言語化と合わせて後日）
+3. `gaps` を**無視した実装**でも画面は壊れないが、その場合は欠損が利用者に見えない。表示は必須と考えてよいか
 
 ---
 
@@ -94,7 +145,8 @@
   query: string;       // 実行したクエリ。出典に必須（API.md §4）
 } | {
   status: "unanswered";
-  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | string;
+  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | "other";  // 閉じた列挙（API.md §4）
+  message: string;   // 画面に出せる日本語。何が無くて答えられなかったのか
 }
 ```
 
@@ -138,7 +190,8 @@
   }>;
 } | {
   status: "unanswered";
-  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | string;
+  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | "other";  // 閉じた列挙（API.md §4）
+  message: string;   // 画面に出せる日本語。何が無くて答えられなかったのか
 }
 ```
 
@@ -167,11 +220,51 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 
 ## 前提として確認したいこと（API.md 側で未定の項目）
 
-以下は API.md 自体が「未定」としている項目で、フロントエンドとして今すぐ必要というわけではありませんが、Step 5 の接続に向けて早めに握っておきたいものです。
+以下は API.md 自体が「未定」としている項目です。
 
-- MCPエンドポイントのURL・プロトコルバージョン
-- `search_datasets` の候補件数上限（`limit`）とスコアリング方法
-- エラーレスポンスの形（MCPのエラー表現に合わせる、とのことですが具体形は未定）
-- 複数データセット横断時の出典表記ルール（`get_provenance` が複数ソースを返す場合の画面表示をどう組み立てるか）。本書の提案入力は `datasetIds: string[]` に対し `query` が1つだが、出力は source ごとに `query` を持つ形になっており、この対応関係も横断ルールと合わせて要決定
+- MCPエンドポイントのURL・プロトコルバージョン（`/mcp` 面は Step 5 で実装。フロントエンドは `/api/*` を使うため直接の影響はない）
+- `search_datasets` のスコアリング方法（Step 5 のメタデータRAG で再設計。`limit` は下記のとおり確定済み）
 
-**解決済み**: `aggregate_dataset` の出力語彙（`name`/`summary` の汎用語彙、`Stop.place`/`Stop.note` へのマッピングはフロントエンド側）は 2026-08-17 に Sho が Okazaki の逆提案に合意。§2 を参照。
+### 解決済み（2026-08-17・Issue #22）
+
+| 項目 | 決定 |
+| ---- | ---- |
+| `aggregate_dataset` の出力語彙 | `name` / `summary` の汎用語彙。`Stop.place` / `Stop.note` へのマッピングはフロントエンド側（§2 参照） |
+| `search_datasets` の `limit` | 既定 4・上限 10。範囲外は 400（黙って丸めない）。既定値は1ルート3〜4停留地という本書 §1 の想定に合わせた |
+| エラーレスポンスの形 | `{ error: "invalid_request" \| "not_found" \| "internal_error", message?: string }`。400 は**入力の形の違反だけ**に使い、「データが無い」は `unanswered` ＋ HTTP 200（API.md §4）。500 も JSON で返るので、画面は常に JSON として読んでよい |
+| 複数データセット横断時の `query` の対応関係 | 入力の `query` を各 source に同じ値で複写する。同じ ID を重ねても出典は1件にまとまる。知らない `datasetId` が混ざったら既知のぶんだけ返さず全体を `unanswered` にする（画面上の並べ方はフロントエンド側の決定事項として残る） |
+| `category` の意味 | 絞り込みの述語ではなく**スコアリングのヒント**。ただし指定して1件も当たらなければ `unanswered` になる（無関係な候補は返らない） |
+| `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物しか返らない。** 無ければ `unanswered`。別エリアの施設で代替されることはないので、画面は返ってきた `name` をそのまま信用してよい |
+
+## Changelog
+
+### [1.3.0] - 2026-08-17
+
+#### 修正
+
+- 冒頭の「現状」を更新（[Issue #31](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/31)）。プラン画面は3操作へ接続済みで、`mockScenarios.ts` は削除された。組み立ては `buildPlan.ts`、通信と障害分類は `src/api/coreOperations.ts`
+- §1 の呼び出しタイミングから「シナリオチップの切り替え時」を削除し「再試行クリック時」へ。シナリオチップは仮データの足場で、画面から消えている
+
+#### 追加
+
+- 接続で分かった2点を明記。エリアの入力欄が無く「その他のご希望」経由でしか指定できないこと（[Issue #42](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/42)）、出典を持つマナーのデータが無くマナー欄が空になったこと（[Issue #43](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/43)）
+
+### [1.2.0] - 2026-08-17
+
+#### 追加
+
+- §1 の入力に注記を追加（[Issue #17](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/17)）。`trip.interests` が ASCII の識別子になったため、`query` を組み立てるときは `INTEREST_LABELS` で日本語ラベルへ変換する必要がある（バックエンドのマッチは日本語の部分一致）
+
+### [1.1.0] - 2026-08-17
+
+#### 追加
+
+- §1 の出力に `gaps`（部分欠損）を追記（[Issue #29](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/29)）。バックエンドは実装済み
+- §1 に「🔴 未合意: `gaps` の画面での出し方」を追加。**Okazaki からの提案であり、Sho との合意は未了**。確認したい3点を明記した
+
+### [1.0.0] - 2026-08-17
+
+#### 追加
+
+- frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を導入し、コア文書と書式を揃えた。本文の変更はない
+- `created` は Git の初回コミット日（実測）。この版より前の変更履歴は Git ログを参照する

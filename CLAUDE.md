@@ -24,6 +24,8 @@ PoC 段階のため軽量な運用を採用している。判断の背景は [AD
 ブランチ作成（develop から）→ 実装・コミット → PR 作成 → レビュー → squash merge → ブランチ削除
 ```
 
+**`main` は使わない。運用方針が未定である**（[ADR-009](docs/06-reference/DECISIONS.md)）。`develop` が唯一の統合ブランチで、デフォルトブランチ・PR の base・デプロイ元をすべて兼ねる。`main` は `develop` から乖離したまま放置しており、**本番を指してはいない**。位置づけは提出（2026-08-23）後に決める。`release/*` / `hotfix/*` も使わない（リリース列が1本しか無いため）。
+
 | 項目 | 扱い |
 | --- | --- |
 | **Issue 起票** | **任意**。仕様に議論が必要なとき・複数人で分担するときだけ起票する |
@@ -49,7 +51,8 @@ Issue があれば件名に含める: feat: #12 ...
 
 ## ドキュメントを変更したとき
 
-- frontmatter を持つ文書（`MASTER.md` / `PROJECT.md` / `ARCHITECTURE.md` / `DOMAIN.md` / `PATTERNS.md` / `TESTING.md` / `DEPLOYMENT.md` ほか）を変更したら、`version`・`updated`・`changeImpact` と末尾の Changelog を同時に更新する
+- **`docs/` 配下の文書はすべて frontmatter を持つ**（例外は `docs/08-knowledge/playbook/*.md`。あれは `/ace-curate` が追記する子ファイルで、メタデータは親の `PLAYBOOK.md` が持つ）。変更したら `version`・`updated`・`changeImpact` と末尾の Changelog を同時に更新する
+- 新しく `docs/` に文書を足すときも frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を付ける
 - 冒頭に「⚠️ テンプレート未具体化」の注記がある文書は、まだ本プロジェクト向けに書き換えられていない。**そこに書かれている技術（DB・REST/GraphQL・コンテナ等）を本プロジェクトの決定と誤認しない**
 
 ## 技術スタックの注意
@@ -60,7 +63,7 @@ Issue があれば件名に含める: feat: #12 ...
 | Worker | Hono（`worker/`）。ローカルも本番も **workerd** で動く（Node ではない） |
 | ビルド | Vite 8 ＋ `@cloudflare/vite-plugin`。ツールチェーンは Node 24（`.nvmrc`） |
 | デプロイ先 | Cloudflare Workers（アカウント `opendata`）。<https://tabi-concierge-tokyo.opendata-002.workers.dev> |
-| デプロイ方法 | **手動**。`npm run deploy`（= `wrangler deploy`）をローカルから実行する。`.github/workflows/ci.yml` は検証（typecheck / test / build）だけを行い、**デプロイはしない**。push 時の自動デプロイは未設定（確認日: 2026-08-16） |
+| デプロイ方法 | **手動**。`npm run deploy`（= `wrangler deploy`）をローカルから実行する。`.github/workflows/ci.yml` は検証（typecheck / test / build）だけを行い、**デプロイはしない**。**いつ実行するかは [DEPLOYMENT.md](docs/05-operations/DEPLOYMENT.md) §3 で契機を定めた**（`worker/` `shared/` を変更したらデプロイ、`migrations/` なら先に `db:migrate`）。契機を決めていなかったため本番が43コミット遅れる事故があった（Issue #46） |
 | 接続 | MCP は `createMcpHandler`（ステートレス。**Durable Objects は使わない**）※Step 5 |
 | データベース | Cloudflare D1（`tabi-concierge-tokyo`・導入済み）。スキーマは `migrations/`、取り込みは `scripts/`。開発は `npm run db:reset:local` |
 | Python 実行環境 | **未確認**。「現状の構成では Cloudflare 上で Python が使えない」という報告があるが、本リポジトリ内に検証記録はなく未確認（実装で Python を前提にする前に要確認） |

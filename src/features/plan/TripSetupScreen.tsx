@@ -1,4 +1,5 @@
 import { BUDGET_OPTIONS, COUNTER_BOUNDS, INTEREST_OPTIONS, PACE_OPTIONS, SETTING_OPTIONS } from "./constants";
+import { BUDGET_LABELS, PACE_LABELS, SETTING_LABELS } from "./labels";
 import { Counter } from "./components/Counter";
 import { ChoiceGroup } from "./components/ChoiceGroup";
 import { InterestChips } from "./components/InterestChips";
@@ -50,6 +51,7 @@ export function TripSetupScreen({ state }: { state: TripSetupState }) {
           label="屋内・屋外"
           hint="天候が崩れたときの提案に反映されます。"
           options={SETTING_OPTIONS}
+          labels={SETTING_LABELS}
           value={trip.setting}
           onSelect={(setting) => setTrip("setting", setting)}
         />
@@ -57,6 +59,7 @@ export function TripSetupScreen({ state }: { state: TripSetupState }) {
           label="ペース"
           hint="1日にどれだけ詰め込むか。"
           options={PACE_OPTIONS}
+          labels={PACE_LABELS}
           value={trip.pace}
           onSelect={(pace) => setTrip("pace", pace)}
         />
@@ -64,6 +67,7 @@ export function TripSetupScreen({ state }: { state: TripSetupState }) {
           label="予算"
           hint="1人1日あたり。"
           options={BUDGET_OPTIONS}
+          labels={BUDGET_LABELS}
           value={trip.budget}
           onSelect={(budget) => setTrip("budget", budget)}
         />

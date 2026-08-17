@@ -1,3 +1,13 @@
+---
+title: "proposal-summary"
+version: "1.0.0"
+status: "draft"
+owner: "@fffokazaki"
+created: "2026-08-15"
+updated: "2026-08-17"
+changeImpact: "low"
+---
+
 # 企画概要｜旅コンシェルジュTOKYO v1.0
 
 ## 課題
@@ -42,3 +52,12 @@
 
 > 公開されていても、届かなければ、開かれていない。
 > 「1データ＝1アプリ」の時代を、旅から終わらせる。
+
+## Changelog
+
+### [1.0.0] - 2026-08-17
+
+#### 追加
+
+- frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を導入し、コア文書と書式を揃えた。本文の変更はない
+- `created` は Git の初回コミット日（実測）。この版より前の変更履歴は Git ログを参照する

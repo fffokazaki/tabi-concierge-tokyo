@@ -1,3 +1,13 @@
+---
+title: "TASKS"
+version: "1.0.0"
+status: "draft"
+owner: "@fffokazaki"
+created: "2026-08-15"
+updated: "2026-08-17"
+changeImpact: "low"
+---
+
 # TASKS.md - タスク管理
 
 > 本書は提出締切（2026-08-23 17:00）までの実作業を管理する。粒度の細かい進行管理は GitHub Issues を SSOT とし、本書は全体像とブロッカーを俯瞰するために使う。
@@ -47,7 +57,7 @@
 
 - [ ] 8/15 ミーティングの文字起こしをチーム全員に共有（担当: 岡崎）
 - [ ] スライド内タイムコード（右上）の非表示化（本番書き出し前）
-- [ ] コア3操作の引数スキーマ確定と [API.md](../02-design/API.md)（スキーマ SSOT）・[MCP.md](../02-design/MCP.md) への反映
+- [x] コア3操作の引数スキーマ確定と [API.md](../02-design/API.md)（スキーマ SSOT）・[MCP.md](../02-design/MCP.md) への反映（2026-08-17・Issue #22。`/api/*` は `worker/core/` の固定データによるスタブで稼働。中身の本実装は Step 5）
 - [ ] [ARCHITECTURE.md](../02-design/ARCHITECTURE.md) §8 の「未確認」バージョンを実値へ更新
 
 ### 🟢 優先度: Low（Final Stage 以降）
@@ -113,3 +123,12 @@ MCP 最小実装 ─────────────────────
 - フェーズ全体像: [ROADMAP.md](./ROADMAP.md)
 - リスクと対応: [RISKS.md](./RISKS.md)
 - 制約（締切・提出要件・著作権ルール）: [CONSTRAINTS.md](../01-context/CONSTRAINTS.md)
+
+## Changelog
+
+### [1.0.0] - 2026-08-17
+
+#### 追加
+
+- frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を導入し、コア文書と書式を揃えた。本文の変更はない
+- `created` は Git の初回コミット日（実測）。この版より前の変更履歴は Git ログを参照する

@@ -1,5 +1,6 @@
 import { AppTabs } from "./features/plan/AppTabs";
 import { HealthPanel } from "./features/health/HealthPanel";
+import { ApiConsole } from "./features/console/ApiConsole";
 
 export function App() {
   return (
@@ -17,6 +18,8 @@ function DevNotes() {
       <p className="eyebrow">開発メモ</p>
 
       <HealthPanel />
+
+      <ApiConsole />
 
       <section className="card">
         <h2>デザインの正典</h2>

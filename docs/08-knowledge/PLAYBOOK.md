@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.12.0"
+version: "1.15.0"
 status: "approved"
 created: "2026-08-15"
-updated: "2026-08-16"
+updated: "2026-08-17"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 20
+ace_entry_count: 33
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -241,8 +241,62 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-23-2 | ステータスコードを根拠にする前に、対照群でそのコードの意味を確かめる | testing | [playbook/testing.md#ace-23-2](./playbook/testing.md#ace-23-2) |
 | ACE-25-1 | 外部データの写像は列名ではなく「値の集合」を見てから書く | data-processing | [playbook/data-processing.md#ace-25-1](./playbook/data-processing.md#ace-25-1) |
 | ACE-25-2 | 新しいディレクトリは references に入れるまで `tsc -b` の検査を素通りする | data-processing | [playbook/data-processing.md#ace-25-2](./playbook/data-processing.md#ace-25-2) |
+| ACE-28-1 | 出典を強制する設計では、フォールバックの既定値が最大の欠陥になる | architecture | [playbook/architecture.md#ace-28-1](./playbook/architecture.md#ace-28-1) |
+| ACE-28-2 | 自分で書いたテストは「発火しない条件」を無意識に選ぶ — 直したら戻して落ちることを確かめる | testing | [playbook/testing.md#ace-28-2](./playbook/testing.md#ace-28-2) |
+| ACE-28-3 | 日本語の部分一致は語の境界を見ない — 語彙リストは誤爆の除外とセットで書く | data-processing | [playbook/data-processing.md#ace-28-3](./playbook/data-processing.md#ace-28-3) |
+| ACE-28-4 | `tsc` の include が要るのは「どこからも import されていないファイル」— import 済みなら検査される | data-processing | [playbook/data-processing.md#ace-28-4](./playbook/data-processing.md#ace-28-4) |
+| ACE-28-5 | 同期のスタブを Hono に載せるときは、戻り値の型と `await` で「後から async にする」に備える | tooling | [playbook/tooling.md#ace-28-5](./playbook/tooling.md#ace-28-5) |
+| ACE-34-1 | デバッグ用の画面は「検証しないこと」が仕様 — 通常のフォームの作法を持ち込まない | tooling | [playbook/tooling.md#ace-34-1](./playbook/tooling.md#ace-34-1) |
+| ACE-34-2 | レビューツールの規約指摘は、そのリポジトリの実績と照合してから採否を決める | process | [playbook/process.md#ace-34-2](./playbook/process.md#ace-34-2) |
+| ACE-37-1 | 名称からエリアを引くとき、括弧書きは「その地物の所在地」ではない | data-processing | [playbook/data-processing.md#ace-37-1](./playbook/data-processing.md#ace-37-1) |
+| ACE-38-1 | 「A / B / C ほか」で終わる規則は取りこぼす — 判定可能な条件に書き換える | documentation-quality | [playbook/documentation-quality.md#ace-38-1](./playbook/documentation-quality.md#ace-38-1) |
+| ACE-39-1 | 「他が当たらなかったときだけ発火する判定」を「当たっても報告する」に変えると、誤検知の性質が変わる | architecture | [playbook/architecture.md#ace-39-1](./playbook/architecture.md#ace-39-1) |
+| ACE-39-2 | `git stash` を使った「戻して落ちるか」検証は HEAD 基準 — ベース基準で見たいなら checkout する | testing | [playbook/testing.md#ace-39-2](./playbook/testing.md#ace-39-2) |
+| ACE-40-1 | 書き込みの副作用は「読み戻すテスト」と「無効化して落ちるか」の二段で確かめる | testing | [playbook/testing.md#ace-40-1](./playbook/testing.md#ace-40-1) |
+| ACE-44-1 | 「本番から落ちる」前提を持つモジュールは、置き場所そのものが契約になっている | architecture | [playbook/architecture.md#ace-44-1](./playbook/architecture.md#ace-44-1) |
 
 ## Changelog
+
+### [1.15.0] - 2026-08-17
+
+#### 追加
+
+- ACE-37-1: 名称からエリアを引くとき、括弧書きは「その地物の所在地」ではない（PR #37 / Issue #30）
+- ACE-38-1: 「A / B / C ほか」で終わる規則は取りこぼす — 判定可能な条件に書き換える（PR #38）
+- ACE-39-1: 「他が当たらなかったときだけ発火する判定」を「当たっても報告する」に変えると、誤検知の性質が変わる（PR #39 / Issue #29）
+- ACE-39-2: `git stash` を使った「戻して落ちるか」検証は HEAD 基準 — ベース基準で見たいなら checkout する（PR #39 / Issue #29）
+- ACE-40-1: 書き込みの副作用は「読み戻すテスト」と「無効化して落ちるか」の二段で確かめる（PR #40 / Issue #27）
+- ACE-44-1: 「本番から落ちる」前提を持つモジュールは、置き場所そのものが契約になっている（PR #44 / Issue #31）
+
+### [1.14.0] - 2026-08-17
+
+#### 追加
+
+- ACE-34-1: デバッグ用の画面は「検証しないこと」が仕様 — 通常のフォームの作法を持ち込まない（Issue #33 / PR #34）
+- ACE-34-2: レビューツールの規約指摘は、そのリポジトリの実績と照合してから採否を決める（Issue #33 / PR #34）
+
+#### カウンター更新
+
+- ACE-21-1: Helpful +1（README の API ガイド追加時に、ADR-008 以前の旧前提（MCP 直結の図・未作成ディレクトリの記述）を洗い出して同時追随した。PR #35）
+
+
+### [1.13.0] - 2026-08-17
+
+#### 追加
+
+- ACE-28-1: 出典を強制する設計では、フォールバックの既定値が最大の欠陥になる（Issue #22 / PR #28）
+- ACE-28-2: 自分で書いたテストは「発火しない条件」を無意識に選ぶ — 直したら戻して落ちることを確かめる（Issue #22 / PR #28）
+- ACE-28-3: 日本語の部分一致は語の境界を見ない — 語彙リストは誤爆の除外とセットで書く（Issue #22 / PR #28）
+- ACE-28-4: `tsc` の include が要るのは「どこからも import されていないファイル」— import 済みなら検査される（Issue #22 / PR #28）
+- ACE-28-5: 同期のスタブを Hono に載せるときは、戻り値の型と `await` で「後から async にする」に備える（Issue #22 / PR #28）
+- カテゴリ `architecture` を新設（`playbook/architecture.md`）
+
+#### カウンター更新
+
+- ACE-19-1: Helpful +1（確定した規定が API_REQUIREMENTS.md の2箇所で食い違っていたのを、grep で洗って同時に追随させた）
+- ACE-23-2: Helpful +1（tsconfig の include の効果を、入れた場合だけでなく外した場合も測って因果を特定した）
+- ACE-25-2: Helpful +1（`shared/` 追加時にわざと型エラーを入れて検査が効くことを確認。その過程で ACE-28-4 の精緻化に至った）
+
 
 ### [1.12.0] - 2026-08-16
 

@@ -1,22 +1,28 @@
-import type { DataGap } from "../types";
+import type { Unanswered } from "../../../../shared/core";
 
 /**
+ * 答えられなかった興味の表示（Issue #29 の `gaps`）。
+ *
  * 承認済みデザインカンプ（public/showcase/uploads/Gap_Design_new_jap.pdf）の
- * 「ラーメンの代わりに」カードを実装したもの。ボタンは静的表示のみで送信先が無い
- * （report_gap が未実装のため。DOMAIN.md §7 / API.md §3.4）。
+ * 見た目（角丸の破線カード）を踏襲しつつ、中身は実際の仕組みに合わせてある。
+ * デザインカンプにあった「この情報をリクエストする」ボタンと件数表示は含めない
+ * ―― 実際の仕組みは、答えられなかった検索が発生した時点で自動的に
+ * gaps テーブルへ記録される（サーバー側、worker/core/gaps.ts）ため、
+ * 利用者が別途ボタンを押して申請するという操作は存在しない。ボタンを残すと
+ * 実在しない「オプトインの申請」という仕組みを示唆してしまう（2026-08-17 合意）。
+ *
+ * エラー扱いにしない。データが無いことは正常な出力で、「どのデータが公開されて
+ * いないか」を見せること自体が企画の芯にあたる（DOMAIN.md §7）。
  */
-export function DataGapCard({ gap }: { gap: DataGap }) {
+export function DataGapCard({ gaps }: { gaps: Unanswered[] }) {
   return (
-    <div className="data-gap-card">
-      <div className="data-gap-card__eyebrow">{gap.subject}の代わりに</div>
-      <div className="data-gap-card__title">{gap.title}</div>
-      <p className="data-gap-card__explanation">{gap.explanation}</p>
-      <div className="data-gap-card__button" role="button" aria-disabled="true">
-        この情報をリクエストする
-      </div>
-      <p className="data-gap-card__note">
-        東京都オープンデータポータルに送信されます。これまでに{gap.requestCount}人がリクエストしています。
-      </p>
+    <div className="data-gap-card" role="status">
+      <p className="data-gap-card__title">一部の興味には答えられませんでした</p>
+      <ul className="data-gap-card__list">
+        {gaps.map((gap) => (
+          <li key={`${gap.reason}:${gap.message}`}>{gap.message}</li>
+        ))}
+      </ul>
     </div>
   );
 }

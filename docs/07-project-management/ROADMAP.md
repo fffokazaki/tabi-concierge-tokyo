@@ -1,3 +1,13 @@
+---
+title: "ROADMAP"
+version: "1.0.0"
+status: "draft"
+owner: "@fffokazaki"
+created: "2026-08-15"
+updated: "2026-08-17"
+changeImpact: "low"
+---
+
 # ROADMAP.md - プロジェクトロードマップ
 
 ## 1. プロジェクト概要
@@ -147,3 +157,12 @@
 | ---- | -------- |
 | 2026-08-07 | 4案からオープンデータ・コンシェルジュ1案へ絞り込み |
 | 2026-08-15 | スコープを POC レベルへ縮小、アーキテクチャを MCP 構成に確定 |
+
+## Changelog
+
+### [1.0.0] - 2026-08-17
+
+#### 追加
+
+- frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を導入し、コア文書と書式を揃えた。本文の変更はない
+- `created` は Git の初回コミット日（実測）。この版より前の変更履歴は Git ログを参照する

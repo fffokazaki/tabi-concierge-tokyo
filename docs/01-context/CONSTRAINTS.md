@@ -1,3 +1,13 @@
+---
+title: "CONSTRAINTS"
+version: "1.0.0"
+status: "draft"
+owner: "@fffokazaki"
+created: "2026-08-15"
+updated: "2026-08-17"
+changeImpact: "low"
+---
+
 # CONSTRAINTS.md - プロジェクト制約事項
 
 > 本書はハッカソン主催者（東京都 / GovTech東京）の規定と、2026-08-15 チーム合意で確定した制約を記録する。数値・期限は Notion の一次情報（[PROJECT.md](./PROJECT.md) §1 参照）に従う。
@@ -174,3 +184,12 @@
 | 2026-08-15 | 対象エリア | 全都域から渋谷・上野など代表エリアに限定 | チーム合意 |
 | 2026-08-15 | アーキテクチャ | フロント＝旅行アプリ、バックエンド＝コンシェルジュ、両者を MCP で接続する構成に決定 | チーム合意 |
 | 2026-08-15 | 二次利用 | カタログ掲載データは CC BY 4.0 で商用含む二次利用可、と整理 | チーム合意（事務局資料で確認） |
+
+## Changelog
+
+### [1.0.0] - 2026-08-17
+
+#### 追加
+
+- frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を導入し、コア文書と書式を揃えた。本文の変更はない
+- `created` は Git の初回コミット日（実測）。この版より前の変更履歴は Git ログを参照する

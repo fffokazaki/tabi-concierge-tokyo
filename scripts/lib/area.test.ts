@@ -52,6 +52,46 @@ describe("resolveAreaFromName（住所列を持たないデータ用）", () => 
     expect(resolveAreaFromName("12谷中銀座・よみせ通り")).toBeNull();
     expect(resolveAreaFromName("")).toBeNull();
   });
+
+  describe("括弧内の路線名に引っかからない（Issue #30）", () => {
+    it("路線名の地名ではなく停留所名の地名で決まる", () => {
+      // 「上野公園経由」の路線名が先に当たり、この路線の全38停留所が上野に倒れていた
+      expect(resolveAreaFromName("東西(上野公園経由・三崎坂往復ルート)27西浅草三丁目")).toBe("浅草");
+      expect(resolveAreaFromName("東西(上野公園経由・三崎坂往復ルート)30浅草駅")).toBe("浅草");
+      expect(resolveAreaFromName("東西(上野公園経由・三崎坂往復ルート)31雷門前")).toBe("浅草");
+    });
+
+    it("路線名にしか地名が無い停留所は判定しない（路線名で埋めない）", () => {
+      // 谷中・三崎坂・新御徒町は代表エリア外。路線名の「上野公園」で上野にしてはいけない
+      expect(resolveAreaFromName("東西(上野公園経由・三崎坂往復ルート)12谷中銀座・よみせ通り")).toBeNull();
+      expect(resolveAreaFromName("東西(上野公園経由・三崎坂往復ルート)37新御徒町駅")).toBeNull();
+    });
+
+    it("停留所名側の地名は括弧があっても拾える（回帰確認）", () => {
+      expect(resolveAreaFromName("東西(鶯谷駅経由・日医大回りルート)2上野駅入谷口")).toBe("上野");
+      expect(resolveAreaFromName("東西(上野公園経由・三崎坂往復ルート)18池之端四丁目")).toBe("上野");
+    });
+
+    it("全角の括弧書きも落とす", () => {
+      // 補足は全角で書かれている実データがある（三筋は代表エリア外なので null）
+      expect(resolveAreaFromName("東西(上野公園経由・三崎坂往復ルート)35三筋二丁目（台東デザイナーズビレッジ）")).toBeNull();
+      // 括弧内にだけ代表エリア名がある場合も、それで判定しない
+      expect(resolveAreaFromName("架空停留所（上野公園経由）")).toBeNull();
+    });
+
+    it("曖昧な町字の判定も括弧を落とした後に行う", () => {
+      // 路線名に浅草橋を含むだけで、浅草の停留所を判定不能にしない
+      expect(resolveAreaFromName("南北(浅草橋経由ルート)5西浅草三丁目")).toBe("浅草");
+      // 停留所名の側が浅草橋なら従来どおり判定しない
+      expect(resolveAreaFromName("南北(上野公園経由ルート)5浅草橋駅前")).toBeNull();
+    });
+
+    it("括弧が閉じていない名称は削らない（どこまでが括弧書きか決められないため）", () => {
+      // 実データ72件には 0 件。削る範囲を推測しない代わりに、路線名に引っかかる可能性は残る。
+      // 挙動を明示しておかないと、後から「閉じていない場合も直っている」と誤読される
+      expect(resolveAreaFromName("東西(上野公園経由27西浅草三丁目")).toBe("上野");
+    });
+  });
 });
 
 describe("resolveArea", () => {

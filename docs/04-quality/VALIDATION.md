@@ -1,3 +1,13 @@
+---
+title: "VALIDATION"
+version: "1.0.0"
+status: "draft"
+owner: "@fffokazaki"
+created: "2026-08-15"
+updated: "2026-08-17"
+changeImpact: "low"
+---
+
 # VALIDATION.md - 検証・品質保証ガイド
 
 > ⚠️ **テンプレート未具体化（本プロジェクト未適用・2026-08-15 時点）**
@@ -570,3 +580,12 @@ class ValidationReporter {
   }
 }
 ```
+
+## Changelog
+
+### [1.0.0] - 2026-08-17
+
+#### 追加
+
+- frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を導入し、コア文書と書式を揃えた。本文の変更はない
+- `created` は Git の初回コミット日（実測）。この版より前の変更履歴は Git ログを参照する

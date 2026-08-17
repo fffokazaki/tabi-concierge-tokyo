@@ -1,16 +1,36 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import type { Unanswered, UnansweredReason } from "../../../shared/core";
+import { buildPlan, type BuildPlanOptions, type PlanFailure, type SourcedStop } from "./buildPlan";
 import { DEFAULT_TRIP, STOP_COUNT_BY_PACE } from "./constants";
-import { MOCK_SCENARIOS } from "./mockScenarios";
-import type { InterestTag, Scenario, Screen, Stop, Trip } from "./types";
+import { INTEREST_LABELS, PACE_LABELS } from "./labels";
+import type { InterestTag, Screen, Trip } from "./types";
 
 type CounterKey = "adults" | "kids" | "days";
+
+/**
+ * ルート組み立ての状態（Issue #31）。
+ *
+ * **`unanswered` と `failed` を型で分けてある。** 「該当するオープンデータがありません」は
+ * 正常な結果（API.md §4・DOMAIN.md §8 不変条件4）で、通信断や 500 とは別物。
+ * 1つの `error` にまとめると、データが無いことが障害として表示され、欠損が見えなくなる。
+ *
+ * 仮データへ戻す状態は**持たない**。応答が無いときに既定のルートを見せる経路を作ると、
+ * 出典なしの内容が出典つきに見える（[ACE-28-1](../../../docs/08-knowledge/playbook/architecture.md#ace-28-1)）。
+ */
+export type PlanRequestState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "ready"; query: string; stops: SourcedStop[]; gaps: Unanswered[] }
+  | { status: "unanswered"; reason: UnansweredReason; message: string }
+  | { status: "failed"; failure: PlanFailure };
 
 export type OrderedStop = {
   origIdx: number;
   pos: number;
-  stop: Stop;
-  /** activeScenario.schedule[pos] 由来。pos（並べ替え後の位置）に紐づき、stop 自体には持たせない。 */
-  time: string;
+  stop: SourcedStop["stop"];
+  source: SourcedStop["source"];
+  /** 表示用の順番ラベル。pos（並べ替え後の位置）から導出され、stop 自体には持たせない。 */
+  positionLabel: string;
   selected: boolean;
   isDragOver: boolean;
 };
@@ -20,48 +40,37 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * trip.kids / trip.interests からブリーフィング画面の初期シナリオを選ぶ。
- * 子ども連れは最優先で family へ。次に、選択された興味のいずれかが一致するシナリオへ
- * （シナリオ自身の interest フィールドを見るため、"ナイトライフ" 以外の興味を追加しても
- * この関数を書き換えずに拾える）。どれにも一致しなければ ramen（無ければ先頭）へ。
- *
- * ramen 自身はマッチング対象から除外する。ramen の interest（"ラーメン"）は
- * DEFAULT_TRIP で最初から選択済みのため、除外しないと他の興味（例: ナイトライフ）を
- * 追加で選んでも常に ramen が先に一致してしまう（ramen は「フォールバック」の
- * 役割であって、他と対等な「一致候補」ではないため）。
+ * @param options `buildPlan` への注入口。テストが fetch を差し替えるために使う。
  */
-function pickScenarioId(trip: Trip, scenarios: Scenario[]): string {
-  if (trip.kids > 0) {
-    const family = scenarios.find((s) => s.id === "family");
-    if (family) return family.id;
-  }
-  const fallbackId = scenarios.some((s) => s.id === "ramen") ? "ramen" : scenarios[0].id;
-  const matched = scenarios.find((s) => s.id !== fallbackId && s.interest && trip.interests.includes(s.interest));
-  return matched ? matched.id : fallbackId;
-}
-
-export function usePlanState(scenarios: Scenario[] = MOCK_SCENARIOS) {
+export function usePlanState(options: BuildPlanOptions = {}) {
   const [screen, setScreen] = useState<Screen>("setup");
   const [trip, setTripState] = useState<Trip>(DEFAULT_TRIP);
-  const [scenarioId, setScenarioId] = useState<string>(scenarios[0].id);
-  const [stopOrder, setStopOrder] = useState<Record<string, number[]>>({});
-  const [selectedStop, setSelectedStop] = useState<Record<string, number | null>>({});
+  const [request, setRequest] = useState<PlanRequestState>({ status: "idle" });
+  /** null は「並べ替えていない（応答の順）」。新しいルートが来たら null に戻す */
+  const [order, setOrder] = useState<number[] | null>(null);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [dragPos, setDragPos] = useState<number | null>(null);
+  /**
+   * 進行中のリクエストの通し番号。連打で古い応答があとから届いたときに、
+   * 新しいルートを古いもので上書きしないためのガード。
+   */
+  const latestRequest = useRef(0);
 
-  const activeScenario = scenarios.find((s) => s.id === scenarioId) ?? scenarios[0];
-  // 並べ替えは全停留地分保持するが、表示するのはペースに応じた件数だけ（隠れた分の並び順は失わない）。
-  const order = stopOrder[scenarioId] ?? activeScenario.stops.map((_, i) => i);
-  const visibleCount = Math.min(STOP_COUNT_BY_PACE[trip.pace], activeScenario.stops.length);
-  const visibleOrder = order.slice(0, visibleCount);
-  const selIdx = selectedStop[scenarioId] ?? null;
-  const selectedStopData = selIdx != null ? activeScenario.stops[selIdx] : null;
+  const stops = request.status === "ready" ? request.stops : [];
+  // 並べ替えは応答全件分保持するが、表示するのはペースに応じた件数だけ（隠れた分の並び順は失わない）。
+  // reorderStop の範囲判定・splice の基点はどちらも「表示中の件数」を自然に使う形になっている
+  // （下記参照）ため、ここでスライスするだけで両方に正しく効く。
+  const visibleCount = Math.min(STOP_COUNT_BY_PACE[trip.pace], stops.length);
+  const effectiveOrder = (order ?? stops.map((_, i) => i)).slice(0, visibleCount);
+  const selectedStopData = selectedIdx != null ? (stops[selectedIdx]?.stop ?? null) : null;
 
-  const orderedStops: OrderedStop[] = visibleOrder.map((origIdx, pos) => ({
+  const orderedStops: OrderedStop[] = effectiveOrder.map((origIdx, pos) => ({
     origIdx,
     pos,
-    stop: activeScenario.stops[origIdx],
-    time: activeScenario.schedule[pos],
-    selected: selIdx === origIdx,
+    stop: stops[origIdx].stop,
+    source: stops[origIdx].source,
+    positionLabel: `${pos + 1}番目`,
+    selected: selectedIdx === origIdx,
     isDragOver: dragPos === pos,
   }));
 
@@ -77,59 +86,78 @@ export function usePlanState(scenarios: Scenario[] = MOCK_SCENARIOS) {
       interests: t.interests.includes(tag) ? t.interests.filter((i) => i !== tag) : [...t.interests, tag],
     }));
 
+  /** コア3操作を呼んでルートを組み立て直す。並べ替え・選択はリセットする。 */
+  const requestPlan = async () => {
+    const id = ++latestRequest.current;
+    setRequest({ status: "loading" });
+    setOrder(null);
+    setSelectedIdx(null);
+    setDragPos(null);
+
+    const outcome = await buildPlan(trip, options);
+    // 後発のリクエストに追い越されていたら、古い応答は捨てる
+    if (id !== latestRequest.current) return;
+
+    setRequest(
+      outcome.kind === "plan"
+        ? { status: "ready", query: outcome.query, stops: outcome.stops, gaps: outcome.gaps }
+        : outcome.kind === "unanswered"
+          ? { status: "unanswered", reason: outcome.reason, message: outcome.message }
+          : { status: "failed", failure: outcome.failure },
+    );
+  };
+
   const saveTrip = () => {
-    setScenarioId(pickScenarioId(trip, scenarios));
     setScreen("briefing");
+    void requestPlan();
   };
 
   const goSetup = () => setScreen("setup");
   const goBriefing = () => setScreen("briefing");
-  const selectScenario = (id: string) => setScenarioId(id);
 
-  const selectStop = (origIdx: number) =>
-    setSelectedStop((s) => ({ ...s, [scenarioId]: s[scenarioId] === origIdx ? null : origIdx }));
+  const selectStop = (origIdx: number) => setSelectedIdx((current) => (current === origIdx ? null : origIdx));
 
-  const clearStopSelection = () => setSelectedStop((s) => ({ ...s, [scenarioId]: null }));
+  const clearStopSelection = () => setSelectedIdx(null);
 
   /**
    * ドラッグ&ドロップの並べ替え結果を反映する。呼び出し元（PlanScreen）は
    * カスタム MIME タイプでドラッグ元を絞り込んでいるが、fromPos/toPos は外部から
    * 渡ってくる値（dataTransfer 経由）なので、ここでも独立に整数・範囲チェックを行う。
    * 不正な値は無視し、順序は変更しない。
-   *
-   * 範囲は order.length ではなく visibleCount（画面に出ている件数）で判定する。
-   * ペースが「ゆったり」等で一部の停留地が非表示のとき、その隠れた停留地の位置へ
-   * ドラッグできてしまうのを防ぐため（隠れている停留地は並べ替えの対象外）。
    */
   const reorderStop = (fromPos: number, toPos: number) => {
-    const isValidPos = (pos: number) => Number.isInteger(pos) && pos >= 0 && pos < visibleCount;
+    const isValidPos = (pos: number) => Number.isInteger(pos) && pos >= 0 && pos < effectiveOrder.length;
     if (!isValidPos(fromPos) || !isValidPos(toPos)) {
-      console.warn(`reorderStop: 不正な位置を無視しました（fromPos=${fromPos}, toPos=${toPos}, 有効範囲=0-${visibleCount - 1}）`);
+      console.warn(
+        `reorderStop: 不正な位置を無視しました（fromPos=${fromPos}, toPos=${toPos}, 有効範囲=0-${effectiveOrder.length - 1}）`,
+      );
       return;
     }
     if (fromPos === toPos) return;
-    setStopOrder((s) => {
-      const currentOrder = s[scenarioId] ?? activeScenario.stops.map((_, i) => i);
-      const nextOrder = [...currentOrder];
-      const [moved] = nextOrder.splice(fromPos, 1);
-      nextOrder.splice(toPos, 0, moved);
-      return { ...s, [scenarioId]: nextOrder };
+    setOrder((current) => {
+      const next = [...(current ?? stops.map((_, i) => i))];
+      const [moved] = next.splice(fromPos, 1);
+      next.splice(toPos, 0, moved);
+      return next;
     });
   };
 
   const setDragOverPos = (pos: number | null) => setDragPos(pos);
 
-  const displayedEtiquette = selectedStopData ? selectedStopData.etiquette : activeScenario.etiquette;
+  const displayedEtiquette = selectedStopData ? selectedStopData.etiquette : [];
   const etiquetteTitle = selectedStopData ? `${selectedStopData.place}のマナー` : "このルートのマナー";
-  const tripSummary = `大人${trip.adults}名・子ども${trip.kids}名・${trip.days}日間・${trip.pace}・${
-    trip.interests.slice(0, 2).join("、") || "未選択"
+  // 表示はドメイン値そのものではなくラベル越しに引く。値を直接埋めると "balanced" が画面に出る
+  const tripSummary = `大人${trip.adults}名・子ども${trip.kids}名・${trip.days}日間・${PACE_LABELS[trip.pace]}・${
+    trip.interests
+      .slice(0, 2)
+      .map((tag) => INTEREST_LABELS[tag])
+      .join("、") || "未選択"
   }`;
 
   return {
     screen,
     trip,
-    scenarios,
-    activeScenario,
+    request,
     orderedStops,
     selectedStopData,
     displayedEtiquette,
@@ -140,9 +168,9 @@ export function usePlanState(scenarios: Scenario[] = MOCK_SCENARIOS) {
     bumpCounter,
     toggleInterest,
     saveTrip,
+    requestPlan,
     goSetup,
     goBriefing,
-    selectScenario,
     selectStop,
     clearStopSelection,
     reorderStop,
@@ -158,15 +186,14 @@ export type TripSetupState = Pick<PlanState, "trip" | "bumpCounter" | "setTrip" 
 /** PlanScreen が実際に使うフィールドだけに絞った型。 */
 export type PlanScreenState = Pick<
   PlanState,
-  | "scenarios"
-  | "activeScenario"
+  | "request"
   | "orderedStops"
   | "selectedStopData"
   | "displayedEtiquette"
   | "etiquetteTitle"
   | "tripSummary"
   | "goSetup"
-  | "selectScenario"
+  | "requestPlan"
   | "selectStop"
   | "clearStopSelection"
   | "reorderStop"
