@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.12.0"
+version: "1.13.0"
 status: "approved"
 created: "2026-08-15"
-updated: "2026-08-16"
+updated: "2026-08-17"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 20
+ace_entry_count: 25
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -241,8 +241,31 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-23-2 | ステータスコードを根拠にする前に、対照群でそのコードの意味を確かめる | testing | [playbook/testing.md#ace-23-2](./playbook/testing.md#ace-23-2) |
 | ACE-25-1 | 外部データの写像は列名ではなく「値の集合」を見てから書く | data-processing | [playbook/data-processing.md#ace-25-1](./playbook/data-processing.md#ace-25-1) |
 | ACE-25-2 | 新しいディレクトリは references に入れるまで `tsc -b` の検査を素通りする | data-processing | [playbook/data-processing.md#ace-25-2](./playbook/data-processing.md#ace-25-2) |
+| ACE-28-1 | 出典を強制する設計では、フォールバックの既定値が最大の欠陥になる | architecture | [playbook/architecture.md#ace-28-1](./playbook/architecture.md#ace-28-1) |
+| ACE-28-2 | 自分で書いたテストは「発火しない条件」を無意識に選ぶ — 直したら戻して落ちることを確かめる | testing | [playbook/testing.md#ace-28-2](./playbook/testing.md#ace-28-2) |
+| ACE-28-3 | 日本語の部分一致は語の境界を見ない — 語彙リストは誤爆の除外とセットで書く | data-processing | [playbook/data-processing.md#ace-28-3](./playbook/data-processing.md#ace-28-3) |
+| ACE-28-4 | `tsc` の include が要るのは「どこからも import されていないファイル」— import 済みなら検査される | data-processing | [playbook/data-processing.md#ace-28-4](./playbook/data-processing.md#ace-28-4) |
+| ACE-28-5 | 同期のスタブを Hono に載せるときは、戻り値の型と `await` で「後から async にする」に備える | tooling | [playbook/tooling.md#ace-28-5](./playbook/tooling.md#ace-28-5) |
 
 ## Changelog
+
+### [1.13.0] - 2026-08-17
+
+#### 追加
+
+- ACE-28-1: 出典を強制する設計では、フォールバックの既定値が最大の欠陥になる（Issue #22 / PR #28）
+- ACE-28-2: 自分で書いたテストは「発火しない条件」を無意識に選ぶ — 直したら戻して落ちることを確かめる（Issue #22 / PR #28）
+- ACE-28-3: 日本語の部分一致は語の境界を見ない — 語彙リストは誤爆の除外とセットで書く（Issue #22 / PR #28）
+- ACE-28-4: `tsc` の include が要るのは「どこからも import されていないファイル」— import 済みなら検査される（Issue #22 / PR #28）
+- ACE-28-5: 同期のスタブを Hono に載せるときは、戻り値の型と `await` で「後から async にする」に備える（Issue #22 / PR #28）
+- カテゴリ `architecture` を新設（`playbook/architecture.md`）
+
+#### カウンター更新
+
+- ACE-19-1: Helpful +1（確定した規定が API_REQUIREMENTS.md の2箇所で食い違っていたのを、grep で洗って同時に追随させた）
+- ACE-23-2: Helpful +1（tsconfig の include の効果を、入れた場合だけでなく外した場合も測って因果を特定した）
+- ACE-25-2: Helpful +1（`shared/` 追加時にわざと型エラーを入れて検査が効くことを確認。その過程で ACE-28-4 の精緻化に至った）
+
 
 ### [1.12.0] - 2026-08-16
 

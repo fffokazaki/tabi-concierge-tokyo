@@ -98,7 +98,7 @@ API.md で `get_provenance` の必須項目がツール別節（§3.3）と共�
 
 | Category | documentation-quality | Origin | PR #21 |
 | Date | 2026-08-16 |
-| Helpful | 0 | Harmful | 0 |
+| Helpful | 1 | Harmful | 0 |
 | Status | active |
 
 ADR-008（フロントは MCP でなく `/api/*` を呼ぶ二面公開）は承認済みだったのに、旧前提「外部IFは MCP のみ」で書かれた API.md・GLOSSARY・DOMAIN・README・CLAUDE.md 等8ファイルが未追随のまま残り、チームメンバーが古い前提で API 要件を起こす実害につながった。ADR は決定を記録するだけで既存文書を書き換えてはくれないため、承認と同じ PR で旧前提の言い回し（今回なら「MCP で接続」「MCP クライアントとして」）を grep し、追随修正まで済ませる。修正しない歴史的記録（変更履歴・過去の ADR タイトル）は書き換えず区別する。
