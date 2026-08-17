@@ -75,6 +75,32 @@ describe("callOperation", () => {
 
     expect(result).toEqual({ kind: "network", elapsedMs: 10, detail: "Failed to fetch" });
   });
+
+  it("本文の読み取り失敗は network ではなく parse（応答は届いている）", async () => {
+    // ストリーム切断の再現。text() だけが落ちる Response を作る
+    const brokenResponse = {
+      ok: true,
+      status: 200,
+      text: () => Promise.reject(new Error("stream cut")),
+    } as unknown as Response;
+    const fetchImpl = vi.fn().mockResolvedValue(brokenResponse);
+
+    const result = await callOperation("search_datasets", { query: "上野" }, { fetchImpl, now: fixedClock() });
+
+    // 「接続できません」に分類すると、HTTP ステータスを失い原因と逆方向へ誘導する
+    expect(result).toMatchObject({ kind: "parse", status: 200, detail: "本文の読み取りに失敗: stream cut" });
+  });
+
+  it("シリアライズできないボディは input（サーバーには何も送っていない）", async () => {
+    const fetchImpl = vi.fn();
+    const circular: Record<string, unknown> = {};
+    circular["self"] = circular;
+
+    const result = await callOperation("search_datasets", circular, { fetchImpl, now: fixedClock() });
+
+    expect(result).toMatchObject({ kind: "input" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
 });
 
 describe("peekAnswerStatus", () => {

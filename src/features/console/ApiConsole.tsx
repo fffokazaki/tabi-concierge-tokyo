@@ -273,9 +273,10 @@ function ResultView({ result }: { result: ConsoleResult | null }) {
         />
       );
     case "parse":
+      // サーバーは応答している。「接続できません」に寄せない（原因と逆方向へ誘導するため）
       return (
         <ResultShell
-          headline={`HTTP ${result.status} ・ ${result.elapsedMs}ms ・ 応答を JSON として読めません（${result.detail}）`}
+          headline={`HTTP ${result.status} ・ ${result.elapsedMs}ms ・ 応答を読めません（${result.detail}）`}
           tone="error"
           body={result.rawText}
         />
@@ -284,6 +285,13 @@ function ResultView({ result }: { result: ConsoleResult | null }) {
       return (
         <ResultShell
           headline={`サーバーに接続できません（${result.detail}）・ ${result.elapsedMs}ms`}
+          tone="error"
+        />
+      );
+    case "input":
+      return (
+        <ResultShell
+          headline={`リクエストボディを JSON にできません（${result.detail}）— 送信していません`}
           tone="error"
         />
       );

@@ -25,13 +25,19 @@ export type ConsoleOperation = keyof typeof CONSOLE_ENDPOINTS;
  * （どちらも正常応答。API.md §4）。
  */
 export type ConsoleResult =
+  /** リクエストボディを JSON にできなかった。送信前の失敗で、サーバーには何も届いていない */
+  | { kind: "input"; elapsedMs: number; detail: string }
   /** 2xx で JSON が読めた。`body` は応答そのもの */
   | { kind: "ok"; status: number; elapsedMs: number; body: unknown }
   /** 4xx/5xx。JSON なら `body` に入れる（Worker の ApiError を想定）。読めなければ text を入れる */
   | { kind: "http"; status: number; elapsedMs: number; body: unknown; rawText?: string }
   /** リクエストがサーバーまで届かなかった */
   | { kind: "network"; elapsedMs: number; detail: string }
-  /** 2xx だが JSON として読めない（プロキシの HTML 差し込み等） */
+  /**
+   * サーバーは応答したが、本文を読み取れない・JSON として解析できない
+   * （ストリーム切断・プロキシの HTML 差し込み等）。`network` と分けるのは、
+   * 「接続できていない」と表示すると原因と逆方向へデバッグを誘導するため
+   */
   | { kind: "parse"; status: number; elapsedMs: number; detail: string; rawText: string };
 
 /**
@@ -49,12 +55,21 @@ export async function callOperation(
   const startedAt = now();
   const elapsed = () => Math.round(now() - startedAt);
 
+  // シリアライズは fetch と別に捕まえる。同じ try に入れると、循環参照や BigInt の
+  // 失敗（送信前）が「サーバーに接続できません」（送信後）として表示される
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(requestBody);
+  } catch (cause) {
+    return { kind: "input", elapsedMs: elapsed(), detail: toMessage(cause) };
+  }
+
   let response: Response;
   try {
     response = await fetchImpl(CONSOLE_ENDPOINTS[operation], {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(requestBody),
+      body: serialized,
     });
   } catch (cause) {
     return { kind: "network", elapsedMs: elapsed(), detail: toMessage(cause) };
@@ -66,7 +81,14 @@ export async function callOperation(
   try {
     text = await response.text();
   } catch (cause) {
-    return { kind: "network", elapsedMs: elapsed(), detail: toMessage(cause) };
+    // 応答は届いている。network（未接続）に分類すると原因と逆方向へ誘導する
+    return {
+      kind: "parse",
+      status: response.status,
+      elapsedMs: elapsed(),
+      detail: `本文の読み取りに失敗: ${toMessage(cause)}`,
+      rawText: "",
+    };
   }
 
   let parsed: unknown;
