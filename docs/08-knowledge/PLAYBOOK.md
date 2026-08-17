@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.15.0"
+version: "1.16.0"
 status: "approved"
 created: "2026-08-15"
-updated: "2026-08-17"
+updated: "2026-08-18"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 33
+ace_entry_count: 38
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -254,8 +254,31 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-39-2 | `git stash` を使った「戻して落ちるか」検証は HEAD 基準 — ベース基準で見たいなら checkout する | testing | [playbook/testing.md#ace-39-2](./playbook/testing.md#ace-39-2) |
 | ACE-40-1 | 書き込みの副作用は「読み戻すテスト」と「無効化して落ちるか」の二段で確かめる | testing | [playbook/testing.md#ace-40-1](./playbook/testing.md#ace-40-1) |
 | ACE-44-1 | 「本番から落ちる」前提を持つモジュールは、置き場所そのものが契約になっている | architecture | [playbook/architecture.md#ace-44-1](./playbook/architecture.md#ace-44-1) |
+| ACE-51-1 | ガードは「見ているフィールド」と「置かれた分岐」の両方で到達性を確かめる | architecture | [playbook/architecture.md#ace-51-1](./playbook/architecture.md#ace-51-1) |
+| ACE-51-2 | 「すべての経路で同じ」型の不変条件を破るときは、コードのコメントと設計文書を同時に grep する | documentation-quality | [playbook/documentation-quality.md#ace-51-2](./playbook/documentation-quality.md#ace-51-2) |
+| ACE-51-3 | 欠損・未回答の message には、実測で確かめたことだけを書く | architecture | [playbook/architecture.md#ace-51-3](./playbook/architecture.md#ace-51-3) |
+| ACE-51-4 | 公開 API 経由で内部関数の境界を測るテストは、入力がその関数に到達しているか確かめる | testing | [playbook/testing.md#ace-51-4](./playbook/testing.md#ace-51-4) |
+| ACE-51-5 | 自分が読まない設定ファイルの同期漏れは、それを読むモデルが見つける | process | [playbook/process.md#ace-51-5](./playbook/process.md#ace-51-5) |
 
 ## Changelog
+
+### [1.16.0] - 2026-08-18
+
+#### 追加
+
+- ACE-51-1: ガードは「見ているフィールド」と「置かれた分岐」の両方で到達性を確かめる（Issue #50 / PR #51）
+- ACE-51-2: 「すべての経路で同じ」型の不変条件を破るときは、コードのコメントと設計文書を同時に grep する（Issue #50 / PR #51）
+- ACE-51-3: 欠損・未回答の message には、実測で確かめたことだけを書く（Issue #50 / PR #51）
+- ACE-51-4: 公開 API 経由で内部関数の境界を測るテストは、入力がその関数に到達しているか確かめる（Issue #50 / PR #51）
+- ACE-51-5: 自分が読まない設定ファイルの同期漏れは、それを読むモデルが見つける（Issue #50 / PR #51。PR #49 のレビュー中に判明）
+
+#### カウンター更新
+
+- ACE-28-1: Helpful +1（出典つきフォールバックが誤答の説得力を上げる、を `search_datasets` 側でも踏んだ）
+- ACE-28-2: Helpful +1（修正を戻して新規テストが落ちることを確認する手順を実行した）
+- ACE-28-3: Helpful +1（銭湯のキーワード「夜」が「夜遊び」に部分一致してガードを無効化していた）
+- ACE-39-1: Helpful +1（判定を広げると過検知の性質が変わる、を区切り記号の網羅で踏んだ）
+
 
 ### [1.15.0] - 2026-08-17
 
