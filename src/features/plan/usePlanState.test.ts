@@ -22,13 +22,13 @@ describe("usePlanState", () => {
 
   it("toggles interests on and off", () => {
     const { result } = renderHook(() => usePlanState());
-    const before = result.current.trip.interests.includes("自然");
+    const before = result.current.trip.interests.includes("nature");
 
-    act(() => result.current.toggleInterest("自然"));
-    expect(result.current.trip.interests.includes("自然")).toBe(!before);
+    act(() => result.current.toggleInterest("nature"));
+    expect(result.current.trip.interests.includes("nature")).toBe(!before);
 
-    act(() => result.current.toggleInterest("自然"));
-    expect(result.current.trip.interests.includes("自然")).toBe(before);
+    act(() => result.current.toggleInterest("nature"));
+    expect(result.current.trip.interests.includes("nature")).toBe(before);
   });
 
   it("picks the family scenario once kids > 0, regardless of interests", () => {
@@ -41,7 +41,7 @@ describe("usePlanState", () => {
 
   it("picks the nightlife scenario when that interest is selected and there are no kids", () => {
     const { result } = renderHook(() => usePlanState());
-    act(() => result.current.toggleInterest("ナイトライフ"));
+    act(() => result.current.toggleInterest("nightlife"));
     act(() => result.current.saveTrip());
     expect(result.current.activeScenario.id).toBe("nightlife");
   });
@@ -128,9 +128,11 @@ describe("usePlanState", () => {
   });
 
   it("accepts an injected scenarios list instead of the built-in mock data", () => {
+    // id は ScenarioId union に閉じた（Issue #17）。任意の文字列は型として渡せないので、
+    // 「差し替えられること」は中身の違いで確かめる
     const customScenarios: Scenario[] = [
       {
-        id: "custom",
+        id: "nightlife",
         label: "テストシナリオ",
         interest: null,
         prompt: "テスト用",
@@ -146,7 +148,7 @@ describe("usePlanState", () => {
     const { result } = renderHook(() => usePlanState(customScenarios));
 
     expect(result.current.scenarios).toBe(customScenarios);
-    expect(result.current.activeScenario.id).toBe("custom");
+    expect(result.current.activeScenario.label).toBe("テストシナリオ");
     expect(result.current.orderedStops.map((s) => s.stop.place)).toEqual(["テスト地点A", "テスト地点B"]);
   });
 });

@@ -1,9 +1,31 @@
 import type { ProvenanceSource } from "../../../shared/core";
 
-export type Pace = "ゆったり" | "バランス型" | "しっかり";
-export type Setting = "屋外中心" | "どちらも" | "屋内中心";
-export type Budget = "節約" | "中間価格帯" | "ぜいたく";
-export type InterestTag = "ラーメン" | "文化" | "家族向け" | "ナイトライフ" | "ショッピング" | "自然";
+/**
+ * 旅のプロフィールのドメイン値。
+ *
+ * 値は **ASCII の識別子**にする（[DOMAIN.md](../../../docs/02-design/DOMAIN.md) §11
+ * 「コード上の識別子は英語」）。以前は日本語の文字列リテラルで、**ドメイン値・表示文字列・
+ * React key の三役**を兼ねていた。訪日観光客が対象である以上、利用者向け表示は日本語・英語の
+ * 2言語が必要になるが、日本語リテラルのままでは切り替える座標が無い（Issue #17）。
+ *
+ * 表示ラベルは `labels.ts` の `Record<T, string>` が持つ。`Record` なので、union に値を
+ * 足したときにラベルの書き漏れがコンパイルエラーになる。
+ *
+ * 配列を `as const` で定義して union を導出するのは、選択肢の一覧（`constants.ts`）と
+ * 型が必ず一致するようにするため。片方だけ足しても気づけない形にしない。
+ */
+
+export const PACES = ["relaxed", "balanced", "packed"] as const;
+export type Pace = (typeof PACES)[number];
+
+export const SETTINGS = ["outdoor", "mixed", "indoor"] as const;
+export type Setting = (typeof SETTINGS)[number];
+
+export const BUDGETS = ["thrifty", "moderate", "luxury"] as const;
+export type Budget = (typeof BUDGETS)[number];
+
+export const INTEREST_TAGS = ["ramen", "culture", "family", "nightlife", "shopping", "nature"] as const;
+export type InterestTag = (typeof INTEREST_TAGS)[number];
 
 export type Trip = {
   adults: number;
@@ -36,8 +58,16 @@ export type Stop = {
   etiquette: EtiquetteTip[];
 };
 
+/**
+ * シナリオの識別子。実質は閉じた集合なのに `string` だったため、`selectScenario("ramn")` の
+ * ようなタイポが**黙って先頭シナリオへのフォールバックに変換**されていた（`?? scenarios[0]`）。
+ * union にすることでコンパイル時に閉じる（Issue #17）。
+ */
+export const SCENARIO_IDS = ["ramen", "nightlife", "family"] as const;
+export type ScenarioId = (typeof SCENARIO_IDS)[number];
+
 export type Scenario = {
-  id: string;
+  id: ScenarioId;
   label: string;
   interest: InterestTag | null;
   prompt: string;
