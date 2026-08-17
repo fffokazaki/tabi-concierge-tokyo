@@ -104,6 +104,39 @@ const findNonTargetArea = (text: string): string | undefined =>
     (area) => text.includes(area.name) && !area.notWhen?.some((exclusion) => text.includes(exclusion)),
   )?.name;
 
+/** 既知の地名（代表エリア＋対象外）。エリア以外に何か訊かれていたかの判定に使う */
+const AREA_NAMES: readonly string[] = [...REPRESENTATIVE_AREAS, ...NON_TARGET_AREAS.map((area) => area.name)];
+
+/**
+ * 区切り記号と空白。使い道は `hasContentBeyondArea` の1箇所だけで、除去後の文字列は
+ * **空かどうかしか見ない**（語の照合には使わない）。網羅を広げても下流の判定は変わらない。
+ */
+const SEPARATORS = /[\s、。，．,.・…〜～「」『』（）()【】？?！!／/：:；;]/g;
+
+/**
+ * 質問文に**エリア名のほかに何か書かれていたか**を返す（Issue #50）。
+ *
+ * 「上野」だけを訊かれたのか、「ナイトライフ（を上野で）」のように内容を訊かれたのかを
+ * 分けるためだけに使う。前者はエリアのデータセット一覧が答えそのものだが、後者は
+ * 訊かれた内容に答えられていないので、それを黙って落とさない。
+ *
+ * **語には分解しない。** 日本語は分かち書きしないため内容語を取り出すには形態素解析が要り、
+ * 分解の規則をスタブに作り込むと Step 5 で LLM が担う分解と二重になる（Issue #29 と同じ理由）。
+ * ここで必要なのは「エリア名以外が残るか」の一点だけなので、既知の地名と区切り記号を
+ * 落として残りが空かどうかだけを見る。助詞は落とさない（品詞の知識を持ち込まない）ので、
+ * 「上野で」のような書き方は内容ありと判定される。過検知の側に倒してある。
+ *
+ * **複数の代表エリアが書かれた場合は取り落とす**（Issue #52）。「上野・渋谷」は残余が
+ * 空になるので欠損を添えないが、候補は `resolveArea` が選んだ上野の分だけで、渋谷の要求は
+ * どこにも残らない。ここは「エリア以外に何か訊かれたか」しか見ていないので、
+ * 「訊かれたエリアのうち答えたのはどれか」は別の判定が要る。`resolveArea` が代表エリアを
+ * 1つしか返さない設計そのものを変える必要があるため、この関数では扱わない。
+ */
+const hasContentBeyondArea = (query: string): boolean => {
+  const withoutAreas = AREA_NAMES.reduce((text, name) => text.split(name).join(""), query);
+  return withoutAreas.replace(SEPARATORS, "") !== "";
+};
+
 const unanswered = (reason: UnansweredReason, message: string): Unanswered => ({
   status: "unanswered",
   reason,
@@ -134,6 +167,30 @@ const shibuyaSightseeingUnanswered = (): Unanswered =>
   unanswered(
     "data_not_published",
     "該当するオープンデータがありません。渋谷区のカタログ掲載データは17件で、観光ポイント・名所・文化施設に相当するデータは公開されていません（2026-08-16 調査）。",
+  );
+
+/**
+ * エリアだけで絞った一覧を返すとき、訊かれた内容に答えられていないことを添える（Issue #50）。
+ *
+ * `other` を使う。`data_not_published`（最も強い分類）は「カタログ側に無いことを確かめてある」
+ * ときにしか使えず、ここに来る問い（ナイトライフ・ショッピングなど）は**未調査**なので、
+ * 未公開と言い切ると推測で埋めることになる（CLAUDE.md 絶対ルール #1）。
+ *
+ * **質問文の残余を message に埋め込まない。** `buildQuery` は興味ラベルと自由文を「、」で
+ * 連結するため、エリア名を除いた残余は「ナイトライフ、で夜遊びしたい」のように壊れた文字列に
+ * なる。それを画面に出すと、欠損を可視化するための文が新たな意味不明な文字列の出所になる。
+ *
+ * **「利用中の10件に無い」と書かない。** 実装が知っているのは「キーワード表に当たらなかった」
+ * だけで、10件が問いをカバーするかは判定していない。「ナイトライフ、上野」に対して銭湯
+ * （営業時間 15:00〜0:00・キーワードに「夜」）は10件の中に実在するので、無いと断定すると
+ * 推測で埋めることになる（CLAUDE.md 絶対ルール #1）。同じ10件から候補を出しながら
+ * 「対応するものが無い」と言うのは、読み手から見て自己矛盾でもある。`describeQuery` と同じく
+ * **実際に行ったことだけを書く**。
+ */
+const areaOnlyFallbackUnanswered = (area: RepresentativeArea): Unanswered =>
+  unanswered(
+    "other",
+    `該当するオープンデータがありません。質問文の語に当たるデータセットが無かったため、「${area}」を収録するデータセットを、エリアの事実として提示しています。`,
   );
 
 const isRepresentativeArea = (value: string): value is RepresentativeArea =>
@@ -286,13 +343,30 @@ async function recorded<T extends CoreOutput>(output: T, context: GapContext, re
  *
  * 答えられる興味と答えられない興味が1つの質問文に混ざっている場合（例「上野の美術館と
  * ラーメン」）は、答えられる候補を返したうえで、答えられなかった側面を `gaps` に載せる
- * （Issue #29）。**`answered` を返すどの経路でも同じ `gaps` を添える**ので、
- * 「候補は出たが欠損は消えた」という壊れ方が経路ごとに再発しない。
+ * （Issue #29）。載せるのは `collectPartialGaps` が語から判定できる2つ（ジャンル指定の飲食・
+ * 渋谷の観光データ未公開）だけで、**自然文を興味に分解することはしない**。
  *
  * すべて答えられないときは従来どおり `unanswered` を返す（`answered` ＋ 全部 `gaps` には
  * しない。それでは「答えがある」と嘘をつくことになる）。ただし `unanswered` は理由を
  * **1つしか運べない**ため、複数の側面が同時に答えられない場合（渋谷の寺とラーメン）は
  * 先に判定されたものだけが返る。記録（Issue #27）もその1件になる。
+ *
+ * 最後のエリア・フォールバックは、キーワードが1件も当たらなくてもそのエリアを収録した
+ * データセットを返す。エリアだけを訊かれた（「上野」）ならそれが答えそのものだが、
+ * **エリア名のほかに何か訊かれていた**（「ナイトライフ、渋谷」）ならこの一覧は答えではないので、
+ * 答えられていないことを `gaps` に添える（Issue #50）。添えないと、無関係な候補に本物の出典が
+ * 付いたまま「回答あり」として返り、画面にも記録にも痕跡が残らない（DOMAIN.md §8 不変条件4）。
+ *
+ * **経路によって添える `gaps` の数が違う。** 以前この doc コメントには「`answered` を返す
+ * どの経路でも同じ `gaps` を添える」と書いてあったが、Issue #50 でフォールバック経路だけ
+ * 1件多くなったため事実でなくなった（API.md §3.1 も同時に直した）。
+ *
+ * **キーワードが1件でも当たると、内容の取り落ちは報告されない**（[Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53)・未修正）。
+ * 「ナイトライフ、上野で夜遊びしたい」は銭湯のキーワード「夜」が「夜遊び」に部分一致するため
+ * キーワード経路で `answered` になり、ナイトライフに答えていないことは残らない。興味チップを
+ * 複数選ぶほど何かが当たるので、**実際に旅程が組み上がるケースほど Issue #50 の手当ては効かない**。
+ * 「どの興味が答えられたか」を解くには質問文を興味の列として受ける入口が必要で、スタブで
+ * 形態素解析を持ち込む話になるため分けた。
  */
 export async function searchDatasets(
   input: SearchDatasetsInput,
@@ -346,7 +420,11 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   }
 
   // 分類を明示されたのに1件も当たらなかったときは、エリアだけの一覧へ落とさない。
-  // 落とすと「神社」の問いにトイレや宿泊施設を返すことになる（指定を黙って捨てない）
+  // 落とすと「動物園」の問いに名所・史跡やトイレを返すことになる（指定を黙って捨てない）。
+  //
+  // なおこのガードは `category` を送る呼び出し（API コンソール・将来の `/mcp`）にしか効かない。
+  // プラン画面は興味も要望も `query` に畳み込むため（`buildPlan.ts` の `buildQuery`）ここを通らず、
+  // 下のエリア・フォールバックへ落ちる。そちら側の手当ては Issue #50 で入れた
   if (input.category?.trim()) {
     return unanswered(
       "other",
@@ -355,9 +433,25 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   }
 
   // キーワードが当たらなくても、エリアが分かっていればそのエリアを収録したデータセットは
-  // 事実として提示できる（「上野」だけの質問など）
-  const byArea = area.kind === "representative" ? answeredCandidates(inArea.slice(0, limit)) : undefined;
-  if (byArea) return withGaps(byArea, gaps);
+  // 事実として提示できる（「上野」だけの質問など）。
+  //
+  // ただし**エリア名のほかに何か訊かれていた**場合（「ナイトライフ、渋谷」など）、この一覧は
+  // 訊かれた内容の答えではない。答えられていないことを添えないと、無関係な候補に本物の出典が
+  // 付いたまま「回答あり」として返り、画面にも `gaps` テーブルにも痕跡が残らない（Issue #50）。
+  // 記録は `recorded` が `gaps` から作るので、ここで添えれば D1 にも入る。
+  // ここに来た時点で `gaps` は必ず空。`collectPartialGaps` が集める2つはどちらも、
+  // このフォールバックより手前で `unanswered` として return されている（ジャンル指定の飲食は
+  // 上の `genre && usable.length === 0`、渋谷の観光語は直前の分岐。条件は同一）。
+  // spread は、将来 `collectPartialGaps` に語が増えたときに取り落とさないためだけに残す。
+  if (area.kind === "representative") {
+    const byArea = answeredCandidates(inArea.slice(0, limit));
+    if (byArea) {
+      return withGaps(
+        byArea,
+        hasContentBeyondArea(input.query) ? [...gaps, areaOnlyFallbackUnanswered(area.area)] : gaps,
+      );
+    }
+  }
 
   return unanswered(
     "other",
