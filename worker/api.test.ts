@@ -196,15 +196,6 @@ describe("POST /api/search-datasets", () => {
       expect(body.reason).toBe("insufficient_granularity");
     });
 
-    it("代表エリアを優先しても、一緒に書かれた対象エリア外の地名を捨てない", async () => {
-      const body = expectAnswered(await search({ query: "新宿から上野へ行きたい" }));
-
-      expect(body.candidates.length).toBeGreaterThan(0);
-      expect(body.gaps).toHaveLength(1);
-      expect(body.gaps?.[0].reason).toBe("out_of_area");
-      expect(body.gaps?.[0].message).toContain("新宿");
-    });
-
     it("渋谷で答えられる問いと答えられない問いが混ざった場合も両方返す", async () => {
       const body = expectAnswered(await search({ query: "渋谷の公園と美術館", area: "渋谷" }));
 
@@ -213,19 +204,32 @@ describe("POST /api/search-datasets", () => {
       expect(body.gaps?.[0].reason).toBe("data_not_published");
     });
 
-    it("欠損が複数あればすべて載せる（先頭1件で打ち切らない）", async () => {
-      const body = expectAnswered(await search({ query: "新宿と上野の美術館とラーメン" }));
+    /**
+     * 対象エリア外の地名は部分欠損にしない。
+     *
+     * 「新宿のホテルから上野の美術館へ」の新宿は**出発地**であって、新宿のデータを
+     * 求めてはいない。スタブには「新宿について訊かれた」と「新宿を経路として書いた」を
+     * 見分ける手段が無いため、報告すると答えられている応答にノイズを足すことになる。
+     * `gaps` に残しているジャンル語・観光施設語は**求めているデータの種類**を指す語なので、
+     * 散文中の言及と取り違えにくい。
+     */
+    it("出発地・宿泊地として書かれた対象エリア外の地名を欠損として報告しない", async () => {
+      const withExplicitArea = expectAnswered(
+        await search({ query: "新宿のホテルから上野の美術館へ", area: "上野" }),
+      );
+      const fromQuery = expectAnswered(await search({ query: "新宿から上野へ行きたい" }));
 
-      expect(body.gaps?.map((gap) => gap.reason).sort()).toEqual(["insufficient_granularity", "out_of_area"]);
+      for (const body of [withExplicitArea, fromQuery]) {
+        expect(body.candidates.length).toBeGreaterThan(0);
+        expect(Object.hasOwn(body, "gaps")).toBe(false);
+      }
     });
 
-    it("キーワードが当たらずエリアだけで答えた場合にも欠損を載せる", async () => {
-      // エリア一覧へのフォールバック経路。ここを素通りさせると、
-      // 「候補は出たが欠損は消えた」という同じ壊れ方が別経路で残る
-      const body = expectAnswered(await search({ query: "新宿から上野" }));
-
-      expect(body.candidates.length).toBeGreaterThan(0);
-      expect(body.gaps?.[0].reason).toBe("out_of_area");
+    it("対象エリア外だけを訊かれた場合は従来どおり unanswered(out_of_area)", async () => {
+      // 部分欠損から外したのは「一緒に書かれた地名」であって、
+      // エリア外そのものを訊かれたときの未回答は変えていない
+      const body = expectUnanswered(await search({ query: "新宿の美術館", area: "新宿" }));
+      expect(body.reason).toBe("out_of_area");
     });
   });
 

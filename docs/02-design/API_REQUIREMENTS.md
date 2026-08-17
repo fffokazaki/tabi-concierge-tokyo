@@ -85,6 +85,8 @@ changeImpact: "medium"
 
 [Issue #29](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/29) で、`answered` に `gaps` を載せるようにした（バックエンド実装済み）。**画面での出し方はまだ Sho と合意していない。** 以下は Okazaki からの提案で、確定ではない。
 
+載るのは**求めているデータの種類**を指す語から判定できる2つだけ。ジャンル指定の飲食（`insufficient_granularity`）と、渋谷の観光データ未公開（`data_not_published`）。対象エリア外の地名は**載せない**（「新宿のホテルから上野の美術館へ」の新宿は出発地であって、新宿のデータを求めてはいないため）。
+
 **提案する扱い**:
 
 | 状況 | 画面 |

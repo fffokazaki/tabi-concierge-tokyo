@@ -140,15 +140,7 @@ const findRepresentativeArea = (text: string): RepresentativeArea | undefined =>
   REPRESENTATIVE_AREAS.find((area) => text.includes(area));
 
 type ResolvedArea =
-  | {
-      kind: "representative";
-      area: RepresentativeArea;
-      /**
-       * 代表エリアと**一緒に**質問文に現れた対象エリア外の地名（「上野と品川の寺」の品川）。
-       * 代表エリアを優先して答えるが、対象外だった側を黙って捨てないために持ち回る（Issue #29）。
-       */
-      alsoOutOfArea?: string;
-    }
+  | { kind: "representative"; area: RepresentativeArea }
   | { kind: "out_of_area"; label: string }
   | { kind: "unspecified" };
 
@@ -156,20 +148,17 @@ type ResolvedArea =
  * `area` の明示指定を優先し、無ければ質問文から代表エリア名／対象外の地名を拾う。
  *
  * 質問文の中では代表エリアを対象外の地名より優先する（「新宿から上野へ行きたい」は答えられる）。
- * ただし優先しただけで対象外の地名が消えるわけではないので、`alsoOutOfArea` に残す。
  */
 function resolveArea(input: SearchDatasetsInput): ResolvedArea {
   const explicit = input.area?.trim();
   if (explicit) {
     return isRepresentativeArea(explicit)
-      ? { kind: "representative", area: explicit, alsoOutOfArea: findNonTargetArea(input.query) }
+      ? { kind: "representative", area: explicit }
       : { kind: "out_of_area", label: explicit };
   }
 
   const fromQuery = findRepresentativeArea(input.query);
-  if (fromQuery) {
-    return { kind: "representative", area: fromQuery, alsoOutOfArea: findNonTargetArea(input.query) };
-  }
+  if (fromQuery) return { kind: "representative", area: fromQuery };
 
   const nonTarget = findNonTargetArea(input.query);
   return nonTarget ? { kind: "out_of_area", label: nonTarget } : { kind: "unspecified" };
@@ -206,10 +195,16 @@ function answeredCandidates(entries: readonly CatalogEntry[]): AnsweredSearch | 
 /**
  * 質問文に混ざっている「答えられない側面」を集める。
  *
- * ここに挙がるのは、既存の未回答判定がすでに列挙している3つ（ジャンル指定の飲食 /
- * 対象エリア外の地名 / 渋谷の観光データ未公開）だけ。**自然文を興味に分解することはしない。**
- * 分解の規則を今スタブに作り込むと、Step 5 で LLM が担う分解と二重になる（Issue #29）。
- * 答えられない側面は元々ここに列挙されており、変わるのは「他が当たっても報告するか」だけ。
+ * **自然文を興味に分解することはしない。** ここに挙がるのは、既存の未回答判定がすでに
+ * 列挙している語彙だけで、変わるのは「他が当たっても報告するか」だけ。分解の規則を今
+ * スタブに作り込むと、Step 5 で LLM が担う分解と二重になる（Issue #29）。
+ *
+ * **対象エリア外の地名（`NON_TARGET_AREAS`）は部分欠損にしない。** 「新宿のホテルから
+ * 上野の美術館へ」の新宿は出発地であって、新宿のデータを求めてはいない。スタブには
+ * 「新宿について訊かれた」と「新宿を経路として書いた」を見分ける手段が無く、
+ * 報告すると答えられている応答にノイズを足すことになる（Issue #29 の AC「空配列や
+ * ノイズを足さない」）。ここに残す2つは**求めているデータの種類**を指す語なので、
+ * 散文中の言及と取り違えにくい。
  */
 function collectPartialGaps(area: ResolvedArea, genre: string | undefined, haystack: string): Unanswered[] {
   const gaps: Unanswered[] = [];
@@ -218,11 +213,8 @@ function collectPartialGaps(area: ResolvedArea, genre: string | undefined, hayst
   // （`usable` で除外済み）なので、ジャンルの問いは必ず未回答のまま残っている
   if (genre) gaps.push(cuisineGenreUnanswered(genre));
 
-  if (area.kind === "representative") {
-    if (area.alsoOutOfArea) gaps.push(outOfAreaUnanswered(area.alsoOutOfArea));
-    if (area.area === "渋谷" && findFirstTerm(haystack, SHIBUYA_SIGHTSEEING_TERMS)) {
-      gaps.push(shibuyaSightseeingUnanswered());
-    }
+  if (area.kind === "representative" && area.area === "渋谷" && findFirstTerm(haystack, SHIBUYA_SIGHTSEEING_TERMS)) {
+    gaps.push(shibuyaSightseeingUnanswered());
   }
 
   return gaps;
@@ -247,8 +239,13 @@ function withGaps(answered: AnsweredSearch, gaps: readonly Unanswered[]): Answer
  *
  * 答えられる興味と答えられない興味が1つの質問文に混ざっている場合（例「上野の美術館と
  * ラーメン」）は、答えられる候補を返したうえで、答えられなかった側面を `gaps` に載せる
- * （Issue #29）。すべて答えられないときは従来どおり `unanswered` を返す（`answered` ＋
- * 全部 `gaps` にはしない。それでは「答えがある」と嘘をつくことになる）。
+ * （Issue #29）。**`answered` を返すどの経路でも同じ `gaps` を添える**ので、
+ * 「候補は出たが欠損は消えた」という壊れ方が経路ごとに再発しない。
+ *
+ * すべて答えられないときは従来どおり `unanswered` を返す（`answered` ＋ 全部 `gaps` には
+ * しない。それでは「答えがある」と嘘をつくことになる）。ただし `unanswered` は理由を
+ * **1つしか運べない**ため、複数の側面が同時に答えられない場合（渋谷の寺とラーメン）は
+ * 先に判定されたものだけが返る。記録（Issue #27）もその1件になる。
  */
 export function searchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput {
   // 境界を通らない直接呼び出しでも壊れた値で応答を作らないよう、ここでも範囲に収める
