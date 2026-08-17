@@ -13,6 +13,7 @@ import type {
 } from "../../shared/core";
 import { REPRESENTATIVE_AREAS } from "../../shared/core";
 import { CATALOG, findEntry, RESTAURANT_DATASET_ID, type CatalogEntry, type CatalogSample } from "./catalog";
+import type { GapRecord, GapRecorder } from "./gaps";
 
 /**
  * コア3操作のスタブ実装（Issue #22）。
@@ -30,6 +31,9 @@ import { CATALOG, findEntry, RESTAURANT_DATASET_ID, type CatalogEntry, type Cata
  *
  * **`worker/core/` は境界（`parse.ts`）を通らずに直接呼ばれうる**（Step 5 の `/mcp`）。
  * 入力の検査を境界任せにせず、ここでも壊れた値で不正な応答を作らないようにする。
+ *
+ * 3操作はいずれも記録器（`GapRecorder`）を**必須の引数**として受け取り、返す未回答を
+ * `gaps` テーブルへ記録する（Issue #27・DOMAIN.md §8 不変条件4）。理由は `gaps.ts` を参照。
  */
 
 /** 候補件数の既定値。フロントエンドが1ルートに3〜4停留地を想定している（API_REQUIREMENTS.md §1） */
@@ -229,6 +233,49 @@ function withGaps(answered: AnsweredSearch, gaps: readonly Unanswered[]): Answer
   return first ? { ...answered, gaps: [first, ...rest] } : answered;
 }
 
+// ---------------------------------------------------------------------------
+// 未回答の記録（Issue #27）
+// ---------------------------------------------------------------------------
+
+/**
+ * 記録に添える文脈。
+ *
+ * **応答の形からは復元できない値**（解決後のエリアなど）を運ぶためにある。
+ * 応答の `message` から地名を抜き出す実装にすると、文言を直した瞬間に集計が壊れる。
+ */
+type GapContext = { question: string; area?: string; category?: string };
+
+type CoreOutput = SearchDatasetsOutput | AggregateDatasetOutput | GetProvenanceOutput;
+
+/**
+ * 応答に含まれる未回答を、すべて `gaps` の行にする。
+ *
+ * `answered` に載る部分欠損（Issue #29）も1件ずつ行にする。ここを `unanswered` だけに
+ * すると、#29 で可視化したばかりの部分欠損が記録に残らず、DOMAIN.md §8 不変条件4 が
+ * **一番効いてほしい場所で**破れる。
+ *
+ * 重複排除はしない。同じ未回答が何度起きたかを数えられる形にしておく（Issue #27 の AC）。
+ */
+function toGapRecords(output: CoreOutput, context: GapContext): GapRecord[] {
+  if (output.status === "unanswered") return [{ ...context, reason: output.reason }];
+
+  // `answered` に部分欠損が載るのは search_datasets だけ
+  const gaps = "gaps" in output ? output.gaps : undefined;
+  return gaps ? gaps.map((gap) => ({ ...context, reason: gap.reason })) : [];
+}
+
+/**
+ * 応答を記録してから返す。
+ *
+ * 各 return 地点ではなく**応答が確定した1か所**で記録する。return 地点ごとに書くと、
+ * 分岐を足した人が記録を書き忘れても何も壊れない（記録の欠落は応答を壊さないため、
+ * テストでも本番でも気づけない）。
+ */
+async function recorded<T extends CoreOutput>(output: T, context: GapContext, recorder: GapRecorder): Promise<T> {
+  await recorder.record(toGapRecords(output, context));
+  return output;
+}
+
 /**
  * データセット検索。
  *
@@ -247,7 +294,29 @@ function withGaps(answered: AnsweredSearch, gaps: readonly Unanswered[]): Answer
  * **1つしか運べない**ため、複数の側面が同時に答えられない場合（渋谷の寺とラーメン）は
  * 先に判定されたものだけが返る。記録（Issue #27）もその1件になる。
  */
-export function searchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput {
+export async function searchDatasets(
+  input: SearchDatasetsInput,
+  recorder: GapRecorder,
+): Promise<SearchDatasetsOutput> {
+  return recorded(computeSearchDatasets(input), searchGapContext(input), recorder);
+}
+
+/**
+ * 記録に添えるエリアは**解決後の値**。入力の `area` をそのまま入れない。
+ *
+ * 「新宿の美術館」（`area` 未指定）が `out_of_area` で返るとき、集計に効くのは
+ * 質問文から解決した「新宿」であって、未指定の `area` ではない。
+ */
+function searchGapContext(input: SearchDatasetsInput): GapContext {
+  const area = resolveArea(input);
+  return {
+    question: input.query,
+    area: area.kind === "representative" ? area.area : area.kind === "out_of_area" ? area.label : undefined,
+    category: input.category?.trim() || undefined,
+  };
+}
+
+function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput {
   // 境界を通らない直接呼び出しでも壊れた値で応答を作らないよう、ここでも範囲に収める
   const limit = Math.min(Math.max(Math.trunc(input.limit ?? DEFAULT_SEARCH_LIMIT), 1), MAX_SEARCH_LIMIT);
   const haystack = [input.query, input.area ?? "", input.category ?? ""].join(" ");
@@ -313,7 +382,23 @@ const describeQuery = (entry: CatalogEntry, sample: CatalogSample): string =>
  * フォールバックすると、「浅草の銭湯」に上野の銭湯を実在する出典つきで返すことになる。
  * 出典が本物であるぶん誤りが見つけにくく、推測で埋めるより質が悪い（CLAUDE.md 絶対ルール #1・#2）。
  */
-export function aggregateDataset(input: AggregateDatasetInput): AggregateDatasetOutput {
+export async function aggregateDataset(
+  input: AggregateDatasetInput,
+  recorder: GapRecorder,
+): Promise<AggregateDatasetOutput> {
+  return recorded(computeAggregateDataset(input), aggregateGapContext(input), recorder);
+}
+
+/**
+ * 対象外の地名を代表エリアより先に見るのは、`computeAggregateDataset` の判定順に揃えるため
+ * （検索とは違い、集計は対象エリア外を無条件で弾く）。
+ */
+const aggregateGapContext = (input: AggregateDatasetInput): GapContext => ({
+  question: input.intent,
+  area: findNonTargetArea(input.intent) ?? findRepresentativeArea(input.intent),
+});
+
+function computeAggregateDataset(input: AggregateDatasetInput): AggregateDatasetOutput {
   const datasetId = input.datasetId.trim();
   const entry = findEntry(datasetId);
   if (!entry) {
@@ -376,8 +461,19 @@ export function aggregateDataset(input: AggregateDatasetInput): AggregateDataset
  *
  * 知らない ID が1つでも混じっていたら、既知のぶんだけ返すのではなく全体を `unanswered` にする。
  * 黙って落とすと、呼び出し側は「出典が揃った」と誤認したまま画面に出してしまう。
+ *
+ * **例外（`datasetIds` が空）は記録しない。** あれは「答えが無い」ではなく呼び出し側の
+ * 契約違反で、`gaps` に混ぜるとデータ欠損の集計に自分たちのバグが積み上がる。
+ * 例外は `recorded` に到達する前に投げられるので、構造としてそうなっている。
  */
-export function getProvenance(input: GetProvenanceInput): GetProvenanceOutput {
+export async function getProvenance(
+  input: GetProvenanceInput,
+  recorder: GapRecorder,
+): Promise<GetProvenanceOutput> {
+  return recorded(computeGetProvenance(input), { question: input.query }, recorder);
+}
+
+function computeGetProvenance(input: GetProvenanceInput): GetProvenanceOutput {
   // 出典0件の「回答あり」は仕様違反（DOMAIN.md §8 不変条件1）。これは未回答ではなく
   // 呼び出し側の契約違反なので、`unanswered` の統計に混ぜず例外にする（500 として記録される）
   if (input.datasetIds.length === 0) {
