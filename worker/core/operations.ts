@@ -2,6 +2,7 @@ import type {
   AggregateDatasetInput,
   AggregateDatasetOutput,
   DatasetCandidate,
+  Gap,
   GetProvenanceInput,
   GetProvenanceOutput,
   NonEmpty,
@@ -126,11 +127,9 @@ const SEPARATORS = /[\s、。，．,.・…〜～「」『』（）()【】？?�
  * 落として残りが空かどうかだけを見る。助詞は落とさない（品詞の知識を持ち込まない）ので、
  * 「上野で」のような書き方は内容ありと判定される。過検知の側に倒してある。
  *
- * **複数の代表エリアが書かれた場合は取り落とす**（Issue #52）。「上野・渋谷」は残余が
- * 空になるので欠損を添えないが、候補は `resolveArea` が選んだ上野の分だけで、渋谷の要求は
- * どこにも残らない。ここは「エリア以外に何か訊かれたか」しか見ていないので、
- * 「訊かれたエリアのうち答えたのはどれか」は別の判定が要る。`resolveArea` が代表エリアを
- * 1つしか返さない設計そのものを変える必要があるため、この関数では扱わない。
+ * **複数の代表エリアが書かれた場合はここでは拾えない。** 「上野・渋谷」はどちらもエリア名
+ * なので残余が空になり、この関数は「エリアだけの質問」と答える。それは正しい（内容は
+ * 訊かれていない）が、渋谷に答えていないことは別の話で、`uncoveredAreaGaps` が見る（Issue #52）。
  */
 const hasContentBeyondArea = (query: string): boolean => {
   const withoutAreas = AREA_NAMES.reduce((text, name) => text.split(name).join(""), query);
@@ -193,12 +192,70 @@ const areaOnlyFallbackUnanswered = (area: RepresentativeArea): Unanswered =>
     `該当するオープンデータがありません。質問文の語に当たるデータセットが無かったため、「${area}」を収録するデータセットを、エリアの事実として提示しています。`,
   );
 
+/**
+ * 訊かれたエリアのうち、返した候補が収録していないもの（Issue #52）。
+ *
+ * `unanswered` の頭に付く「該当するオープンデータがありません」を**使わない**。渋谷には
+ * データがある（都市公園・都立公園一覧123件）のに返していないだけなので、無いと書くと嘘になる。
+ * 実際に行ったこと（`answering` のエリアで絞り込んだ結果、このエリアのデータセットが
+ * 候補に入っていない）だけを書く。
+ *
+ * `reason` は `other`。`data_not_published` は「カタログ側に無いことを確かめてある」場合に
+ * しか使えず、`out_of_area` は対象エリア外の分類なので、対象エリアである渋谷には当たらない。
+ */
+const uncoveredAreaUnanswered = (area: RepresentativeArea, answering: RepresentativeArea): Gap => ({
+  ...unanswered(
+    "other",
+    `「${area}」について訊かれましたが、返した候補はいずれも「${area}」を収録していません。候補は「${answering}」で絞り込んでいるためです。`,
+  ),
+  area,
+});
+
 const isRepresentativeArea = (value: string): value is RepresentativeArea =>
   (REPRESENTATIVE_AREAS as readonly string[]).includes(value);
 
 /** 質問文に現れた代表エリア。複数あれば先に定義した順（上野→浅草→渋谷） */
 const findRepresentativeArea = (text: string): RepresentativeArea | undefined =>
   REPRESENTATIVE_AREAS.find((area) => text.includes(area));
+
+/**
+ * **訊かれた**代表エリアをすべて返す（Issue #52）。候補を絞り込む `resolveArea` とは別物で、
+ * あちらは1つに決める（絞り込みは1エリアぶんしか行わない）。
+ *
+ * **`area` を明示されたらそれだけを見る。** 明示指定は質問文より優先する（API.md §3.1）ので、
+ * `{ query: "上野の公園", area: "渋谷" }` の上野は呼び出し側が意図して外したものであって、
+ * こちらが黙って落としたのではない。ここで拾うと、絞り込みの指定そのものが欠損として報告される。
+ *
+ * **代表エリアだけを見る。** 対象エリア外の地名（`NON_TARGET_AREAS`）を混ぜると、
+ * 「新宿から上野へ行きたい」の新宿＝出発地が欠損として報告される（Issue #29 の判断）。
+ *
+ * **代表エリアについては過検知の側に倒す**（[Issue #58](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/58)）。
+ * 「渋谷から上野の美術館へ」の渋谷も「訊かれた」と数えるので、出発地のつもりで書かれた
+ * 渋谷が欠損になる。新宿と逆に倒すのは事情が違うため — 新宿は対象外で**そもそも答えられない**が、
+ * 渋谷は対象エリアでデータがあり、渋谷のデータも欲しい可能性が残る。区別には質問文を
+ * 構造化して受ける入口が要る（Issue #53 と同じ根）ので分けた。
+ */
+function askedAreas(input: SearchDatasetsInput): readonly RepresentativeArea[] {
+  const explicit = input.area?.trim();
+  if (explicit) return isRepresentativeArea(explicit) ? [explicit] : [];
+  return REPRESENTATIVE_AREAS.filter((area) => input.query.includes(area));
+}
+
+/**
+ * 訊かれたエリアのうち、`entries`（実際に返す候補）が1つも収録していないものを欠損にする。
+ *
+ * **「解決に使わなかったエリア」ではなく「返した候補が覆っていないエリア」で判定する。**
+ * 前者にすると「上野・浅草」で浅草の欠損が付くが、台東区の8件はいずれも両方を収録しており
+ * 実際には答えられている。ノイズを足さない（Issue #29 の AC）ためには実測で見る必要がある。
+ */
+function uncoveredAreaGaps(
+  asked: readonly RepresentativeArea[],
+  answering: RepresentativeArea,
+  entries: readonly CatalogEntry[],
+): Gap[] {
+  const covered = new Set<RepresentativeArea>(entries.flatMap((entry) => [...entry.areas]));
+  return asked.filter((area) => !covered.has(area)).map((area) => uncoveredAreaUnanswered(area, answering));
+}
 
 type ResolvedArea =
   | { kind: "representative"; area: RepresentativeArea }
@@ -267,8 +324,8 @@ function answeredCandidates(entries: readonly CatalogEntry[]): AnsweredSearch | 
  * ノイズを足さない」）。ここに残す2つは**求めているデータの種類**を指す語なので、
  * 散文中の言及と取り違えにくい。
  */
-function collectPartialGaps(area: ResolvedArea, genre: string | undefined, haystack: string): Unanswered[] {
-  const gaps: Unanswered[] = [];
+function collectPartialGaps(area: ResolvedArea, genre: string | undefined, haystack: string): Gap[] {
+  const gaps: Gap[] = [];
 
   // ジャンル指定の飲食が混ざっているとき、返す候補は飲食店データを除いたもの
   // （`usable` で除外済み）なので、ジャンルの問いは必ず未回答のまま残っている
@@ -285,7 +342,7 @@ function collectPartialGaps(area: ResolvedArea, genre: string | undefined, hayst
  * 部分欠損があるときだけ `gaps` を添える。無いときはキーごと省く
  * （空配列を返すと「欠損なし」と「欠損あり」を長さで判定させることになる）。
  */
-function withGaps(answered: AnsweredSearch, gaps: readonly Unanswered[]): AnsweredSearch {
+function withGaps(answered: AnsweredSearch, gaps: readonly Gap[]): AnsweredSearch {
   const [first, ...rest] = gaps;
   return first ? { ...answered, gaps: [first, ...rest] } : answered;
 }
@@ -312,13 +369,18 @@ type CoreOutput = SearchDatasetsOutput | AggregateDatasetOutput | GetProvenanceO
  * **一番効いてほしい場所で**破れる。
  *
  * 重複排除はしない。同じ未回答が何度起きたかを数えられる形にしておく（Issue #27 の AC）。
+ *
+ * **エリアは欠損ごとに違いうる**（Issue #52）。「上野・渋谷」は上野の候補を返しつつ渋谷に
+ * 答えていないので、その行の `area` は応答全体の「上野」ではなく「渋谷」でなければ、
+ * どのエリアに答えられなかったかを集計できない。自分のエリアを持たない欠損は従来どおり
+ * 応答全体の値を使う。
  */
 function toGapRecords(output: CoreOutput, context: GapContext): GapRecord[] {
   if (output.status === "unanswered") return [{ ...context, reason: output.reason }];
 
   // `answered` に部分欠損が載るのは search_datasets だけ
   const gaps = "gaps" in output ? output.gaps : undefined;
-  return gaps ? gaps.map((gap) => ({ ...context, reason: gap.reason })) : [];
+  return gaps ? gaps.map((gap) => ({ ...context, area: gap.area ?? context.area, reason: gap.reason })) : [];
 }
 
 /**
@@ -357,16 +419,23 @@ async function recorded<T extends CoreOutput>(output: T, context: GapContext, re
  * 答えられていないことを `gaps` に添える（Issue #50）。添えないと、無関係な候補に本物の出典が
  * 付いたまま「回答あり」として返り、画面にも記録にも痕跡が残らない（DOMAIN.md §8 不変条件4）。
  *
+ * **訊かれた代表エリアを候補が覆っていなければ、それも `gaps` に載せる**（Issue #52）。
+ * 「上野・渋谷」の候補は絞り込みに使った上野の分だけなので、渋谷に答えていないことを添える。
+ * これは `answered` を返す**どの経路でも**行う（フォールバック経路だけに付けると、Issue #50 と
+ * 同じ非対称——実際に旅程が組み上がるケースほど発火しない——を作り直すことになる）。
+ *
  * **経路によって添える `gaps` の数が違う。** 以前この doc コメントには「`answered` を返す
  * どの経路でも同じ `gaps` を添える」と書いてあったが、Issue #50 でフォールバック経路だけ
- * 1件多くなったため事実でなくなった（API.md §3.1 も同時に直した）。
+ * 1件多くなったため事実でなくなった（API.md §3.1 も同時に直した）。Issue #52 の欠損は
+ * それとは独立に付くので、フォールバック経路の `gaps` は**1件とは限らない**。
  *
  * **キーワードが1件でも当たると、内容の取り落ちは報告されない**（[Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53)・未修正）。
  * 「ナイトライフ、上野で夜遊びしたい」は銭湯のキーワード「夜」が「夜遊び」に部分一致するため
  * キーワード経路で `answered` になり、ナイトライフに答えていないことは残らない。興味チップを
  * 複数選ぶほど何かが当たるので、**実際に旅程が組み上がるケースほど Issue #50 の手当ては効かない**。
- * 「どの興味が答えられたか」を解くには質問文を興味の列として受ける入口が必要で、スタブで
- * 形態素解析を持ち込む話になるため分けた。
+ * 残っているのは**内容**の取り落ちだけで、**エリア**の取り落ちは上記のとおりキーワード経路でも
+ * 報告する。「どの興味が答えられたか」を解くには質問文を興味の列として受ける入口が必要で、
+ * スタブで形態素解析を持ち込む話になるため分けた。
  */
 export async function searchDatasets(
   input: SearchDatasetsInput,
@@ -398,6 +467,12 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   const area = resolveArea(input);
   if (area.kind === "out_of_area") return outOfAreaUnanswered(area.label);
 
+  // 訊かれたエリアのうち、実際に返す候補が収録していないものを欠損にする（Issue #52）。
+  // 候補が決まらないと判定できないので、`answered` を作る各地点で呼ぶ
+  const asked = askedAreas(input);
+  const uncovered = (entries: readonly CatalogEntry[]): Gap[] =>
+    area.kind === "representative" ? uncoveredAreaGaps(asked, area.area, entries) : [];
+
   const inArea = area.kind === "unspecified" ? CATALOG : CATALOG.filter((entry) => entry.areas.includes(area.area));
   const matched = inArea
     .map((entry) => ({ entry, score: scoreEntry(entry, haystack) }))
@@ -412,8 +487,9 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
 
   const gaps = collectPartialGaps(area, genre, haystack);
 
-  const answered = answeredCandidates(usable.slice(0, limit));
-  if (answered) return withGaps(answered, gaps);
+  const selected = usable.slice(0, limit);
+  const answered = answeredCandidates(selected);
+  if (answered) return withGaps(answered, [...gaps, ...uncovered(selected)]);
 
   if (area.kind === "representative" && area.area === "渋谷" && findFirstTerm(haystack, SHIBUYA_SIGHTSEEING_TERMS)) {
     return shibuyaSightseeingUnanswered();
@@ -439,17 +515,26 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   // 訊かれた内容の答えではない。答えられていないことを添えないと、無関係な候補に本物の出典が
   // 付いたまま「回答あり」として返り、画面にも `gaps` テーブルにも痕跡が残らない（Issue #50）。
   // 記録は `recorded` が `gaps` から作るので、ここで添えれば D1 にも入る。
-  // ここに来た時点で `gaps` は必ず空。`collectPartialGaps` が集める2つはどちらも、
-  // このフォールバックより手前で `unanswered` として return されている（ジャンル指定の飲食は
-  // 上の `genre && usable.length === 0`、渋谷の観光語は直前の分岐。条件は同一）。
-  // spread は、将来 `collectPartialGaps` に語が増えたときに取り落とさないためだけに残す。
+  //
+  // 返す配列は最大3つの出所を連結したもので、**それぞれ空になる条件が違う**。
+  //  1. `gaps`（`collectPartialGaps` の語からの判定）— ここでは必ず空。集める2つはどちらも
+  //     このフォールバックより手前で `unanswered` として return されている（ジャンル指定の
+  //     飲食は上の `genre && usable.length === 0`、渋谷の観光語は直前の分岐。条件は同一）。
+  //     spread は、将来 `collectPartialGaps` に語が増えたときに取り落とさないためだけに残す
+  //  2. エリア・フォールバックの欠損 — エリア名のほかに何か訊かれていれば1件（Issue #50）
+  //  3. 訊かれたエリアの取り落ち — 覆えなかったエリアの数だけ（Issue #52）
+  //
+  // 2 と 3 は独立に付くので、**この経路が返す欠損は1件とは限らない**。「上野・渋谷の公園」は
+  // 「内容に答えていない」と「渋谷を覆えていない」の2件になる。
   if (area.kind === "representative") {
-    const byArea = answeredCandidates(inArea.slice(0, limit));
+    const selectedByArea = inArea.slice(0, limit);
+    const byArea = answeredCandidates(selectedByArea);
     if (byArea) {
-      return withGaps(
-        byArea,
-        hasContentBeyondArea(input.query) ? [...gaps, areaOnlyFallbackUnanswered(area.area)] : gaps,
-      );
+      return withGaps(byArea, [
+        ...gaps,
+        ...(hasContentBeyondArea(input.query) ? [areaOnlyFallbackUnanswered(area.area)] : []),
+        ...uncovered(selectedByArea),
+      ]);
     }
   }
 

@@ -92,6 +92,23 @@ export type DatasetCandidate = {
   matchReason: string;
 };
 
+/**
+ * 部分欠損の1件。`unanswered` 応答と同じ形に、**その欠損がどのエリアについてのものか**を足したもの。
+ *
+ * `area` が要るのは、1つの応答に**別々のエリアについての欠損**が混ざるため（Issue #52）。
+ * 「上野・渋谷」は上野の候補を返しつつ渋谷に答えていないので、応答全体のエリア（上野）と
+ * この欠損のエリア（渋谷）が食い違う。記録（`gaps` テーブルの `area` 列）が応答全体の値だけを
+ * 見ていると、**答えなかったエリアが集計から消える**。
+ *
+ * `message` から地名を抜き出す実装にはしない。文言を直した瞬間に集計が壊れるため、
+ * 構造化した値として持つ（`worker/core/gaps.ts` の `GapRecord.area` と同じ理由）。
+ *
+ * **現状これを設定するのは取り落ちの欠損だけ**で、そこでは必ず応答全体のエリアと違う値になる。
+ * 常に埋める運用にはしない — 埋めると読み手が「応答のエリアと違うから書いてある」という
+ * 区別を失う。ただしこれは型では縛れない約束なので、欠損の種類を足すときに読み直すこと。
+ */
+export type Gap = Unanswered & { area?: RepresentativeArea };
+
 export type SearchDatasetsOutput =
   | {
       status: "answered";
@@ -109,7 +126,7 @@ export type SearchDatasetsOutput =
        *
        * 追加は optional なので、既存クライアントは無視しても壊れない。
        */
-      gaps?: NonEmpty<Unanswered>;
+      gaps?: NonEmpty<Gap>;
     }
   | Unanswered;
 

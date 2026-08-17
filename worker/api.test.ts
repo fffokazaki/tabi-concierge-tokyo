@@ -222,6 +222,22 @@ describe("POST /api/search-datasets", () => {
       expect(Object.hasOwn(body, "gaps")).toBe(false);
     });
 
+    it("覆えなかったエリアは応答の gaps にも area 付きで載る（Issue #52）", async () => {
+      // D1 の記録は別のテストで見ている。ここはクライアントが受け取る契約のほう。
+      // 応答整形の変更で `area` が落ちても、記録だけ見ていると気づけない
+      const body = expectAnswered(await search({ query: "上野・渋谷" }));
+
+      expect(body.gaps).toEqual([
+        {
+          status: "unanswered",
+          reason: "other",
+          message:
+            "「渋谷」について訊かれましたが、返した候補はいずれも「渋谷」を収録していません。候補は「上野」で絞り込んでいるためです。",
+          area: "渋谷",
+        },
+      ]);
+    });
+
     it("すべて答えられないクエリは unanswered のまま（answered ＋ 全部 gaps にしない）", async () => {
       // ここを answered にすると「答えがある」と嘘をつくことになる
       const body = expectUnanswered(await search({ query: "上野でラーメンが食べたい", area: "上野" }));
@@ -560,6 +576,17 @@ describe("未回答の gaps 記録", () => {
 
     expect(await readGapRows()).toEqual([
       { question: "ナイトライフ、渋谷", area: "渋谷", category: undefined, reason: "other" },
+    ]);
+  });
+
+  it("覆えなかったエリアは、応答全体のエリアではなく自分のエリアで記録される（Issue #52）", async () => {
+    // 「上野・渋谷」の応答全体のエリアは解決結果の「上野」。この行まで上野で記録すると、
+    // どのエリアに答えられなかったかが D1 から分からなくなる（それが Issue #52 の症状）
+    const body = expectAnswered(await search({ query: "上野・渋谷" }));
+    expect(body.gaps).toHaveLength(1);
+
+    expect(await readGapRows()).toEqual([
+      { question: "上野・渋谷", area: "渋谷", category: undefined, reason: "other" },
     ]);
   });
 
