@@ -104,6 +104,30 @@ const findNonTargetArea = (text: string): string | undefined =>
     (area) => text.includes(area.name) && !area.notWhen?.some((exclusion) => text.includes(exclusion)),
   )?.name;
 
+/** 既知の地名（代表エリア＋対象外）。エリア以外に何か訊かれていたかの判定に使う */
+const AREA_NAMES: readonly string[] = [...REPRESENTATIVE_AREAS, ...NON_TARGET_AREAS.map((area) => area.name)];
+
+/** 区切り記号と空白。語には分解しない（`hasContentBeyondArea` のコメント参照） */
+const SEPARATORS = /[\s、。，．,.・…「」『』（）()]/g;
+
+/**
+ * 質問文に**エリア名のほかに何か書かれていたか**を返す（Issue #50）。
+ *
+ * 「上野」だけを訊かれたのか、「ナイトライフ（を上野で）」のように内容を訊かれたのかを
+ * 分けるためだけに使う。前者はエリアのデータセット一覧が答えそのものだが、後者は
+ * 訊かれた内容に答えられていないので、それを黙って落とさない。
+ *
+ * **語には分解しない。** 日本語は分かち書きしないため内容語を取り出すには形態素解析が要り、
+ * 分解の規則をスタブに作り込むと Step 5 で LLM が担う分解と二重になる（Issue #29 と同じ理由）。
+ * ここで必要なのは「エリア名以外が残るか」の一点だけなので、既知の地名と区切り記号を
+ * 落として残りが空かどうかだけを見る。助詞は落とさない（品詞の知識を持ち込まない）ので、
+ * 「上野で」のような書き方は内容ありと判定される。過検知の側に倒してある。
+ */
+const hasContentBeyondArea = (query: string): boolean => {
+  const withoutAreas = AREA_NAMES.reduce((text, name) => text.split(name).join(""), query);
+  return withoutAreas.replace(SEPARATORS, "") !== "";
+};
+
 const unanswered = (reason: UnansweredReason, message: string): Unanswered => ({
   status: "unanswered",
   reason,
@@ -134,6 +158,23 @@ const shibuyaSightseeingUnanswered = (): Unanswered =>
   unanswered(
     "data_not_published",
     "該当するオープンデータがありません。渋谷区のカタログ掲載データは17件で、観光ポイント・名所・文化施設に相当するデータは公開されていません（2026-08-16 調査）。",
+  );
+
+/**
+ * エリアだけで絞った一覧を返すとき、訊かれた内容に答えられていないことを添える（Issue #50）。
+ *
+ * `other` を使う。`data_not_published`（最も強い分類）は「カタログ側に無いことを確かめてある」
+ * ときにしか使えず、ここに来る問い（ナイトライフ・ショッピングなど）は**未調査**なので、
+ * 未公開と言い切ると推測で埋めることになる（CLAUDE.md 絶対ルール #1）。
+ *
+ * **質問文の残余を message に埋め込まない。** `buildQuery` は興味ラベルと自由文を「、」で
+ * 連結するため、エリア名を除いた残余は「ナイトライフ、で夜遊びしたい」のように壊れた文字列に
+ * なる。それを画面に出すと、欠損を可視化するための文が新たな意味不明な文字列の出所になる。
+ */
+const areaOnlyFallbackUnanswered = (area: RepresentativeArea): Unanswered =>
+  unanswered(
+    "other",
+    `該当するオープンデータがありません。質問文の内容に対応するデータセットが利用中の10件にないため、「${area}」を収録するデータセットを、エリアの事実として提示しています。`,
   );
 
 const isRepresentativeArea = (value: string): value is RepresentativeArea =>
@@ -293,6 +334,12 @@ async function recorded<T extends CoreOutput>(output: T, context: GapContext, re
  * しない。それでは「答えがある」と嘘をつくことになる）。ただし `unanswered` は理由を
  * **1つしか運べない**ため、複数の側面が同時に答えられない場合（渋谷の寺とラーメン）は
  * 先に判定されたものだけが返る。記録（Issue #27）もその1件になる。
+ *
+ * 最後のエリア・フォールバックは、キーワードが1件も当たらなくてもそのエリアを収録した
+ * データセットを返す。エリアだけを訊かれた（「上野」）ならそれが答えそのものだが、
+ * **エリア名のほかに何か訊かれていた**（「ナイトライフ、渋谷」）ならこの一覧は答えではないので、
+ * 答えられていないことを `gaps` に添える（Issue #50）。添えないと、無関係な候補に本物の出典が
+ * 付いたまま「回答あり」として返り、画面にも記録にも痕跡が残らない（DOMAIN.md §8 不変条件4）。
  */
 export async function searchDatasets(
   input: SearchDatasetsInput,
@@ -346,7 +393,11 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   }
 
   // 分類を明示されたのに1件も当たらなかったときは、エリアだけの一覧へ落とさない。
-  // 落とすと「神社」の問いにトイレや宿泊施設を返すことになる（指定を黙って捨てない）
+  // 落とすと「動物園」の問いに名所・史跡やトイレを返すことになる（指定を黙って捨てない）。
+  //
+  // なおこのガードは `category` を送る呼び出し（API コンソール・将来の `/mcp`）にしか効かない。
+  // プラン画面は興味も要望も `query` に畳み込むため（`buildPlan.ts` の `buildQuery`）ここを通らず、
+  // 下のエリア・フォールバックへ落ちる。そちら側の手当ては Issue #50 で入れた
   if (input.category?.trim()) {
     return unanswered(
       "other",
@@ -355,9 +406,21 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   }
 
   // キーワードが当たらなくても、エリアが分かっていればそのエリアを収録したデータセットは
-  // 事実として提示できる（「上野」だけの質問など）
-  const byArea = area.kind === "representative" ? answeredCandidates(inArea.slice(0, limit)) : undefined;
-  if (byArea) return withGaps(byArea, gaps);
+  // 事実として提示できる（「上野」だけの質問など）。
+  //
+  // ただし**エリア名のほかに何か訊かれていた**場合（「ナイトライフ、渋谷」など）、この一覧は
+  // 訊かれた内容の答えではない。答えられていないことを添えないと、無関係な候補に本物の出典が
+  // 付いたまま「回答あり」として返り、画面にも `gaps` テーブルにも痕跡が残らない（Issue #50）。
+  // 記録は `recorded` が `gaps` から作るので、ここで添えれば D1 にも入る。
+  if (area.kind === "representative") {
+    const byArea = answeredCandidates(inArea.slice(0, limit));
+    if (byArea) {
+      return withGaps(
+        byArea,
+        hasContentBeyondArea(input.query) ? [...gaps, areaOnlyFallbackUnanswered(area.area)] : gaps,
+      );
+    }
+  }
 
   return unanswered(
     "other",

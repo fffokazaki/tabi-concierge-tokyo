@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { capturingGapRecorder } from "../test-support";
+import { capturingGapRecorder, expectAnswered } from "../test-support";
 import { aggregateDataset, getProvenance, searchDatasets, MAX_SEARCH_LIMIT } from "./operations";
 
 /**
@@ -35,6 +35,79 @@ describe("searchDatasets（直接呼び出し）", () => {
     expect(output.status).toBe("answered");
     if (output.status !== "answered") return;
     expect(output.candidates.length).toBeLessThanOrEqual(MAX_SEARCH_LIMIT);
+  });
+});
+
+/**
+ * エリア・フォールバックの部分欠損（Issue #50）。
+ *
+ * キーワードが1件も当たらなくても、エリアを収録したデータセットは事実として提示できる。
+ * ただし**エリア名のほかに何か訊かれていた**場合、その一覧は訊かれた内容の答えではない。
+ * 以前はそれを黙って `answered` として返し、`gaps` も記録も残らなかったため、無関係な候補に
+ * 本物の CC BY 出典が付いたまま旅程に載っていた（`operations.ts` 冒頭の「問われたものと違う
+ * ものを返さない」に反する状態）。
+ *
+ * **渋谷だけの問題ではない**ので、代表エリア3つのうち収録データセット数が最も多い上野も見る。
+ */
+describe("エリアだけで絞った一覧に添える欠損", () => {
+  it("エリア名のほかに訊かれた内容があれば、答えられていないことを gaps に載せて記録する", async () => {
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "ナイトライフ、渋谷で夜遊びしたい" }, recorder);
+
+    const body = expectAnswered(output);
+    expect(body.gaps).toHaveLength(1);
+    expect(body.gaps?.[0].reason).toBe("other");
+    expect(body.gaps?.[0].message).toContain("渋谷");
+    // 画面に出るだけでなく D1 にも残る（DOMAIN.md §8 不変条件4）
+    expect(recorder.records).toEqual([
+      { question: "ナイトライフ、渋谷で夜遊びしたい", area: "渋谷", category: undefined, reason: "other" },
+    ]);
+  });
+
+  it("上野・浅草でも同じように欠損を載せる（渋谷固有の判定に頼らない）", async () => {
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "ショッピング、上野" }, recorder);
+
+    const body = expectAnswered(output);
+    // 以前はここでトイレ情報までが gaps なしの「回答あり」として返っていた
+    expect(body.gaps).toHaveLength(1);
+    expect(body.gaps?.[0].reason).toBe("other");
+    expect(recorder.records).toHaveLength(1);
+  });
+
+  it("エリアだけを訊かれたときは欠損を足さない（ノイズにしない）", async () => {
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "上野" }, recorder);
+
+    const body = expectAnswered(output);
+    // 「上野」だけの質問には、上野を収録するデータセットの一覧が答えそのもの。
+    // ここに欠損を添えると Issue #29 の AC「空配列やノイズを足さない」に反する
+    expect(body.gaps).toBeUndefined();
+    expect(recorder.records).toEqual([]);
+  });
+
+  it("区切り記号だけが余っていてもエリアだけの質問として扱う", async () => {
+    const output = await searchDatasets({ query: "上野・浅草" }, capturingGapRecorder());
+
+    expect(expectAnswered(output).gaps).toBeUndefined();
+  });
+
+  it("渋谷の観光・文化施設は従来どおり data_not_published のまま（強い分類を薄めない）", async () => {
+    const output = await searchDatasets({ query: "渋谷の美術館", area: "渋谷" }, capturingGapRecorder());
+
+    expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    expect(output.reason).toBe("data_not_published");
+  });
+
+  it("未調査のジャンルを data_not_published にしない", async () => {
+    // 渋谷の観光語リストに「ナイトライフ」を足せば unanswered にはできるが、
+    // 未公開と言い切れる根拠（2026-08-16 の観光・文化施設の実測）が無いカテゴリなので
+    // それは推測で埋めることになる（CLAUDE.md 絶対ルール #1）
+    const output = await searchDatasets({ query: "ナイトライフ、渋谷" }, capturingGapRecorder());
+
+    const body = expectAnswered(output);
+    expect(body.gaps?.[0].reason).not.toBe("data_not_published");
   });
 });
 

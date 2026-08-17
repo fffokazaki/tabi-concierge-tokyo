@@ -91,6 +91,17 @@ describe("POST /api/search-datasets", () => {
 
     // 上野を収録するのは8件。既定値で切られることを実際の件数で確かめる
     expect(body.candidates).toHaveLength(DEFAULT_SEARCH_LIMIT);
+    // エリアだけを訊かれているので欠損は足さない（Issue #50）
+    expect(body.gaps).toBeUndefined();
+  });
+
+  it("エリア名のほかに訊かれた内容があれば、応答の gaps に載って返る（Issue #50）", async () => {
+    // 興味チップ「ナイトライフ」＋その他のご希望「渋谷」でプランを作ると、この形の query になる。
+    // 以前は都市公園データが gaps なしの「回答あり」として返り、欠損が画面にも記録にも残らなかった
+    const body = expectAnswered(await search({ query: "ナイトライフ、渋谷" }));
+
+    expect(body.gaps).toHaveLength(1);
+    expect(body.gaps?.[0].reason).toBe("other");
   });
 
   it("limit で件数を変えられる（上限まで指定できる）", async () => {
