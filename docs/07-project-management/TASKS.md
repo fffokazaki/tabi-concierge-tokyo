@@ -1,11 +1,11 @@
 ---
 title: "TASKS"
-version: "1.0.0"
+version: "1.1.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-17"
-changeImpact: "low"
+changeImpact: "medium"
 ---
 
 # TASKS.md - タスク管理
@@ -28,11 +28,12 @@ changeImpact: "low"
 | ---- | ---- |
 | 企画 | ✅ 完了（最終企画案 v1.0） |
 | UI デザイン | ✅ プロトタイプ完成（5画面・日英2バージョン → `/showcase/`） |
-| UI 実装 | 🔄 着手（骨組みのみ。プラン画面はこれから） |
+| UI 実装 | 🔄 進行中（プラン画面が `/api/*` に接続済み。旅のプロフィール→プランの縦貫通は成立。スキャン・周辺・あなたへは未着手） |
 | Cloudflare 基盤 | ✅ Worker ＋ SPA ＋ showcase をデプロイ済み（<https://tabi-concierge-tokyo.opendata-002.workers.dev>） |
 | データ（D1） | ✅ 利用データ10件を確定（[Issue #10](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/10)・[DATABASE.md](../02-design/DATABASE.md) §2）。ブロック解消 |
 | データ組み込み | ✅ 完了（1,645 spots・エリア分類済み。[Issue #24](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/24)） |
-| MCP 接続 | ⬜ 未着手 |
+| `/api/*` 接続 | ✅ 完了（スタブ。Issue #31・#22）。プランのコア3操作をフロントから呼べる |
+| `/mcp` 接続 | ⬜ 未着手（Step 5） |
 | 提出物（資料・キャプチャ・動画） | ⬜ 未着手 |
 
 ## 2. 現在のタスク
@@ -41,7 +42,7 @@ changeImpact: "low"
 
 - [x] **利用オープンデータの確定（[Issue #10](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/10)）** — 台東区7件＋都2件＋渋谷区1件の計10件を実データ検証のうえ確定（[DATABASE.md](../02-design/DATABASE.md) §2）
 - [x] **オープンデータを D1 へ取り込む（スキーマ設計 ＋ シード）** — [Issue #24](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/24)。datasets/spots/gaps の3テーブル、1,645 spots を投入済み
-- [ ] 上野・浅草を軸にした画面イメージを作成（既存 UI の SCENARIOS をオープンデータ由来の内容へ差し替え。渋谷は観光データが無いため面のみ）
+- [x] **プラン画面を `/api/*` のコア3操作へ接続**（Issue #31）。SCENARIOS の静的差し替えではなく、`search_datasets` → `aggregate_dataset` → `get_provenance` を実際に呼ぶ形に置き換え済み。渋谷は観光データが無いため引き続き面のみ（`DATABASE.md`「渋谷エリアの制約」）。🔍 `feat/plan-data-grounding-and-pace` ブランチが develop と競合していたが解消済み（2026-08-17）。ペース別表示件数・ギャップカード（実データ連動、承認済みデザインカンプ準拠）を追加し、Futoshi のレビュー待ち
 - [ ] 提出用画面キャプチャ（1600×900px・1〜3点）の切り出し
 - [ ] 提出資料（16:9・必須4項目を含む）の完成
 - [ ] 提出フォーム送信（<https://form.jotform.com/261870604352051>）
@@ -125,6 +126,13 @@ MCP 最小実装 ─────────────────────
 - 制約（締切・提出要件・著作権ルール）: [CONSTRAINTS.md](../01-context/CONSTRAINTS.md)
 
 ## Changelog
+
+### [1.1.0] - 2026-08-17
+
+#### 変更
+
+- 進捗サマリー・Critical タスクを実態へ更新: プラン画面が `/api/*` のコア3操作（スタブ）に接続済み（Issue #31）。「MCP 接続」の行を `/api/*`（完了）と `/mcp`（未着手・Step 5）に分けた
+- `feat/plan-data-grounding-and-pace` ブランチの develop 競合解消と、ペース別表示件数・ギャップカードの追加を記録。Futoshi のレビュー待ち
 
 ### [1.0.0] - 2026-08-17
 
