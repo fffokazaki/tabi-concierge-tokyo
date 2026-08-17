@@ -106,6 +106,32 @@ const unanswered = (reason: UnansweredReason, message: string): Unanswered => ({
   message,
 });
 
+/**
+ * 「答えられない」と実測で言い切れる既知の欠損。
+ *
+ * この3つは**応答全体の未回答としても、答えられた候補に添える部分欠損としても、同じ値を返す**
+ * （Issue #29）。片方だけ文言を変えると、同じ欠損が呼び出し側で別物に見え、
+ * 未回答の集計（DOMAIN.md §7）が分裂する。
+ */
+
+const cuisineGenreUnanswered = (genre: string): Unanswered =>
+  unanswered(
+    "insufficient_granularity",
+    `該当するオープンデータがありません。飲食店の店舗データは「東京都内の飲食店のバリアフリー情報」（210件・バリアフリー対応店に限定）のみで、ジャンルの列を持たないため「${genre}」の粒度では答えられません。`,
+  );
+
+const outOfAreaUnanswered = (label: string): Unanswered =>
+  unanswered(
+    "out_of_area",
+    `該当するオープンデータがありません。「${label}」は POC の対象エリア（${REPRESENTATIVE_AREAS.join("・")}）の外です。`,
+  );
+
+const shibuyaSightseeingUnanswered = (): Unanswered =>
+  unanswered(
+    "data_not_published",
+    "該当するオープンデータがありません。渋谷区のカタログ掲載データは17件で、観光ポイント・名所・文化施設に相当するデータは公開されていません（2026-08-16 調査）。",
+  );
+
 const isRepresentativeArea = (value: string): value is RepresentativeArea =>
   (REPRESENTATIVE_AREAS as readonly string[]).includes(value);
 
@@ -114,7 +140,15 @@ const findRepresentativeArea = (text: string): RepresentativeArea | undefined =>
   REPRESENTATIVE_AREAS.find((area) => text.includes(area));
 
 type ResolvedArea =
-  | { kind: "representative"; area: RepresentativeArea }
+  | {
+      kind: "representative";
+      area: RepresentativeArea;
+      /**
+       * 代表エリアと**一緒に**質問文に現れた対象エリア外の地名（「上野と品川の寺」の品川）。
+       * 代表エリアを優先して答えるが、対象外だった側を黙って捨てないために持ち回る（Issue #29）。
+       */
+      alsoOutOfArea?: string;
+    }
   | { kind: "out_of_area"; label: string }
   | { kind: "unspecified" };
 
@@ -122,17 +156,20 @@ type ResolvedArea =
  * `area` の明示指定を優先し、無ければ質問文から代表エリア名／対象外の地名を拾う。
  *
  * 質問文の中では代表エリアを対象外の地名より優先する（「新宿から上野へ行きたい」は答えられる）。
+ * ただし優先しただけで対象外の地名が消えるわけではないので、`alsoOutOfArea` に残す。
  */
 function resolveArea(input: SearchDatasetsInput): ResolvedArea {
   const explicit = input.area?.trim();
   if (explicit) {
     return isRepresentativeArea(explicit)
-      ? { kind: "representative", area: explicit }
+      ? { kind: "representative", area: explicit, alsoOutOfArea: findNonTargetArea(input.query) }
       : { kind: "out_of_area", label: explicit };
   }
 
   const fromQuery = findRepresentativeArea(input.query);
-  if (fromQuery) return { kind: "representative", area: fromQuery };
+  if (fromQuery) {
+    return { kind: "representative", area: fromQuery, alsoOutOfArea: findNonTargetArea(input.query) };
+  }
 
   const nonTarget = findNonTargetArea(input.query);
   return nonTarget ? { kind: "out_of_area", label: nonTarget } : { kind: "unspecified" };
@@ -151,17 +188,53 @@ const toCandidate = (entry: CatalogEntry): DatasetCandidate => ({
   matchReason: entry.matchReason,
 });
 
+type AnsweredSearch = Extract<SearchDatasetsOutput, { status: "answered" }>;
+
 /**
  * 候補が1件以上あるときだけ `answered` を作る。
  *
  * 戻り値の型が `NonEmpty` なので、空配列から「回答あり」を作ることが**型として不可能**になる
  * （DOMAIN.md §8 不変条件1）。以前は `limit: 0` で候補ゼロの `answered` が作れていた。
  */
-function answeredCandidates(entries: readonly CatalogEntry[]): SearchDatasetsOutput | undefined {
+function answeredCandidates(entries: readonly CatalogEntry[]): AnsweredSearch | undefined {
   const [first, ...rest] = entries;
   if (!first) return undefined;
   const candidates: NonEmpty<DatasetCandidate> = [toCandidate(first), ...rest.map(toCandidate)];
   return { status: "answered", candidates };
+}
+
+/**
+ * 質問文に混ざっている「答えられない側面」を集める。
+ *
+ * ここに挙がるのは、既存の未回答判定がすでに列挙している3つ（ジャンル指定の飲食 /
+ * 対象エリア外の地名 / 渋谷の観光データ未公開）だけ。**自然文を興味に分解することはしない。**
+ * 分解の規則を今スタブに作り込むと、Step 5 で LLM が担う分解と二重になる（Issue #29）。
+ * 答えられない側面は元々ここに列挙されており、変わるのは「他が当たっても報告するか」だけ。
+ */
+function collectPartialGaps(area: ResolvedArea, genre: string | undefined, haystack: string): Unanswered[] {
+  const gaps: Unanswered[] = [];
+
+  // ジャンル指定の飲食が混ざっているとき、返す候補は飲食店データを除いたもの
+  // （`usable` で除外済み）なので、ジャンルの問いは必ず未回答のまま残っている
+  if (genre) gaps.push(cuisineGenreUnanswered(genre));
+
+  if (area.kind === "representative") {
+    if (area.alsoOutOfArea) gaps.push(outOfAreaUnanswered(area.alsoOutOfArea));
+    if (area.area === "渋谷" && findFirstTerm(haystack, SHIBUYA_SIGHTSEEING_TERMS)) {
+      gaps.push(shibuyaSightseeingUnanswered());
+    }
+  }
+
+  return gaps;
+}
+
+/**
+ * 部分欠損があるときだけ `gaps` を添える。無いときはキーごと省く
+ * （空配列を返すと「欠損なし」と「欠損あり」を長さで判定させることになる）。
+ */
+function withGaps(answered: AnsweredSearch, gaps: readonly Unanswered[]): AnsweredSearch {
+  const [first, ...rest] = gaps;
+  return first ? { ...answered, gaps: [first, ...rest] } : answered;
 }
 
 /**
@@ -172,9 +245,10 @@ function answeredCandidates(entries: readonly CatalogEntry[]): SearchDatasetsOut
  * 空振りを分け、最後にエリアだけの絞り込みへ落とす。ジャンル判定をエリアのフォールバックより
  * 後ろに回すと、答えられない問い（ラーメン）にエリアのデータセット一覧を返して欠損が消える。
  *
- * 既知の制限（スタブ）: 答えられる興味と答えられない興味を1つの質問文に混ぜた場合
- * （例「上野の美術館とラーメン」）は、答えられる候補だけを返し、ラーメン側の欠損は応答に
- * 現れない。興味ごとに呼べば検出できる。解消方針は Issue #29。
+ * 答えられる興味と答えられない興味が1つの質問文に混ざっている場合（例「上野の美術館と
+ * ラーメン」）は、答えられる候補を返したうえで、答えられなかった側面を `gaps` に載せる
+ * （Issue #29）。すべて答えられないときは従来どおり `unanswered` を返す（`answered` ＋
+ * 全部 `gaps` にはしない。それでは「答えがある」と嘘をつくことになる）。
  */
 export function searchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput {
   // 境界を通らない直接呼び出しでも壊れた値で応答を作らないよう、ここでも範囲に収める
@@ -182,12 +256,7 @@ export function searchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   const haystack = [input.query, input.area ?? "", input.category ?? ""].join(" ");
 
   const area = resolveArea(input);
-  if (area.kind === "out_of_area") {
-    return unanswered(
-      "out_of_area",
-      `該当するオープンデータがありません。「${area.label}」は POC の対象エリア（${REPRESENTATIVE_AREAS.join("・")}）の外です。`,
-    );
-  }
+  if (area.kind === "out_of_area") return outOfAreaUnanswered(area.label);
 
   const inArea = area.kind === "unspecified" ? CATALOG : CATALOG.filter((entry) => entry.areas.includes(area.area));
   const matched = inArea
@@ -199,21 +268,15 @@ export function searchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   // ジャンル指定の飲食は、飲食店データで答えたことにしない（ジャンルの列が無いため）
   const genre = findFirstTerm(haystack, CUISINE_GENRE_TERMS);
   const usable = genre ? matched.filter((entry) => entry.datasetId !== RESTAURANT_DATASET_ID) : matched;
-  if (genre && usable.length === 0) {
-    return unanswered(
-      "insufficient_granularity",
-      `該当するオープンデータがありません。飲食店の店舗データは「東京都内の飲食店のバリアフリー情報」（210件・バリアフリー対応店に限定）のみで、ジャンルの列を持たないため「${genre}」の粒度では答えられません。`,
-    );
-  }
+  if (genre && usable.length === 0) return cuisineGenreUnanswered(genre);
+
+  const gaps = collectPartialGaps(area, genre, haystack);
 
   const answered = answeredCandidates(usable.slice(0, limit));
-  if (answered) return answered;
+  if (answered) return withGaps(answered, gaps);
 
   if (area.kind === "representative" && area.area === "渋谷" && findFirstTerm(haystack, SHIBUYA_SIGHTSEEING_TERMS)) {
-    return unanswered(
-      "data_not_published",
-      "該当するオープンデータがありません。渋谷区のカタログ掲載データは17件で、観光ポイント・名所・文化施設に相当するデータは公開されていません（2026-08-16 調査）。",
-    );
+    return shibuyaSightseeingUnanswered();
   }
 
   // 分類を明示されたのに1件も当たらなかったときは、エリアだけの一覧へ落とさない。
@@ -228,7 +291,7 @@ export function searchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   // キーワードが当たらなくても、エリアが分かっていればそのエリアを収録したデータセットは
   // 事実として提示できる（「上野」だけの質問など）
   const byArea = area.kind === "representative" ? answeredCandidates(inArea.slice(0, limit)) : undefined;
-  if (byArea) return byArea;
+  if (byArea) return withGaps(byArea, gaps);
 
   return unanswered(
     "other",
