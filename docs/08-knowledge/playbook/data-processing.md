@@ -70,7 +70,7 @@ rm <dir>/__probe.ts
 
 | Category | data-processing | Origin | PR #28 |
 | Date | 2026-08-17 |
-| Helpful | 0 | Harmful | 0 |
+| Helpful | 1 | Harmful | 0 |
 | Status | active |
 
 **Insight**: 日本語は分かち書きしないため、`includes()` による語彙マッチには**必ず誤爆が埋め込まれる**。英語なら単語境界（`\b`）で防げる種類の誤りが、日本語では設計時に個別へ潰すしかない。厄介なのは、誤爆が「答えられる問いを握りつぶす」方向に働くこと。
