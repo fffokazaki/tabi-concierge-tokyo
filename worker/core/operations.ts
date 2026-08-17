@@ -515,13 +515,17 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   // 訊かれた内容の答えではない。答えられていないことを添えないと、無関係な候補に本物の出典が
   // 付いたまま「回答あり」として返り、画面にも `gaps` テーブルにも痕跡が残らない（Issue #50）。
   // 記録は `recorded` が `gaps` から作るので、ここで添えれば D1 にも入る。
-  // ここに来た時点で `gaps` は必ず空。`collectPartialGaps` が集める2つはどちらも、
-  // このフォールバックより手前で `unanswered` として return されている（ジャンル指定の飲食は
-  // 上の `genre && usable.length === 0`、渋谷の観光語は直前の分岐。条件は同一）。
-  // spread は、将来 `collectPartialGaps` に語が増えたときに取り落とさないためだけに残す。
   //
-  // **この経路の `gaps` は1件とは限らない**（Issue #52）。「上野・渋谷の公園」は
-  // エリア・フォールバックの欠損（内容に答えていない）と、渋谷を覆えていない欠損の2件が付く。
+  // 返す配列は最大3つの出所を連結したもので、**それぞれ空になる条件が違う**。
+  //  1. `gaps`（`collectPartialGaps` の語からの判定）— ここでは必ず空。集める2つはどちらも
+  //     このフォールバックより手前で `unanswered` として return されている（ジャンル指定の
+  //     飲食は上の `genre && usable.length === 0`、渋谷の観光語は直前の分岐。条件は同一）。
+  //     spread は、将来 `collectPartialGaps` に語が増えたときに取り落とさないためだけに残す
+  //  2. エリア・フォールバックの欠損 — エリア名のほかに何か訊かれていれば1件（Issue #50）
+  //  3. 訊かれたエリアの取り落ち — 覆えなかったエリアの数だけ（Issue #52）
+  //
+  // 2 と 3 は独立に付くので、**この経路が返す欠損は1件とは限らない**。「上野・渋谷の公園」は
+  // 「内容に答えていない」と「渋谷を覆えていない」の2件になる。
   if (area.kind === "representative") {
     const selectedByArea = inArea.slice(0, limit);
     const byArea = answeredCandidates(selectedByArea);
