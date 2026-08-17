@@ -1,6 +1,6 @@
 ---
 title: "API_REQUIREMENTS"
-version: "1.2.0"
+version: "1.3.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-16"
@@ -18,7 +18,14 @@ changeImpact: "medium"
 
 **呼び出し経路の注記（ADR-008）**: フロントエンドが呼ぶのは **`/api/*`（JSON）** であり、MCP を直接話すことはありません（React 側に MCP クライアントを実装するのは ADR-008 で禁止）。本書で `search_datasets` 等と呼んでいるのは `worker/core/` の**コア操作名**で、`/mcp`（[MCP.md](./MCP.md)、AI クライアント向け開放面）でも同名ツールとして公開されます。本書の入出力提案は経路によらずコア操作のスキーマに対するものなので、内容はそのまま有効です。
 
-**現状**: `src/features/plan/` に「旅のプロフィール→プラン」画面は実装済みですが、**まだこの3操作を呼んでいません**。`mockScenarios.ts` の静的な仮データで動いています。一方、**バックエンド側の3エンドポイントは 2026-08-17 に呼べる状態になりました**（`worker/core/` の固定データによるスタブ。中身は Step 5 で本実装に差し替えるが、入出力の形は変えない）。したがって fetch 経路・ローディング・`unanswered` 表示の実装は、Step 5 を待たずに着手できます。
+**現状**: プラン画面は **2026-08-17 に3操作へ接続済み**（[Issue #31](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/31)）。`mockScenarios.ts` の静的な仮データは削除し、`search_datasets` → `aggregate_dataset` → `get_provenance` の応答から旅程と出典チップを組み立てています。組み立ては `src/features/plan/buildPlan.ts`、通信と障害分類は `src/api/coreOperations.ts`。
+
+バックエンドは `worker/core/` の固定データによるスタブのままですが、**入出力の形は本実装（Step 5）でも変えません**。
+
+**この接続で分かったこと2点**:
+
+1. **エリアを指定する入力欄が無い。** `Trip` に `area` フィールドが無いため、`search_datasets` の `area` は送っていません。代表エリアを狙うには「その他のご希望」（`trip.notes`）に地名を書く経路しかなく、書かれた地名は質問文の一部として渡ります（実測で効くことを確認済み）。専用の入力欄は [Issue #42](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/42)
+2. **マナー解説が空になった。** `mockScenarios.ts` のマナー文は出典を持たない仮データだったため、API 接続経路に残せませんでした（CLAUDE.md 絶対ルール #2）。出典のあるデータの確保は [Issue #43](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/43)
 
 **✅ 全体注記（確認済み）**: `ProvenanceSource` の3フィールド（`datasetId` / `license` / `query`）は Okazaki 確認済み（2026-08-16）。**3フィールドともドラフトの想定どおりで確定**。根拠は本書末尾の「ProvenanceSource フィールド確認結果」を参照。あわせて `get_provenance` の入力 `query` は optional から**必須**に修正した（API.md §4）。
 
@@ -228,6 +235,16 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 | `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物しか返らない。** 無ければ `unanswered`。別エリアの施設で代替されることはないので、画面は返ってきた `name` をそのまま信用してよい |
 
 ## Changelog
+
+### [1.3.0] - 2026-08-17
+
+#### 修正
+
+- 冒頭の「現状」を更新（[Issue #31](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/31)）。プラン画面は3操作へ接続済みで、`mockScenarios.ts` は削除された。組み立ては `buildPlan.ts`、通信と障害分類は `src/api/coreOperations.ts`
+
+#### 追加
+
+- 接続で分かった2点を明記。エリアの入力欄が無く「その他のご希望」経由でしか指定できないこと（[Issue #42](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/42)）、出典を持つマナーのデータが無くマナー欄が空になったこと（[Issue #43](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/43)）
 
 ### [1.2.0] - 2026-08-17
 

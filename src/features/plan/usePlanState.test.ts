@@ -1,8 +1,25 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import {
+  AGGREGATE_PATH,
+  jsonResponse,
+  MEISHO_ID,
+  provenanceSource,
+  SEARCH_PATH,
+  stubFetch,
+  stubSuccessfulPlan,
+  PROVENANCE_PATH,
+} from "../../test/planFixtures";
 import { COUNTER_BOUNDS } from "./constants";
 import { usePlanState } from "./usePlanState";
-import type { Scenario } from "./types";
+
+/** 成功応答でルートが揃った状態まで進めたフックを返す */
+async function renderReadyPlan(fetchImpl: typeof fetch) {
+  const { result } = renderHook(() => usePlanState({ fetchImpl }));
+  act(() => result.current.saveTrip());
+  await waitFor(() => expect(result.current.request.status).toBe("ready"));
+  return result;
+}
 
 describe("usePlanState", () => {
   it("clamps counters at their min/max bounds", () => {
@@ -30,72 +47,108 @@ describe("usePlanState", () => {
     act(() => result.current.toggleInterest("nature"));
     expect(result.current.trip.interests.includes("nature")).toBe(before);
   });
+});
 
-  it("picks the family scenario once kids > 0, regardless of interests", () => {
-    const { result } = renderHook(() => usePlanState());
-    act(() => result.current.bumpCounter("kids", 1, 0, 8));
+describe("ルートの組み立て（Issue #31）", () => {
+  it("saveTrip でブリーフィングへ移り、応答が来るまで loading になる", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    const { result } = renderHook(() => usePlanState({ fetchImpl }));
+
     act(() => result.current.saveTrip());
-    expect(result.current.activeScenario.id).toBe("family");
+    // 無反応に見せない（AC: ローディング表示）
     expect(result.current.screen).toBe("briefing");
+    expect(result.current.request.status).toBe("loading");
+
+    await waitFor(() => expect(result.current.request.status).toBe("ready"));
   });
 
-  it("picks the nightlife scenario when that interest is selected and there are no kids", () => {
-    const { result } = renderHook(() => usePlanState());
-    act(() => result.current.toggleInterest("nightlife"));
+  it("応答由来の停留地と出典が並ぶ", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    const result = await renderReadyPlan(fetchImpl);
+
+    expect(result.current.orderedStops.map((s) => s.stop.place)).toEqual(["寛永寺", "国立西洋美術館", "燕湯"]);
+    expect(result.current.orderedStops[0].source.datasetId).toBe(MEISHO_ID);
+    // 順番ラベルは位置から導出する（時刻データを持っていないので時刻を捏造しない）
+    expect(result.current.orderedStops.map((s) => s.positionLabel)).toEqual(["1番目", "2番目", "3番目"]);
+  });
+
+  it("unanswered は障害ではなく unanswered として保持する", async () => {
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({ status: "unanswered", reason: "out_of_area", message: "「新宿」は対象エリアの外です。" }),
+    });
+    const { result } = renderHook(() => usePlanState({ fetchImpl }));
+
     act(() => result.current.saveTrip());
-    expect(result.current.activeScenario.id).toBe("nightlife");
+    await waitFor(() => expect(result.current.request.status).toBe("unanswered"));
+    expect(result.current.request).toMatchObject({ reason: "out_of_area" });
   });
 
-  it("falls back to the ramen scenario by default", () => {
-    const { result } = renderHook(() => usePlanState());
+  it("障害は unanswered と別の状態にする", async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new TypeError("Failed to fetch")) as unknown as typeof fetch;
+    const { result } = renderHook(() => usePlanState({ fetchImpl }));
+
     act(() => result.current.saveTrip());
-    expect(result.current.activeScenario.id).toBe("ramen");
+    await waitFor(() => expect(result.current.request.status).toBe("failed"));
+    expect(result.current.request).toMatchObject({ failure: { kind: "network" } });
   });
 
-  it("switches scenarios directly via selectScenario, independent of saveTrip's picking rule", () => {
-    const { result } = renderHook(() => usePlanState());
-    act(() => result.current.saveTrip()); // ramen (default)
-    expect(result.current.activeScenario.id).toBe("ramen");
+  it("応答が無いときに前のルートへ黙って戻さない（ACE-28-1）", async () => {
+    // 1回目は成功、2回目はネットワーク断
+    let failNext = false;
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (failNext) throw new TypeError("Failed to fetch");
+      return stubSuccessfulPlan().fetchImpl(input, init);
+    }) as unknown as typeof fetch;
 
-    act(() => result.current.selectScenario("nightlife"));
-    expect(result.current.activeScenario.id).toBe("nightlife");
+    const { result } = renderHook(() => usePlanState({ fetchImpl }));
+    act(() => result.current.saveTrip());
+    await waitFor(() => expect(result.current.request.status).toBe("ready"));
 
-    act(() => result.current.selectScenario("family"));
-    expect(result.current.activeScenario.id).toBe("family");
+    failNext = true;
+    act(() => void result.current.requestPlan());
+    await waitFor(() => expect(result.current.request.status).toBe("failed"));
+
+    // 前回のルートが残っていると「取れた」と誤認される
+    expect(result.current.orderedStops).toEqual([]);
   });
+});
 
-  it("reorders stops by moving the dragged item to its drop position", () => {
-    const { result } = renderHook(() => usePlanState());
+describe("停留地の並べ替えと選択", () => {
+  it("ドラッグした停留地をドロップ位置へ動かす", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    const result = await renderReadyPlan(fetchImpl);
     const originalPlaces = result.current.orderedStops.map((s) => s.stop.place);
 
     act(() => result.current.reorderStop(0, 2));
 
-    const reorderedPlaces = result.current.orderedStops.map((s) => s.stop.place);
-    expect(reorderedPlaces).toEqual([originalPlaces[1], originalPlaces[2], originalPlaces[0]]);
+    expect(result.current.orderedStops.map((s) => s.stop.place)).toEqual([
+      originalPlaces[1],
+      originalPlaces[2],
+      originalPlaces[0],
+    ]);
   });
 
-  it("keeps displayed times tied to position (not the stop) after reordering, so times never go backwards", () => {
-    const { result } = renderHook(() => usePlanState());
-    const originalTimes = result.current.orderedStops.map((s) => s.time);
+  it("順番ラベルは位置に紐づく（並べ替えても番号が前後しない）", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    const result = await renderReadyPlan(fetchImpl);
     const movedPlace = result.current.orderedStops[0].stop.place;
 
     act(() => result.current.reorderStop(0, 2));
 
     const reordered = result.current.orderedStops;
-    // 時刻は位置（schedule[pos]）に紐づくので、並べ替え前と同じ並びのまま
-    expect(reordered.map((s) => s.time)).toEqual(originalTimes);
-    // 移動した停留地は最後の位置に来て、その位置の時刻を引き継ぐ
+    expect(reordered.map((s) => s.positionLabel)).toEqual(["1番目", "2番目", "3番目"]);
     expect(reordered[2].stop.place).toBe(movedPlace);
-    expect(reordered[2].time).toBe(originalTimes[2]);
   });
 
-  it("rejects invalid reorderStop positions and leaves the order unchanged", () => {
-    const { result } = renderHook(() => usePlanState());
+  it("不正な位置は無視して順序を変えない", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    const result = await renderReadyPlan(fetchImpl);
     const originalPlaces = result.current.orderedStops.map((s) => s.stop.place);
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     act(() => result.current.reorderStop(Number.NaN, 2));
-    act(() => result.current.reorderStop(5, 0)); // out of range for a 3-stop scenario
+    act(() => result.current.reorderStop(5, 0));
     act(() => result.current.reorderStop(-1, 0));
 
     expect(result.current.orderedStops.map((s) => s.stop.place)).toEqual(originalPlaces);
@@ -103,52 +156,59 @@ describe("usePlanState", () => {
     warnSpy.mockRestore();
   });
 
-  it("filters the etiquette list to the selected stop and clears back to the route-level list", () => {
-    const { result } = renderHook(() => usePlanState());
-    const firstStop = result.current.activeScenario.stops[0];
+  it("停留地を選ぶとマナーの見出しがその停留地になり、解除で戻る", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    const result = await renderReadyPlan(fetchImpl);
 
     act(() => result.current.selectStop(0));
-    expect(result.current.displayedEtiquette).toEqual(firstStop.etiquette);
-    expect(result.current.etiquetteTitle).toBe(`${firstStop.place}のマナー`);
+    expect(result.current.etiquetteTitle).toBe("寛永寺のマナー");
 
     act(() => result.current.clearStopSelection());
-    expect(result.current.displayedEtiquette).toEqual(result.current.activeScenario.etiquette);
+    expect(result.current.etiquetteTitle).toBe("このルートのマナー");
   });
 
-  it("deselects a stop when it's selected again (toggle-off)", () => {
-    const { result } = renderHook(() => usePlanState());
-    const routeLevelEtiquette = result.current.activeScenario.etiquette;
+  it("同じ停留地をもう一度選ぶと選択が外れる", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    const result = await renderReadyPlan(fetchImpl);
 
     act(() => result.current.selectStop(0));
     expect(result.current.selectedStopData).not.toBeNull();
 
     act(() => result.current.selectStop(0));
     expect(result.current.selectedStopData).toBeNull();
-    expect(result.current.displayedEtiquette).toEqual(routeLevelEtiquette);
   });
 
-  it("accepts an injected scenarios list instead of the built-in mock data", () => {
-    // id は ScenarioId union に閉じた（Issue #17）。任意の文字列は型として渡せないので、
-    // 「差し替えられること」は中身の違いで確かめる
-    const customScenarios: Scenario[] = [
-      {
-        id: "nightlife",
-        label: "テストシナリオ",
-        interest: null,
-        prompt: "テスト用",
-        schedule: ["午前9:00", "午前10:00"],
-        stops: [
-          { place: "テスト地点A", note: "", etiquette: [{ text: "tip A" }] },
-          { place: "テスト地点B", note: "", etiquette: [{ text: "tip B" }] },
-        ],
-        etiquette: [{ text: "route-level tip" }],
-      },
-    ];
+  it("新しいルートを取り直すと並べ替えと選択がリセットされる", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    const result = await renderReadyPlan(fetchImpl);
 
-    const { result } = renderHook(() => usePlanState(customScenarios));
+    act(() => result.current.reorderStop(0, 2));
+    act(() => result.current.selectStop(0));
 
-    expect(result.current.scenarios).toBe(customScenarios);
-    expect(result.current.activeScenario.label).toBe("テストシナリオ");
-    expect(result.current.orderedStops.map((s) => s.stop.place)).toEqual(["テスト地点A", "テスト地点B"]);
+    // 停留地が変わったのに前の並び順が残ると、別の地物に前の位置が付く
+    act(() => void result.current.requestPlan());
+    await waitFor(() => expect(result.current.request.status).toBe("ready"));
+
+    expect(result.current.orderedStops.map((s) => s.stop.place)).toEqual(["寛永寺", "国立西洋美術館", "燕湯"]);
+    expect(result.current.selectedStopData).toBeNull();
+  });
+});
+
+describe("マナー", () => {
+  it("出典のあるマナーが無いので空になる（仮のマナー文を出さない）", async () => {
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
+        }),
+      [AGGREGATE_PATH]: () =>
+        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" }),
+      [PROVENANCE_PATH]: () =>
+        jsonResponse({ status: "answered", sources: [provenanceSource(MEISHO_ID, "名所・史跡")] }),
+    });
+    const result = await renderReadyPlan(fetchImpl);
+
+    expect(result.current.displayedEtiquette).toEqual([]);
   });
 });
