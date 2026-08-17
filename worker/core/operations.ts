@@ -228,6 +228,12 @@ const findRepresentativeArea = (text: string): RepresentativeArea | undefined =>
  *
  * **代表エリアだけを見る。** 対象エリア外の地名（`NON_TARGET_AREAS`）を混ぜると、
  * 「新宿から上野へ行きたい」の新宿＝出発地が欠損として報告される（Issue #29 の判断）。
+ *
+ * **代表エリアについては過検知の側に倒す**（[Issue #58](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/58)）。
+ * 「渋谷から上野の美術館へ」の渋谷も「訊かれた」と数えるので、出発地のつもりで書かれた
+ * 渋谷が欠損になる。新宿と逆に倒すのは事情が違うため — 新宿は対象外で**そもそも答えられない**が、
+ * 渋谷は対象エリアでデータがあり、渋谷のデータも欲しい可能性が残る。区別には質問文を
+ * 構造化して受ける入口が要る（Issue #53 と同じ根）ので分けた。
  */
 function askedAreas(input: SearchDatasetsInput): readonly RepresentativeArea[] {
   const explicit = input.area?.trim();

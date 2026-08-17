@@ -209,6 +209,61 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
     ]);
   });
 
+  it("エリア・フォールバックの欠損と同時に付く（欠損は1件とは限らない）", async () => {
+    // 「上野・渋谷の公園」は (1) 質問文の語に当たるデータセットが無い (2) 渋谷を覆えていない
+    // の2つが同時に成り立つ。片方だけ消えても件数を見ていないと気づけない
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "上野・渋谷の公園" }, recorder);
+
+    const body = expectAnswered(output);
+    expect(body.gaps).toHaveLength(2);
+    // 応答全体のエリア（上野）についての欠損は area を持たない
+    expect(body.gaps?.[0].area).toBeUndefined();
+    expect(body.gaps?.[1].area).toBe("渋谷");
+    // 同じ reason でも重複排除しない（Issue #27 の AC）
+    expect(recorder.records).toEqual([
+      { question: "上野・渋谷の公園", area: "上野", category: undefined, reason: "other" },
+      { question: "上野・渋谷の公園", area: "渋谷", category: undefined, reason: "other" },
+    ]);
+  });
+
+  it("絞り込みに使うのは質問文の登場順ではなく定義順（上野→浅草→渋谷）", async () => {
+    // 「上野・渋谷」では登場順と定義順が一致してしまい、登場順で実装しても通ってしまう
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "渋谷・上野" }, recorder);
+
+    const body = expectAnswered(output);
+    // 先に書かれているのは渋谷だが、絞り込みに使われるのは上野（台東区のデータセット）
+    expect(body.candidates[0].datasetId).toBe("t131067d0000000251");
+    expect(recorder.records).toEqual([
+      { question: "渋谷・上野", area: "渋谷", category: undefined, reason: "other" },
+    ]);
+  });
+
+  it("出発地として書かれた代表エリアも欠損として報告する（過検知の側に倒す）", async () => {
+    // 「渋谷から上野の美術館へ」の渋谷は出発地かもしれないが、渋谷は POC の対象エリアなので
+    // 「渋谷のデータも欲しい」の可能性が残る。対象エリア外の新宿（そもそも答えられない）とは
+    // 事情が違うため、Issue #29 と逆に過検知の側へ倒す。区別には質問文を構造化して受ける
+    // 入口が要るので Issue #58 に分けた。倒す向きを明示するためにテストで固定しておく
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "渋谷から上野の美術館へ行きたい" }, recorder);
+
+    const body = expectAnswered(output);
+    expect(body.gaps).toHaveLength(1);
+    expect(body.gaps?.[0].area).toBe("渋谷");
+    expect(recorder.records).toHaveLength(1);
+  });
+
+  it("エリアを持たない従来の部分欠損には area を足さない", async () => {
+    // 常に埋めると「応答のエリアと違うから書いてある」という区別が失われる
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "上野の美術館とラーメン", area: "上野" }, recorder);
+
+    const body = expectAnswered(output);
+    expect(body.gaps?.[0].reason).toBe("insufficient_granularity");
+    expect(Object.hasOwn(body.gaps?.[0] ?? {}, "area")).toBe(false);
+  });
+
   it("area を明示したら、質問文の他の代表エリアは訊かれたエリアに数えない", async () => {
     // 明示指定は質問文より優先する（API.md §3.1）。絞り込みの指定を尊重し、
     // 指定によって外れたエリアは「黙って落とした」ではなく呼び出し側の意図として扱う
