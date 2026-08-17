@@ -97,23 +97,39 @@ export function resolveArea(address: string, fixedArea?: string): string | null 
 }
 
 /**
+ * 名称に含まれる括弧書きを落とす。半角・全角のどちらも実在する
+ * （路線名は半角 "東西(上野公園経由・三崎坂往復ルート)"、補足は全角 "三筋二丁目（台東デザイナーズビレッジ）"）。
+ *
+ * 開きと閉じが対応していない名称は、壊れた範囲を推測して削らずそのまま返す
+ * （どこまでが括弧書きか決められないため。CLAUDE.md「推測で埋めない」）。
+ */
+const stripParenthesized = (name: string): string => name.replace(/[（(][^）)]*[）)]/g, "");
+
+/**
  * 施設名・停留所名からエリアを判定する。住所列を持たないデータセット専用。
  *
  * めぐりん停留所（東西めぐりん・72件）は所在地列が空で、地名は名称にしか無い
  * （例 "東西(鶯谷駅経由・日医大回りルート)27西浅草三丁目"）。住所が無い以上、
- * 完全一致は使えないため部分一致で引くが、そのままでは浅草橋・元浅草を巻き込む。
- * そこで曖昧な町字を先に弾き、残りを**長い町字から順に**照合する
- * （"西浅草" を "浅草" より先に見ないと、西浅草が浅草として素通りする）。
+ * 完全一致は使えないため部分一致で引くが、そのままでは2つの誤りを踏む。
  *
- * 東西めぐりんの72件には浅草橋・元浅草を含む停留所名が0件であることを確認済みだが、
- * 他路線を追加したときに備えてガードは残す。
+ * 1. **括弧の中は経由地であって、その停留所の所在地ではない。**
+ *    "東西(上野公園経由・三崎坂往復ルート)27西浅草三丁目" は路線名側の「上野公園」が先に
+ *    当たり、この路線の全38停留所が上野に倒れていた（Issue #30）。照合の前に括弧書きを落とす。
+ * 2. そのままでは浅草橋・元浅草を巻き込む。曖昧な町字を弾いたうえで、残りを
+ *    **長い町字から順に**照合する（"西浅草" を "浅草" より先に見ないと、西浅草が浅草として素通りする）。
+ *
+ * 曖昧な町字の判定も括弧を落とした**後**に行う。名称の側が浅草橋でなくても、路線名に
+ * 浅草橋を含むだけで判定不能にしてしまうため（東西めぐりんの72件では 0 件だが、
+ * 他路線を足したときに黙って停留所を落とす）。
  */
 export function resolveAreaFromName(name: string): string | null {
   if (!name) return null;
-  if (AMBIGUOUS_TOWNS.some((t) => name.includes(t))) return null;
+  const stopName = stripParenthesized(name);
+  if (!stopName) return null;
+  if (AMBIGUOUS_TOWNS.some((t) => stopName.includes(t))) return null;
   const towns = Object.keys(TOWN_TO_AREA).sort((a, b) => b.length - a.length);
   for (const town of towns) {
-    if (name.includes(town)) return TOWN_TO_AREA[town];
+    if (stopName.includes(town)) return TOWN_TO_AREA[town];
   }
   return null;
 }
