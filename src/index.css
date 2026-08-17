@@ -187,3 +187,19 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .tab-bar__label { font-size: 9.5px; font-weight: 600; }
 
 .dev-notes { margin-top: 2rem; padding-top: 2rem; border-top: 1px dashed var(--border); }
+
+/* 開発用 API コンソール（ApiConsole.tsx。開発ビルド限定） */
+.api-console { max-width: 720px; }
+.console-block { border-top: 1px solid var(--border); margin-top: 1.25rem; padding-top: 1rem; }
+.console-block__title { font-size: 0.8rem; font-weight: 700; color: var(--ink); margin: 0 0 0.75rem; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+.console-form { display: flex; flex-direction: column; gap: 0.625rem; align-items: flex-start; }
+.console-field { display: flex; flex-direction: column; gap: 0.25rem; width: 100%; }
+.console-field .notes-input { margin-top: 0; }
+.console-field__label { font-size: 0.72rem; font-weight: 600; color: var(--muted); }
+.console-candidates { margin-top: 0.75rem; }
+.console-result { margin-top: 0.75rem; border-radius: 10px; padding: 0.625rem 0.75rem; border: 1px solid var(--border); }
+.console-result--ok { background: oklch(96% 0.03 150); border-color: oklch(85% 0.06 150); }
+.console-result--warn { background: oklch(96% 0.04 85); border-color: oklch(85% 0.07 85); }
+.console-result--error { background: oklch(96% 0.03 25); border-color: oklch(85% 0.07 25); }
+.console-result__headline { font-size: 0.78rem; font-weight: 700; margin: 0; color: var(--ink); }
+.console-result__body { font-size: 0.72rem; line-height: 1.55; margin: 0.5rem 0 0; overflow-x: auto; white-space: pre-wrap; word-break: break-all; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
