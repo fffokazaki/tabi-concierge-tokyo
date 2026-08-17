@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.16.0"
+version: "1.17.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-18"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 38
+ace_entry_count: 43
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -259,8 +259,29 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-51-3 | 欠損・未回答の message には、実測で確かめたことだけを書く | architecture | [playbook/architecture.md#ace-51-3](./playbook/architecture.md#ace-51-3) |
 | ACE-51-4 | 公開 API 経由で内部関数の境界を測るテストは、入力がその関数に到達しているか確かめる | testing | [playbook/testing.md#ace-51-4](./playbook/testing.md#ace-51-4) |
 | ACE-51-5 | 自分が読まない設定ファイルの同期漏れは、それを読むモデルが見つける | process | [playbook/process.md#ace-51-5](./playbook/process.md#ace-51-5) |
+| ACE-57-1 | 「訊かれたのに答えていない」は、入力で拾い落としたものではなく出力が覆っていないもので判定する | architecture | [playbook/architecture.md#ace-57-1](./playbook/architecture.md#ace-57-1) |
+| ACE-57-2 | 「応答から記録を導出する」設計に行ごとの差分が要るなら、応答側に構造化して持たせる | architecture | [playbook/architecture.md#ace-57-2](./playbook/architecture.md#ace-57-2) |
+| ACE-57-3 | 同じ文型の入力でも、対象範囲の内か外かで過検知の倒し方は逆になる | architecture | [playbook/architecture.md#ace-57-3](./playbook/architecture.md#ace-57-3) |
+| ACE-57-4 | 対処案が併記された Issue では、案の魅力ではなく受け入れ条件が案を選ぶ | process | [playbook/process.md#ace-57-4](./playbook/process.md#ace-57-4) |
+| ACE-57-5 | レビューが挙げた反例は、真偽値ではなく応答全文を出して読む | process | [playbook/process.md#ace-57-5](./playbook/process.md#ace-57-5) |
 
 ## Changelog
+
+### [1.17.0] - 2026-08-18
+
+#### 追加
+
+- ACE-57-1: 「訊かれたのに答えていない」は、入力で拾い落としたものではなく出力が覆っていないもので判定する（Issue #52 / PR #57）
+- ACE-57-2: 「応答から記録を導出する」設計に行ごとの差分が要るなら、応答側に構造化して持たせる（Issue #52 / PR #57）
+- ACE-57-3: 同じ文型の入力でも、対象範囲の内か外かで過検知の倒し方は逆になる（Issue #52 / PR #57。別 Issue #58 に分離）
+- ACE-57-4: 対処案が併記された Issue では、案の魅力ではなく受け入れ条件が案を選ぶ（Issue #52 / PR #57）
+- ACE-57-5: レビューが挙げた反例は、真偽値ではなく応答全文を出して読む（Issue #52 / PR #57。別 Issue #59 の発見経路）
+
+#### カウンター更新
+
+- ACE-39-1: Helpful +1（判定を広げると誤検知の性質が変わる件。代表エリアの過検知をどちらへ倒すかの下敷きにした）
+- ACE-51-2: Helpful +1（「この経路の gaps は必ず1件」を撤回する際、コードのコメントと API.md を同時に grep して直した）
+- ACE-51-3: Helpful +1（取り落ちの message で「該当するオープンデータがありません」を使わない判断に再利用）
 
 ### [1.16.0] - 2026-08-18
 

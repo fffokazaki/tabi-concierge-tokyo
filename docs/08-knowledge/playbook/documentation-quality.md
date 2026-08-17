@@ -126,7 +126,7 @@ CLAUDE.md の「frontmatter を持つ文書（MASTER / PROJECT / … ほか）�
 
 | Category | documentation-quality | Origin | PR #51 / Issue #50 |
 | Date | 2026-08-18 |
-| Helpful | 0 | Harmful | 0 |
+| Helpful | 1 | Harmful | 0 |
 | Status | active |
 
 **Insight**: 全称命題として書かれた不変条件は、**同じ文言がコードのコメントと設計文書の両方に置かれている**ことが多い。破るときに片方だけ直すと、残った方が「守られていない不変条件を保証するコメント」になる。これは単なる腐敗ではなく、次に触る人がその前提で読むため**同じ欠陥を再生産する装置**になる。
