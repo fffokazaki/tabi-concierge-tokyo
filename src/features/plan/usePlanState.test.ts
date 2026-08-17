@@ -1,8 +1,21 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { COUNTER_BOUNDS } from "./constants";
+import { MOCK_SCENARIOS } from "./mockScenarios";
 import { usePlanState } from "./usePlanState";
 import type { Scenario } from "./types";
+
+describe("MOCK_SCENARIOS", () => {
+  it("keeps the ramen scenario's data gap card so it can't be silently dropped", () => {
+    const ramen = MOCK_SCENARIOS.find((s) => s.id === "ramen");
+    expect(ramen?.dataGap?.subject).toBe("ラーメン店");
+  });
+
+  it("leaves nightlife without a data gap, since it stays fully mock this round", () => {
+    const nightlife = MOCK_SCENARIOS.find((s) => s.id === "nightlife");
+    expect(nightlife?.dataGap).toBeUndefined();
+  });
+});
 
 describe("usePlanState", () => {
   it("clamps counters at their min/max bounds", () => {
@@ -52,6 +65,25 @@ describe("usePlanState", () => {
     expect(result.current.activeScenario.id).toBe("ramen");
   });
 
+  it("matches a scenario via its own interest field generically, not just the hardcoded nightlife check", () => {
+    const { result } = renderHook(() => usePlanState());
+    // デフォルトの興味には「自然」が含まれない。「ラーメン」「文化」を外し「自然」だけにすると
+    // どのシナリオの interest フィールドとも一致しなくなり、フォールバックの ramen になる
+    act(() => result.current.toggleInterest("ラーメン"));
+    act(() => result.current.toggleInterest("文化"));
+    act(() => result.current.toggleInterest("自然"));
+    act(() => result.current.saveTrip());
+    expect(result.current.activeScenario.id).toBe("ramen"); // フォールバックとしての ramen
+  });
+
+  it("prioritizes kids over a matching interest when both apply", () => {
+    const { result } = renderHook(() => usePlanState());
+    act(() => result.current.bumpCounter("kids", 1, 0, 8));
+    act(() => result.current.toggleInterest("ナイトライフ")); // nightlife にも一致しうる状態
+    act(() => result.current.saveTrip());
+    expect(result.current.activeScenario.id).toBe("family"); // kids のチェックが先に効く
+  });
+
   it("switches scenarios directly via selectScenario, independent of saveTrip's picking rule", () => {
     const { result } = renderHook(() => usePlanState());
     act(() => result.current.saveTrip()); // ramen (default)
@@ -87,6 +119,54 @@ describe("usePlanState", () => {
     // 移動した停留地は最後の位置に来て、その位置の時刻を引き継ぐ
     expect(reordered[2].stop.place).toBe(movedPlace);
     expect(reordered[2].time).toBe(originalTimes[2]);
+  });
+
+  it("shows a different number of stops depending on pace", () => {
+    const { result } = renderHook(() => usePlanState());
+
+    act(() => result.current.setTrip("pace", "ゆったり"));
+    expect(result.current.orderedStops).toHaveLength(2);
+
+    act(() => result.current.setTrip("pace", "バランス型"));
+    expect(result.current.orderedStops).toHaveLength(3);
+
+    act(() => result.current.setTrip("pace", "しっかり"));
+    expect(result.current.orderedStops).toHaveLength(4);
+  });
+
+  it("rejects reorderStop positions beyond what's currently visible for the pace", () => {
+    const { result } = renderHook(() => usePlanState());
+    act(() => result.current.setTrip("pace", "ゆったり")); // 2件だけ表示
+    const originalPlaces = result.current.orderedStops.map((s) => s.stop.place);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    act(() => result.current.reorderStop(0, 2)); // 2 は非表示（3・4番目）の位置なので不正
+
+    expect(result.current.orderedStops.map((s) => s.stop.place)).toEqual(originalPlaces);
+    expect(warnSpy).toHaveBeenCalledOnce();
+    warnSpy.mockRestore();
+  });
+
+  it("keeps schedule[pos] correct after reordering within a reduced pace, and after switching pace back up", () => {
+    const { result } = renderHook(() => usePlanState());
+    act(() => result.current.setTrip("pace", "ゆったり")); // 2件表示
+    const [firstPlace, secondPlace] = result.current.orderedStops.map((s) => s.stop.place);
+    const [time0, time1] = result.current.orderedStops.map((s) => s.time);
+
+    act(() => result.current.reorderStop(0, 1)); // 表示中の2件だけを入れ替え
+
+    const afterSwap = result.current.orderedStops;
+    expect(afterSwap.map((s) => s.stop.place)).toEqual([secondPlace, firstPlace]);
+    // 時刻は位置に紐づくので、並べ替え後も schedule[0]/schedule[1] のまま
+    expect(afterSwap.map((s) => s.time)).toEqual([time0, time1]);
+
+    act(() => result.current.setTrip("pace", "しっかり")); // 4件表示に戻す
+    const full = result.current.orderedStops;
+    expect(full).toHaveLength(4);
+    // 各位置の時刻は activeScenario.schedule[pos] とそのまま一致する（隠れていた3・4番目も破損していない）
+    full.forEach((s, pos) => {
+      expect(s.time).toBe(result.current.activeScenario.schedule[pos]);
+    });
   });
 
   it("rejects invalid reorderStop positions and leaves the order unchanged", () => {
@@ -132,6 +212,7 @@ describe("usePlanState", () => {
       {
         id: "custom",
         label: "テストシナリオ",
+        placesFromOpenData: false,
         interest: null,
         prompt: "テスト用",
         schedule: ["午前9:00", "午前10:00"],

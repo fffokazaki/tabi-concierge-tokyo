@@ -1,6 +1,7 @@
 import type { DragEvent } from "react";
 import { RouteStopCard } from "./components/RouteStopCard";
 import { EtiquetteList } from "./components/EtiquetteList";
+import { DataGapCard } from "./components/DataGapCard";
 import type { PlanScreenState } from "./usePlanState";
 
 /** ルートカードの並べ替えドラッグだけを受け付けるための独自 MIME タイプ。
@@ -85,10 +86,15 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
           <span className="route-panel__header-label">あなたのルート</span>
         </div>
 
-        {/* 営業時間・料金・マナーの内容はすべて仮データで出典を持たない（EtiquetteTip.source 未設定）。
-            出典なしの内容を実データであるかのように見せないため、明示のラベルを出す。 */}
+        {/* 営業時間・案内文・マナーの内容はすべて仮データで出典を持たない（EtiquetteTip.source 未設定）。
+            出典なしの内容を実データであるかのように見せないため、明示のラベルを出す。
+            場所・住所が確認済み（placesFromOpenData）かどうかでシナリオごとに文言を出し分ける
+            ―― 確認済みでも note・etiquette・dataGap.requestCount 等は引き続き未検証のため、
+            「営業時間・案内文・マナー解説は未検証」の一文はどちらの文言にも残す。 */}
         <p className="demo-data-notice">
-          デモデータです — 実データにはまだ接続されていません。営業時間・料金などの内容は未検証です。
+          {activeScenario.placesFromOpenData
+            ? "場所・住所は東京都オープンデータで確認済みです。営業時間・案内文・マナー解説は未検証の仮データです。"
+            : "デモデータです — 実データにはまだ接続されていません。営業時間・料金などの内容は未検証です。"}
         </p>
 
         {orderedStops.map(({ origIdx, pos, stop, time, selected, isDragOver }) => (
@@ -105,6 +111,8 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
             onDragEnd={() => setDragOverPos(null)}
           />
         ))}
+
+        {activeScenario.dataGap && <DataGapCard gap={activeScenario.dataGap} />}
 
         <div className="route-divider" />
         <div className="route-panel__section-header">

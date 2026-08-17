@@ -44,6 +44,21 @@ describe("AppTabs", () => {
     expect(adultsValue()).toBe(String(COUNTER_BOUNDS.adults.max));
   });
 
+  it("changes the number of rendered stop cards when pace changes", () => {
+    const { container } = render(<AppTabs />);
+
+    fireEvent.click(screen.getByRole("button", { name: "ゆったり" }));
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+    expect(container.querySelectorAll(".stop-card")).toHaveLength(2);
+
+    // trip-summary-bar は複数の <span> をまとめて1つの <button> にしているため、
+    // アクセシブルネームは連結された全文になる（"編集" 単体では一致しない）
+    fireEvent.click(screen.getByRole("button", { name: /編集/ }));
+    fireEvent.click(screen.getByRole("button", { name: "しっかり" }));
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+    expect(container.querySelectorAll(".stop-card")).toHaveLength(4);
+  });
+
   it("renders the other tabs as disabled placeholders", () => {
     render(<AppTabs />);
     fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));

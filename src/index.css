@@ -169,6 +169,13 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .stop-card__place { font-family: "Lora", Georgia, "Yu Mincho", serif; font-size: 15px; font-weight: 600; color: var(--ink); margin: 2px 0 0; }
 .stop-card__note { font-size: 12.5px; color: oklch(40% 0.02 75); line-height: 1.5; margin: 3px 0 0; }
 
+.data-gap-card { border: 1.5px dashed var(--border); border-radius: 12px; padding: 14px; margin: 4px 0 16px; background: var(--bg); }
+.data-gap-card__eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: 0.5px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
+.data-gap-card__title { font-family: "Lora", Georgia, "Yu Mincho", serif; font-size: 15px; font-weight: 600; color: var(--ink); margin: 0 0 6px; }
+.data-gap-card__explanation { font-size: 12.5px; line-height: 1.6; color: oklch(40% 0.02 75); margin: 0 0 12px; }
+.data-gap-card__button { background: var(--accent); color: #fff; border-radius: 10px; padding: 12px; text-align: center; font-size: 13px; font-weight: 700; cursor: default; }
+.data-gap-card__note { font-size: 11px; color: var(--muted); line-height: 1.5; text-align: center; margin: 8px 0 0; }
+
 .route-divider { border-top: 1px solid var(--border); margin: 6px 0 14px; }
 .route-panel__section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .route-panel__section-title { font-size: 11.5px; font-weight: 700; color: oklch(30% 0.02 75); text-transform: uppercase; letter-spacing: 0.5px; }

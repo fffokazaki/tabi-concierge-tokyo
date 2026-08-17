@@ -19,6 +19,13 @@ export const SETTING_OPTIONS: Setting[] = ["屋外中心", "どちらも", "屋�
 export const PACE_OPTIONS: Pace[] = ["ゆったり", "バランス型", "しっかり"];
 export const BUDGET_OPTIONS: Budget[] = ["節約", "中間価格帯", "ぜいたく"];
 
+/** ペースに応じて表示する停留地数。シナリオの stops がこれより少ない場合はある分だけ表示する。 */
+export const STOP_COUNT_BY_PACE: Record<Pace, number> = {
+  ゆったり: 2,
+  バランス型: 3,
+  しっかり: 4,
+};
+
 /** すべて未選択で始めると saveTrip のシナリオ選択が不安定になるため、プロトタイプと同じ初期値にする。 */
 export const DEFAULT_TRIP: Trip = {
   adults: 2,

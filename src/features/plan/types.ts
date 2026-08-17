@@ -53,6 +53,24 @@ export type Stop = {
   etiquette: EtiquetteTip[];
 };
 
+/**
+ * 検索したが確認できるデータが見つからなかったことを画面上に明示するためのカード用データ。
+ * DOMAIN.md の GapReason でいう「粒度不足」に相当するケース（データ自体は存在するが、
+ * 求めた粒度・エリアでは見つからない）を、推測で埋めずにそのまま提示する。
+ */
+export type DataGap = {
+  /** 何を探していたか（例: "ラーメン店"）。カード見出しに使う。 */
+  subject: string;
+  title: string;
+  explanation: string;
+  /**
+   * 東京都オープンデータポータルへのリクエスト送信を模したボタンに添える件数。
+   * 完全な仮の数値（承認済みデザインカンプの表記をそのまま採用）で、実際のリクエスト件数ではない。
+   * report_gap（DOMAIN.md §7 / API.md §3.4、検討中）が実装されるまでは集計の裏付けが無い。
+   */
+  requestCount: number;
+};
+
 export type Scenario = {
   id: string;
   label: string;
@@ -67,6 +85,14 @@ export type Scenario = {
    */
   schedule: string[];
   etiquette: EtiquetteTip[];
+  /** 該当データが見つからなかった検索があった場合のみ設定する（例: ramen シナリオのラーメン店検索）。 */
+  dataGap?: DataGap;
+  /**
+   * stops の place・住所が東京都オープンデータで確認済みかどうか。true でも note・etiquette・
+   * dataGap.requestCount 等は引き続き未検証（一般知識またはデザインカンプ由来の仮データ）。
+   * PlanScreen.tsx のデモデータ表示文言をシナリオごとに出し分けるために使う。
+   */
+  placesFromOpenData: boolean;
 };
 
 export type Screen = "setup" | "briefing";
