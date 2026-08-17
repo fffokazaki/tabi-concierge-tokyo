@@ -155,7 +155,24 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 
 .route-panel { background: var(--surface-tint); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-top: 1.125rem; }
 .route-panel__header { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; }
-.demo-data-notice { font-size: 11px; font-weight: 600; line-height: 1.5; color: oklch(45% 0.14 60); background: oklch(94% 0.05 60); border: 1px solid oklch(80% 0.08 60); border-radius: 8px; padding: 8px 10px; margin: 0 0 14px; }
+/* ルートの状態表示（Issue #31）。unanswered（正常な結果）と障害は見た目から区別する */
+.route-status { font-size: 12px; line-height: 1.6; color: var(--muted); margin: 0 0 14px; }
+.route-stop { margin-bottom: 10px; }
+
+.route-empty { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 14px; background: var(--surface); }
+.route-empty__title { font-size: 12.5px; font-weight: 700; color: var(--ink); margin: 0 0 6px; }
+.route-empty__message { font-size: 11.5px; line-height: 1.6; color: var(--muted); margin: 0 0 6px; }
+.route-empty__reason { font-size: 10.5px; color: var(--muted); margin: 0; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+/* 答えられなかった興味（#29 の gaps）。データが無いことは正常な出力なのでエラー色にしない */
+.route-gaps { font-size: 11px; line-height: 1.6; color: oklch(45% 0.14 60); background: oklch(94% 0.05 60); border: 1px solid oklch(80% 0.08 60); border-radius: 8px; padding: 8px 10px; margin: 0 0 14px; }
+.route-gaps__title { font-weight: 700; margin: 0 0 4px; }
+.route-gaps__list { margin: 0; padding-left: 1.1em; }
+
+.route-failure { border: 1px solid oklch(75% 0.14 25); background: oklch(96% 0.03 25); border-radius: 10px; padding: 12px; margin-bottom: 14px; }
+.route-failure__title { font-size: 12.5px; font-weight: 700; color: oklch(45% 0.18 25); margin: 0 0 6px; }
+.route-failure__detail { font-size: 11.5px; line-height: 1.6; color: var(--muted); margin: 0 0 8px; word-break: break-word; }
+.route-failure__retry { font-size: 11.5px; font-weight: 700; color: var(--accent); background: none; border: 1px solid var(--accent); border-radius: 999px; padding: 5px 14px; cursor: pointer; }
 .route-panel__header-dot { width: 6px; height: 6px; background: var(--accent); transform: rotate(45deg); }
 .route-panel__header-label { font-size: 11.5px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; }
 

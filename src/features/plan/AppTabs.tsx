@@ -1,3 +1,4 @@
+import type { BuildPlanOptions } from "./buildPlan";
 import { TripSetupScreen } from "./TripSetupScreen";
 import { PlanScreen } from "./PlanScreen";
 import { usePlanState } from "./usePlanState";
@@ -13,8 +14,9 @@ const INACTIVE_TABS = [
   { key: "foryou", label: "あなたへ" },
 ] as const;
 
-export function AppTabs() {
-  const state = usePlanState();
+/** @param options `buildPlan` への注入口。テストが fetch を差し替えるために使う。 */
+export function AppTabs({ options }: { options?: BuildPlanOptions } = {}) {
+  const state = usePlanState(options);
   const { screen, goBriefing } = state;
 
   return (

@@ -43,42 +43,31 @@ export type Trip = {
  *
  * 定義は `shared/core.ts` に移した（Issue #22）。同じ型を worker 側の実装と
  * 画面側で二重に書くと、片方だけ直したときに気づけないため、ここでは再エクスポートに留める。
- * 画面が `/api/provenance` に接続するまでは常に未設定（出典なしの回答を作らないため）。
  */
 export type { ProvenanceSource };
 
+/**
+ * マナーの一言。
+ *
+ * `source` が optional なのは型の都合であって、**出典なしで画面に出してよいという意味ではない**。
+ * 現状このリストは常に空で、出典を持つマナーのデータをカタログに確認できていない（Issue #43）。
+ */
 export type EtiquetteTip = {
   text: string;
   source?: ProvenanceSource;
 };
 
+/**
+ * 旅程の停留地。
+ *
+ * `place` ← `aggregate_dataset` の `name` / `note` ← `summary`。この対応づけは
+ * フロントエンド側の責務（2026-08-17 合意・API_REQUIREMENTS.md §2）。
+ * 出典は `Stop` ではなく `SourcedStop`（`buildPlan.ts`）が対で持つ。
+ * `Stop` に optional で足すと、出典なしの停留地が型として作れてしまう。
+ */
 export type Stop = {
   place: string;
   note: string;
-  etiquette: EtiquetteTip[];
-};
-
-/**
- * シナリオの識別子。実質は閉じた集合なのに `string` だったため、`selectScenario("ramn")` の
- * ようなタイポが**黙って先頭シナリオへのフォールバックに変換**されていた（`?? scenarios[0]`）。
- * union にすることでコンパイル時に閉じる（Issue #17）。
- */
-export const SCENARIO_IDS = ["ramen", "nightlife", "family"] as const;
-export type ScenarioId = (typeof SCENARIO_IDS)[number];
-
-export type Scenario = {
-  id: ScenarioId;
-  label: string;
-  interest: InterestTag | null;
-  prompt: string;
-  stops: Stop[];
-  /**
-   * 表示用の時間帯ラベル。stops と同じ添字だが、意味は「並べ替え後の何番目に訪れるか」
-   * という位置（position）であって、特定の Stop に紐づく属性ではない。
-   * Stop 側に持たせると、並べ替えたときに元の Stop の時刻がそのままついてきてしまい、
-   * 表示上の時刻が前後逆転する不具合になるため、意図的に分離してある。
-   */
-  schedule: string[];
   etiquette: EtiquetteTip[];
 };
 

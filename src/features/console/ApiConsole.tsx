@@ -1,11 +1,11 @@
 import { useId, useState, type ReactNode, type SyntheticEvent } from "react";
 import type { DatasetCandidate } from "../../../shared/core";
 import {
-  callOperation,
+  callCoreOperation,
   peekAnswerStatus,
-  type ConsoleOperation,
-  type ConsoleResult,
-} from "./apiRequest";
+  type CoreOperation,
+  type CoreCallResult,
+} from "../../api/coreOperations";
 
 /**
  * 候補チップに使うフィールド。`shared/core.ts` の `DatasetCandidate` から導出する
@@ -181,15 +181,15 @@ function ProvenanceForm({
 }
 
 /** 1操作分の実行状態。多重送信だけ防ぎ、結果は常に最後の1件を表示する */
-function useOperation(operation: ConsoleOperation) {
-  const [result, setResult] = useState<ConsoleResult | null>(null);
+function useOperation(operation: CoreOperation) {
+  const [result, setResult] = useState<CoreCallResult | null>(null);
   const [running, setRunning] = useState(false);
 
   const submit = async (body: unknown) => {
     if (running) return;
     setRunning(true);
     try {
-      setResult(await callOperation(operation, body));
+      setResult(await callCoreOperation(operation, body));
     } finally {
       setRunning(false);
     }
@@ -209,7 +209,7 @@ function OperationBlock({
   title: string;
   onSubmit: (event: SubmitEvent) => void;
   running: boolean;
-  result: ConsoleResult | null;
+  result: CoreCallResult | null;
   extra?: ReactNode;
   children: ReactNode;
 }) {
@@ -255,7 +255,7 @@ function Field({
   );
 }
 
-function ResultView({ result }: { result: ConsoleResult | null }) {
+function ResultView({ result }: { result: CoreCallResult | null }) {
   if (result === null) return null;
 
   switch (result.kind) {
@@ -318,7 +318,7 @@ function ResultShell({ headline, tone, body }: { headline: string; tone: "ok" | 
 const pretty = (value: unknown): string => JSON.stringify(value, null, 2);
 
 /** 検索の `answered` 応答から候補を取り出す。形が仕様外なら空（表示は生 JSON 側に任せる） */
-function extractCandidates(result: ConsoleResult | null): CandidateChip[] {
+function extractCandidates(result: CoreCallResult | null): CandidateChip[] {
   if (result?.kind !== "ok" || peekAnswerStatus(result.body) !== "answered") return [];
   const candidates = (result.body as { candidates?: unknown }).candidates;
   if (!Array.isArray(candidates)) return [];
