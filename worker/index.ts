@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import type { ApiError } from "../shared/core";
+import { d1GapRecorder, type GapRecorder } from "./core/gaps";
 import { aggregateDataset, getProvenance, searchDatasets } from "./core/operations";
 import {
   parseAggregateDatasetInput,
@@ -26,9 +27,12 @@ const badRequest = (c: Context<{ Bindings: Env }>, message: string) =>
  * `run` の戻り値を `unknown` にせず型引数で受け、`await` する。Step 5 でコアを D1 対応の
  * async にしたとき、`c.json(Promise)` は `{}` にシリアライズされ、例外もログも出ないまま
  * HTTP 200 が返る（`c.json` は `JSON.stringify` を通すだけ）。型と `await` の両方で塞ぐ。
+ *
+ * 未回答の記録器はここで組み立ててコアへ渡す（Issue #27）。記録先は `/api/*` と `/mcp` で
+ * 同じ D1 なので、判断と同じくコア側に置き、ルートは接続だけを担う（ADR-008）。
  */
 const jsonRoute =
-  <T, R>(parse: (body: unknown) => ParseResult<T>, run: (input: T) => R | Promise<R>) =>
+  <T, R>(parse: (body: unknown) => ParseResult<T>, run: (input: T, recorder: GapRecorder) => R | Promise<R>) =>
   async (c: Context<{ Bindings: Env }>) => {
     let body: unknown;
     try {
@@ -44,7 +48,7 @@ const jsonRoute =
     if (!parsed.ok) return badRequest(c, parsed.message);
 
     // 「該当データが無い」は unanswered として 200 で返す（HTTP エラーにしない。API.md §4）
-    return c.json(await run(parsed.value));
+    return c.json(await run(parsed.value, d1GapRecorder(c.env.DB)));
   };
 
 /**

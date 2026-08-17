@@ -1,11 +1,11 @@
 ---
 title: "DATABASE"
-version: "1.0.0"
+version: "1.1.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-17"
-changeImpact: "low"
+changeImpact: "medium"
 ---
 
 # DATABASE.md - データベース設計書
@@ -132,7 +132,7 @@ npm run db:seed              # リモートへシード投入（--remote）
 | -------- | ---- | ---- |
 | `datasets` | 出典の源。§2 の確定10件と 1:1 | 10 行 |
 | `spots` | 地物（施設・史跡・停留所・店舗）。施設一覧型9件を集約 | 1,645 行 |
-| `gaps` | 未回答ログ（[DOMAIN.md](./DOMAIN.md) §8 不変条件4） | 0 行（実行時に増える） |
+| `gaps` | 未回答ログ（[DOMAIN.md](./DOMAIN.md) §8 不変条件4） | 取り込み直後は 0 行。**コア3操作が未回答を返すたびに増える**（[Issue #27](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/27)） |
 
 **設計の芯は「出典を持たない行を作れないようにする」こと。** 出典強制をクエリ側の作法ではなくスキーマ制約として担保している。
 
@@ -141,6 +141,24 @@ npm run db:seed              # リモートへシード投入（--remote）
 | すべてのスポットが出典を持つ | `spots.dataset_id` を `NOT NULL REFERENCES datasets(id)` にする。出典なしの行は INSERT が失敗する |
 | 緯度経度を取り違えない | `CHECK (lat BETWEEN 35.4 AND 35.9)` / `CHECK (lon BETWEEN 138.9 AND 139.95)`。後述の X/Y 逆転を DB が拒否する |
 | 未回答は必ず分類される | `gaps.reason` を `CHECK (reason IN (...))` で4分類に制約（[API_REQUIREMENTS.md](./API_REQUIREMENTS.md) の `unanswered.reason` と同じ英語の値） |
+
+#### `gaps` への記録（Issue #27）
+
+記録は `worker/core/gaps.ts` が行い、**`/api/*` と `/mcp` の両経路で同じように残る**（ADR-008。ルート側にロジックを置かない）。
+
+| 列 | 入る値 |
+| --- | --- |
+| `question` | `search_datasets` の `query` / `aggregate_dataset` の `intent` / `get_provenance` の `query` |
+| `area` | **解決後のエリア**。入力の `area` をそのまま入れない。「新宿の美術館」（`area` 未指定）が `out_of_area` で返るとき、集計に効くのは質問文から解決した「新宿」のほう |
+| `category` | 絞り込みに使った分類（指定があれば） |
+| `reason` | 4分類のいずれか |
+
+- **`answered` に載る部分欠損（[Issue #29](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/29) の `gaps`）も1行ずつ記録する。** `unanswered` だけを記録すると、混在クエリで可視化したばかりの欠損が記録に残らない
+- **重複排除しない。** 同じ未回答が何度起きたかを数えられる形にする
+- **記録の失敗で回答経路を落とさない。** 書き込みは `try/catch` で受け、失敗しても未回答の応答はそのまま返す。ただし握りつぶさず `console.error` に出す（静かに消えると「`gaps` が 0 行なのは未回答が無いから」と誤読される）
+- **入力の形が壊れている 400 と、呼び出し側の契約違反（`get_provenance` に空の `datasetIds`）は記録しない。** データ欠損の集計に呼び出し側のバグを混ぜない
+
+記録器はコア3操作の**必須の引数**にしてある。optional にすると `/mcp` を足したときに渡し忘れても型が通り、その経路だけ黙って記録が止まる。
 
 これらは `worker/schema.test.ts` で「実際に壊しにいく」形で検証している。
 
@@ -206,6 +224,16 @@ No.9「R6国・地域別外国人旅行者行動特性調査」はクロス集�
 - アクセス制御・暗号化の要件は現時点で該当なし（[CONSTRAINTS.md](../01-context/CONSTRAINTS.md) §5）
 
 ## Changelog
+
+### [1.1.0] - 2026-08-17
+
+#### 追加
+
+- §2 テーブル構成に「`gaps` への記録」を追加（[Issue #27](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/27)）。列ごとに何が入るか、部分欠損も記録すること、重複排除しないこと、記録の失敗で回答経路を落とさないことを明記
+
+#### 修正
+
+- `gaps` の実測を「0 行（実行時に増える）」から「取り込み直後は 0 行。コア3操作が未回答を返すたびに増える」へ。記録が実装されたため
 
 ### [1.0.0] - 2026-08-17
 

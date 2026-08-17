@@ -1,7 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { AggregateDatasetOutput, GetProvenanceOutput, SearchDatasetsOutput } from "../shared/core";
 import { DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT } from "./core/operations";
-import { expectAnswered, expectUnanswered, postJson, postRaw, readJson, request } from "./test-support";
+import {
+  applyMigrations,
+  clearGaps,
+  expectAnswered,
+  expectUnanswered,
+  postJson,
+  postRaw,
+  readGapRows,
+  readJson,
+  request,
+} from "./test-support";
+
+/**
+ * `/api/*` は未回答を D1 の `gaps` へ書く（Issue #27）。vitest-pool-workers の D1 は
+ * テストファイルごとに**空で立ち上がる**ため、スキーマを適用しないと INSERT が
+ * "no such table" で落ちる。書き込み失敗は応答を落とさない設計なので、
+ * 適用を忘れると**テストは緑のまま記録だけが失われる**。
+ */
+beforeAll(applyMigrations);
 
 /**
  * コア3操作の `/api/*` スタブ（Issue #22）のテスト。
@@ -463,5 +481,74 @@ describe("出典強制（DOMAIN.md §8 不変条件1）", () => {
       expect(source.provider.length).toBeGreaterThan(0);
       expect(source.datasetTitle.length).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * 未回答の D1 記録（Issue #27・DOMAIN.md §8 不変条件4「未回答は必ず理由分類され、記録される」）。
+ *
+ * コア側の記録内容は operations.test.ts が見ている。ここでは **HTTP 経由で実際に D1 の
+ * 行が増えること**を確かめる（記録器の組み立てがルートから抜け落ちていないか）。
+ */
+describe("未回答の gaps 記録", () => {
+  // 直前の describe までの書き込みを持ち越さない
+  beforeEach(clearGaps);
+
+  it("対象エリア外の検索で gaps に1行増える", async () => {
+    expectUnanswered(await search({ query: "新宿の美術館を探しています", category: "美術館" }));
+
+    expect(await readGapRows()).toEqual([
+      {
+        question: "新宿の美術館を探しています",
+        area: "新宿",
+        category: "美術館",
+        reason: "out_of_area",
+      },
+    ]);
+  });
+
+  it("同じ未回答が複数回起きたら発生ごとに積む（重複排除しない）", async () => {
+    await search({ query: "新宿の美術館" });
+    await search({ query: "新宿の美術館" });
+
+    // 頻度を集計できる形にしておく
+    expect(await readGapRows()).toHaveLength(2);
+  });
+
+  it("欠損の無い answered では gaps が増えない", async () => {
+    expectAnswered(await search({ query: "上野の美術館", area: "上野" }));
+
+    expect(await readGapRows()).toEqual([]);
+  });
+
+  it("部分欠損つきの answered では gaps が増える（Issue #29 の gaps を記録に落とす）", async () => {
+    // AC の「answered → gaps は増えない」は #29 より前に書かれたもの。
+    // 部分欠損を持つ answered まで増えないことにすると、#29 で可視化したばかりの
+    // 欠損が記録に残らず、不変条件4 が一番効いてほしい場所で破れる
+    const body = expectAnswered(await search({ query: "上野の美術館とラーメン", area: "上野" }));
+    expect(body.gaps).toHaveLength(1);
+
+    expect(await readGapRows()).toEqual([
+      {
+        question: "上野の美術館とラーメン",
+        area: "上野",
+        category: undefined,
+        reason: "insufficient_granularity",
+      },
+    ]);
+  });
+
+  it("aggregate_dataset / get_provenance の未回答も記録される", async () => {
+    expectUnanswered(await aggregate({ datasetId: MEISHO.datasetId, intent: "新宿の寺を1件" }));
+    expectUnanswered(await provenance({ datasetIds: ["存在しないID"], query: "上野の寺社" }));
+
+    expect((await readGapRows()).map((row) => row.reason)).toEqual(["out_of_area", "other"]);
+  });
+
+  it("入力の形が壊れている 400 は記録しない（データ欠損ではない）", async () => {
+    const response = await postJson("/api/search-datasets", { query: "" });
+    expect(response.status).toBe(400);
+
+    expect(await readGapRows()).toEqual([]);
   });
 });
