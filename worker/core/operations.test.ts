@@ -47,7 +47,12 @@ describe("searchDatasets（直接呼び出し）", () => {
  * 本物の CC BY 出典が付いたまま旅程に載っていた（`operations.ts` 冒頭の「問われたものと違う
  * ものを返さない」に反する状態）。
  *
- * **渋谷だけの問題ではない**ので、代表エリア3つのうち収録データセット数が最も多い上野も見る。
+ * **渋谷だけの問題ではない**ので、収録データセットが8件ある上野・浅草も見る（渋谷は1件）。
+ *
+ * **この手当てが効くのは「キーワードが1件も当たらなかった」経路だけ**。1件でも当たると
+ * キーワード経路で `answered` になり、答えていない興味は残らない（Issue #53・未修正）。
+ * ここのテストが渋谷で通るのは、渋谷を収録するのが都市公園1件だけで、「夜遊び」に部分一致する
+ * 銭湯（キーワードに「夜」）が `inArea` から外れるため。判定が正しいからではない。
  */
 describe("エリアだけで絞った一覧に添える欠損", () => {
   it("エリア名のほかに訊かれた内容があれば、答えられていないことを gaps に載せて記録する", async () => {
@@ -64,16 +69,19 @@ describe("エリアだけで絞った一覧に添える欠損", () => {
     ]);
   });
 
-  it("上野・浅草でも同じように欠損を載せる（渋谷固有の判定に頼らない）", async () => {
-    const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "ショッピング、上野" }, recorder);
+  it.each(["ショッピング、上野", "ショッピング、浅草"])(
+    "上野・浅草でも同じように欠損を載せる（渋谷固有の判定に頼らない）: %s",
+    async (query) => {
+      const recorder = capturingGapRecorder();
+      const output = await searchDatasets({ query }, recorder);
 
-    const body = expectAnswered(output);
-    // 以前はここでトイレ情報までが gaps なしの「回答あり」として返っていた
-    expect(body.gaps).toHaveLength(1);
-    expect(body.gaps?.[0].reason).toBe("other");
-    expect(recorder.records).toHaveLength(1);
-  });
+      const body = expectAnswered(output);
+      // 以前はここでトイレ情報までが gaps なしの「回答あり」として返っていた
+      expect(body.gaps).toHaveLength(1);
+      expect(body.gaps?.[0].reason).toBe("other");
+      expect(recorder.records).toHaveLength(1);
+    },
+  );
 
   it("エリアだけを訊かれたときは欠損を足さない（ノイズにしない）", async () => {
     const recorder = capturingGapRecorder();
@@ -86,10 +94,26 @@ describe("エリアだけで絞った一覧に添える欠損", () => {
     expect(recorder.records).toEqual([]);
   });
 
-  it("区切り記号だけが余っていてもエリアだけの質問として扱う", async () => {
-    const output = await searchDatasets({ query: "上野・浅草" }, capturingGapRecorder());
+  it.each(["上野、", "上野。", "上野？", "上野！", "上野／", "上野 "])(
+    "区切り記号だけが余っていてもエリアだけの質問として扱う（%s）",
+    async (query) => {
+      const recorder = capturingGapRecorder();
+      const output = await searchDatasets({ query }, recorder);
 
-    expect(expectAnswered(output).gaps).toBeUndefined();
+      expect(expectAnswered(output).gaps).toBeUndefined();
+      expect(recorder.records).toEqual([]);
+    },
+  );
+
+  it("area の明示指定でも欠損を添える（/mcp・API コンソール経路）", async () => {
+    // プラン画面は area を送らないが、`worker/core/` は境界を通らず直接呼ばれうる
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "ナイトライフ", area: "渋谷" }, recorder);
+
+    expect(expectAnswered(output).gaps).toHaveLength(1);
+    expect(recorder.records).toEqual([
+      { question: "ナイトライフ", area: "渋谷", category: undefined, reason: "other" },
+    ]);
   });
 
   it("渋谷の観光・文化施設は従来どおり data_not_published のまま（強い分類を薄めない）", async () => {

@@ -126,6 +126,9 @@ describe("POST /api/search-datasets", () => {
   });
 
   it("質問文の代表エリアは対象外の地名より優先される", async () => {
+    // この query が `gaps` なしで通るのは、宿泊施設のキーワード「宿」が「新宿」に部分一致して
+    // キーワード経路で返るため。「宿」を締める（notWhen を足す等）と、Issue #50 の
+    // エリア・フォールバックへ落ちて欠損が1件付き、このテストと :249 の期待が変わる
     const body = expectAnswered(await search({ query: "新宿から上野へ行きたい" }));
     expect(body.candidates.length).toBeGreaterThan(0);
   });
@@ -546,6 +549,17 @@ describe("未回答の gaps 記録", () => {
         category: undefined,
         reason: "insufficient_granularity",
       },
+    ]);
+  });
+
+  it("エリア・フォールバックの欠損も記録される（Issue #50）", async () => {
+    // 応答ボディに載ることは別のテストで見ている。ここは HTTP 経由で実際に D1 の行が増えるか。
+    // 記録器の組み立て漏れ（`worker/index.ts` の配線）はボディだけ見ていても通ってしまう
+    const body = expectAnswered(await search({ query: "ナイトライフ、渋谷" }));
+    expect(body.gaps).toHaveLength(1);
+
+    expect(await readGapRows()).toEqual([
+      { question: "ナイトライフ、渋谷", area: "渋谷", category: undefined, reason: "other" },
     ]);
   });
 

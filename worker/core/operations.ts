@@ -107,8 +107,11 @@ const findNonTargetArea = (text: string): string | undefined =>
 /** 既知の地名（代表エリア＋対象外）。エリア以外に何か訊かれていたかの判定に使う */
 const AREA_NAMES: readonly string[] = [...REPRESENTATIVE_AREAS, ...NON_TARGET_AREAS.map((area) => area.name)];
 
-/** 区切り記号と空白。語には分解しない（`hasContentBeyondArea` のコメント参照） */
-const SEPARATORS = /[\s、。，．,.・…「」『』（）()]/g;
+/**
+ * 区切り記号と空白。使い道は `hasContentBeyondArea` の1箇所だけで、除去後の文字列は
+ * **空かどうかしか見ない**（語の照合には使わない）。網羅を広げても下流の判定は変わらない。
+ */
+const SEPARATORS = /[\s、。，．,.・…〜～「」『』（）()【】？?！!／/：:；;]/g;
 
 /**
  * 質問文に**エリア名のほかに何か書かれていたか**を返す（Issue #50）。
@@ -122,6 +125,12 @@ const SEPARATORS = /[\s、。，．,.・…「」『』（）()]/g;
  * ここで必要なのは「エリア名以外が残るか」の一点だけなので、既知の地名と区切り記号を
  * 落として残りが空かどうかだけを見る。助詞は落とさない（品詞の知識を持ち込まない）ので、
  * 「上野で」のような書き方は内容ありと判定される。過検知の側に倒してある。
+ *
+ * **複数の代表エリアが書かれた場合は取り落とす**（Issue #52）。「上野・渋谷」は残余が
+ * 空になるので欠損を添えないが、候補は `resolveArea` が選んだ上野の分だけで、渋谷の要求は
+ * どこにも残らない。ここは「エリア以外に何か訊かれたか」しか見ていないので、
+ * 「訊かれたエリアのうち答えたのはどれか」は別の判定が要る。`resolveArea` が代表エリアを
+ * 1つしか返さない設計そのものを変える必要があるため、この関数では扱わない。
  */
 const hasContentBeyondArea = (query: string): boolean => {
   const withoutAreas = AREA_NAMES.reduce((text, name) => text.split(name).join(""), query);
@@ -170,11 +179,18 @@ const shibuyaSightseeingUnanswered = (): Unanswered =>
  * **質問文の残余を message に埋め込まない。** `buildQuery` は興味ラベルと自由文を「、」で
  * 連結するため、エリア名を除いた残余は「ナイトライフ、で夜遊びしたい」のように壊れた文字列に
  * なる。それを画面に出すと、欠損を可視化するための文が新たな意味不明な文字列の出所になる。
+ *
+ * **「利用中の10件に無い」と書かない。** 実装が知っているのは「キーワード表に当たらなかった」
+ * だけで、10件が問いをカバーするかは判定していない。「ナイトライフ、上野」に対して銭湯
+ * （営業時間 15:00〜0:00・キーワードに「夜」）は10件の中に実在するので、無いと断定すると
+ * 推測で埋めることになる（CLAUDE.md 絶対ルール #1）。同じ10件から候補を出しながら
+ * 「対応するものが無い」と言うのは、読み手から見て自己矛盾でもある。`describeQuery` と同じく
+ * **実際に行ったことだけを書く**。
  */
 const areaOnlyFallbackUnanswered = (area: RepresentativeArea): Unanswered =>
   unanswered(
     "other",
-    `該当するオープンデータがありません。質問文の内容に対応するデータセットが利用中の10件にないため、「${area}」を収録するデータセットを、エリアの事実として提示しています。`,
+    `該当するオープンデータがありません。質問文の語に当たるデータセットが無かったため、「${area}」を収録するデータセットを、エリアの事実として提示しています。`,
   );
 
 const isRepresentativeArea = (value: string): value is RepresentativeArea =>
@@ -327,8 +343,8 @@ async function recorded<T extends CoreOutput>(output: T, context: GapContext, re
  *
  * 答えられる興味と答えられない興味が1つの質問文に混ざっている場合（例「上野の美術館と
  * ラーメン」）は、答えられる候補を返したうえで、答えられなかった側面を `gaps` に載せる
- * （Issue #29）。**`answered` を返すどの経路でも同じ `gaps` を添える**ので、
- * 「候補は出たが欠損は消えた」という壊れ方が経路ごとに再発しない。
+ * （Issue #29）。載せるのは `collectPartialGaps` が語から判定できる2つ（ジャンル指定の飲食・
+ * 渋谷の観光データ未公開）だけで、**自然文を興味に分解することはしない**。
  *
  * すべて答えられないときは従来どおり `unanswered` を返す（`answered` ＋ 全部 `gaps` には
  * しない。それでは「答えがある」と嘘をつくことになる）。ただし `unanswered` は理由を
@@ -340,6 +356,17 @@ async function recorded<T extends CoreOutput>(output: T, context: GapContext, re
  * **エリア名のほかに何か訊かれていた**（「ナイトライフ、渋谷」）ならこの一覧は答えではないので、
  * 答えられていないことを `gaps` に添える（Issue #50）。添えないと、無関係な候補に本物の出典が
  * 付いたまま「回答あり」として返り、画面にも記録にも痕跡が残らない（DOMAIN.md §8 不変条件4）。
+ *
+ * **経路によって添える `gaps` の数が違う。** 以前この doc コメントには「`answered` を返す
+ * どの経路でも同じ `gaps` を添える」と書いてあったが、Issue #50 でフォールバック経路だけ
+ * 1件多くなったため事実でなくなった（API.md §3.1 も同時に直した）。
+ *
+ * **キーワードが1件でも当たると、内容の取り落ちは報告されない**（[Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53)・未修正）。
+ * 「ナイトライフ、上野で夜遊びしたい」は銭湯のキーワード「夜」が「夜遊び」に部分一致するため
+ * キーワード経路で `answered` になり、ナイトライフに答えていないことは残らない。興味チップを
+ * 複数選ぶほど何かが当たるので、**実際に旅程が組み上がるケースほど Issue #50 の手当ては効かない**。
+ * 「どの興味が答えられたか」を解くには質問文を興味の列として受ける入口が必要で、スタブで
+ * 形態素解析を持ち込む話になるため分けた。
  */
 export async function searchDatasets(
   input: SearchDatasetsInput,
@@ -412,6 +439,10 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   // 訊かれた内容の答えではない。答えられていないことを添えないと、無関係な候補に本物の出典が
   // 付いたまま「回答あり」として返り、画面にも `gaps` テーブルにも痕跡が残らない（Issue #50）。
   // 記録は `recorded` が `gaps` から作るので、ここで添えれば D1 にも入る。
+  // ここに来た時点で `gaps` は必ず空。`collectPartialGaps` が集める2つはどちらも、
+  // このフォールバックより手前で `unanswered` として return されている（ジャンル指定の飲食は
+  // 上の `genre && usable.length === 0`、渋谷の観光語は直前の分岐。条件は同一）。
+  // spread は、将来 `collectPartialGaps` に語が増えたときに取り落とさないためだけに残す。
   if (area.kind === "representative") {
     const byArea = answeredCandidates(inArea.slice(0, limit));
     if (byArea) {
