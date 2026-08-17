@@ -24,6 +24,8 @@ const MEISHO = {
   retrievedAt: "2026-08-16",
 } as const;
 
+/** 文化観光施設（台東区）。上野の美術館・博物館を収録する */
+const BUNKA_ID = "t131067d0000000236";
 /** 銭湯（台東区）。上野・浅草の両方の固定データを持つ */
 const SENTO_ID = "t131067d0000000256";
 /** 都市公園・都立公園一覧（渋谷区）。渋谷を収録する唯一のデータセット */
@@ -152,6 +154,83 @@ describe("POST /api/search-datasets", () => {
   it("エリアも分類も特定できない条件は unanswered(other) を返す", async () => {
     const body = expectUnanswered(await search({ query: "スキー場に行きたい" }));
     expect(body.reason).toBe("other");
+  });
+
+  /**
+   * 混在クエリの部分欠損（Issue #29）。
+   *
+   * 答えられる興味と答えられない興味を1つの `query` に混ぜられたとき、答えられる候補だけを
+   * 返すと、答えられなかった側の欠損が応答のどこにも現れない。DOMAIN.md §8 不変条件4 が
+   * 制約するのは応答であって文書なので、「既知の制限として文書に書く」では満たしたことにならない。
+   */
+  describe("部分欠損（gaps）", () => {
+    it("答えられる興味と答えられない興味が混ざったら、候補と欠損の両方を返す", async () => {
+      // 代表シナリオ「明日は浅草と上野、ラーメンが好き」が最も自然に生む入力の形
+      const body = expectAnswered(await search({ query: "上野の美術館とラーメン", area: "上野" }));
+
+      // 美術館側は答える
+      expect(body.candidates.map((candidate) => candidate.datasetId)).toContain(BUNKA_ID);
+      // ラーメン側の欠損は握りつぶさない
+      expect(body.gaps).toHaveLength(1);
+      expect(body.gaps?.[0].reason).toBe("insufficient_granularity");
+      expect(body.gaps?.[0].message).toContain("ラーメン");
+    });
+
+    it("候補に飲食店データを混ぜない（答えたことにしない）", async () => {
+      // ジャンルの列が無いデータセットを候補に出すと、gaps があっても
+      // 「この出典で答えられる」と読める。欠損の可視化が打ち消される
+      const body = expectAnswered(await search({ query: "上野の美術館とラーメン", area: "上野" }));
+      expect(body.candidates.map((candidate) => candidate.datasetId)).not.toContain(RESTAURANT_ID);
+    });
+
+    it("すべて答えられるクエリには gaps を付けない（キーごと省く）", async () => {
+      const body = expectAnswered(await search({ query: "上野の美術館", area: "上野" }));
+
+      // 空配列を返すと、呼び出し側が欠損の有無を長さで判定する羽目になる。キーごと無いこと
+      expect(Object.hasOwn(body, "gaps")).toBe(false);
+    });
+
+    it("すべて答えられないクエリは unanswered のまま（answered ＋ 全部 gaps にしない）", async () => {
+      // ここを answered にすると「答えがある」と嘘をつくことになる
+      const body = expectUnanswered(await search({ query: "上野でラーメンが食べたい", area: "上野" }));
+      expect(body.reason).toBe("insufficient_granularity");
+    });
+
+    it("渋谷で答えられる問いと答えられない問いが混ざった場合も両方返す", async () => {
+      const body = expectAnswered(await search({ query: "渋谷の公園と美術館", area: "渋谷" }));
+
+      expect(body.candidates.map((candidate) => candidate.datasetId)).toEqual([SHIBUYA_PARK_ID]);
+      expect(body.gaps).toHaveLength(1);
+      expect(body.gaps?.[0].reason).toBe("data_not_published");
+    });
+
+    /**
+     * 対象エリア外の地名は部分欠損にしない。
+     *
+     * 「新宿のホテルから上野の美術館へ」の新宿は**出発地**であって、新宿のデータを
+     * 求めてはいない。スタブには「新宿について訊かれた」と「新宿を経路として書いた」を
+     * 見分ける手段が無いため、報告すると答えられている応答にノイズを足すことになる。
+     * `gaps` に残しているジャンル語・観光施設語は**求めているデータの種類**を指す語なので、
+     * 散文中の言及と取り違えにくい。
+     */
+    it("出発地・宿泊地として書かれた対象エリア外の地名を欠損として報告しない", async () => {
+      const withExplicitArea = expectAnswered(
+        await search({ query: "新宿のホテルから上野の美術館へ", area: "上野" }),
+      );
+      const fromQuery = expectAnswered(await search({ query: "新宿から上野へ行きたい" }));
+
+      for (const body of [withExplicitArea, fromQuery]) {
+        expect(body.candidates.length).toBeGreaterThan(0);
+        expect(Object.hasOwn(body, "gaps")).toBe(false);
+      }
+    });
+
+    it("対象エリア外だけを訊かれた場合は従来どおり unanswered(out_of_area)", async () => {
+      // 部分欠損から外したのは「一緒に書かれた地名」であって、
+      // エリア外そのものを訊かれたときの未回答は変えていない
+      const body = expectUnanswered(await search({ query: "新宿の美術館", area: "新宿" }));
+      expect(body.reason).toBe("out_of_area");
+    });
   });
 
   it("query が無い場合は 400 で invalid_request を返す", async () => {

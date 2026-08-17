@@ -1,11 +1,11 @@
 ---
 title: "API"
-version: "1.0.0"
+version: "1.1.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-17"
-changeImpact: "low"
+changeImpact: "medium"
 ---
 
 # API.md - API設計書（フロントエンド ↔ バックエンド `/api/*`）
@@ -66,8 +66,9 @@ changeImpact: "low"
 | 項目 | 内容 |
 | ---- | ---- |
 | 入力 | `{ query: string, area?: string, category?: string, limit?: number }`。`query` は必須（空文字・空白のみは 400） |
-| 出力（回答あり） | `{ status: "answered", candidates: Array<{ datasetId, title, provider, url, matchReason }> }`。`candidates` は**必ず1件以上**（型でも非空を強制。DOMAIN.md §8 不変条件1） |
+| 出力（回答あり） | `{ status: "answered", candidates: Array<{ datasetId, title, provider, url, matchReason }>, gaps?: Array<{ status: "unanswered", reason, message }> }`。`candidates` は**必ず1件以上**（型でも非空を強制。DOMAIN.md §8 不変条件1） |
 | 出力（回答なし） | `{ status: "unanswered", reason, message }`（§4 参照） |
+| `gaps` | **答えられた候補と一緒に返す、答えられなかった側面**（下記）。欠損が無いときは**キーごと省く**（`gaps: []` は返さない）。要素は `unanswered` 応答と同じ形・同じ文言 |
 | `area` | 代表エリア（上野・浅草・渋谷）以外も**受け付ける**。対象エリア外は 400 ではなく `unanswered("out_of_area")` で返す。未指定なら質問文から代表エリア名を拾う（明示指定が質問文より優先） |
 | `category` | **絞り込みの述語ではなくスコアリングのヒント**。ただし指定して1件も当たらない場合はエリアだけの候補へ落とさず `unanswered` を返す（指定を黙って捨てないため） |
 | `limit` | **既定 4・上限 10**。既定値はフロントエンドが1ルートに3〜4停留地を想定しているため（[API_REQUIREMENTS.md](./API_REQUIREMENTS.md) §1）。上限はデータセットが10件しかないため。範囲外は 400 で、黙って丸めない |
@@ -78,7 +79,33 @@ changeImpact: "low"
 
 日本語は分かち書きしないため、地名・ジャンル語の部分一致は語の境界を見ない。「銀座線」（浅草・上野を通る地下鉄）を「銀座」として対象エリア外にしない、「〜のそば（近く）」を飲食のジャンル指定にしない、といった除外を実装側に持っている。
 
-**既知の制限（スタブ）**: 答えられる興味と答えられない興味を1つの `query` に混ぜた場合（例「上野の美術館とラーメン」）は、答えられる候補だけを返し、ラーメン側の欠損は応答に現れない。欠損を確実に検出したい場合は興味ごとに呼ぶこと。解消方針（`answered` に部分欠損を載せる）は [Issue #29](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/29) で検討する。
+#### 部分欠損（`gaps`）
+
+答えられる興味と答えられない興味を1つの `query` に混ぜられる（例「上野の美術館とラーメン」）と、以前は**答えられる候補だけを返し、ラーメン側の欠損は応答のどこにも現れなかった**。代表シナリオ「明日は浅草と上野、ラーメンが好き」が最も自然に生む入力の形であり、フロントエンドは `trip.interests` を1つの自然文にまとめて送る（[API_REQUIREMENTS.md](./API_REQUIREMENTS.md) §1）ため実際に踏む。
+
+[Issue #29](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/29) で解消し、**答えられた候補を返したうえで、答えられなかった側面を `gaps` に載せる**ようにした。
+
+```jsonc
+{
+  "status": "answered",
+  "candidates": [ { "datasetId": "t131067d0000000236", "title": "文化観光施設", "…": "…" } ],
+  "gaps": [
+    {
+      "status": "unanswered",
+      "reason": "insufficient_granularity",
+      "message": "該当するオープンデータがありません。飲食店の店舗データは…「ラーメン」の粒度では答えられません。"
+    }
+  ]
+}
+```
+
+- **`gaps` に載るのは、実測で「答えられない」と言い切れる既知の欠損だけ**。ジャンル指定の飲食（`insufficient_granularity`）と渋谷の観光データ未公開（`data_not_published`）の2つで、いずれも `unanswered` として返すときと**同じ値**を返す。自然文を興味に分解することはしない（分解は Step 5 の LLM 側の仕事で、スタブに作り込むと二重になる）
+- **対象エリア外の地名（`out_of_area`）は部分欠損にしない。** 「新宿のホテルから上野の美術館へ」の新宿は**出発地**であって、新宿のデータを求めてはいない。「新宿について訊かれた」と「新宿を経路として書いた」を見分ける手段がスタブに無いため、報告すると答えられている応答にノイズを足すことになる。`gaps` に残した2つは**求めているデータの種類**を指す語なので、散文中の言及と取り違えにくい。なお**エリア外そのものを訊かれたときの `unanswered("out_of_area")` は従来どおり**（`{ area: "新宿" }` など）
+- **すべて答えられない場合は従来どおり `status: "unanswered"`。** `answered` ＋ 全部 `gaps` にはしない（それでは「答えがある」と嘘になる）。ただし `unanswered` は理由を**1つしか運べない**ため、複数の側面が同時に答えられない場合は先に判定されたものだけが返る
+- **`gaps` は optional で、無いときはキーごと省く。** 既存クライアントは無視しても壊れないが、無視すると欠損が画面に出ない点に注意
+- `answered` を返す経路はすべて同じ `gaps` を添える（キーワードが当たらずエリアだけで候補を返す経路を含む）
+
+> **未合意**: 画面での表示方法はフロントエンド担当と未合意（[Issue #29](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/29) の DoD）。[API_REQUIREMENTS.md](./API_REQUIREMENTS.md) に**提案**として記載してある。
 
 ### 3.2 `aggregate_dataset` — 集計（`POST /api/aggregate-dataset`・確定）
 
@@ -221,6 +248,17 @@ changeImpact: "low"
 - **サンドボックス環境**: 未定
 
 ## Changelog
+
+### [1.1.0] - 2026-08-17
+
+#### 追加
+
+- §3.1 `search_datasets` の `answered` に optional の `gaps`（部分欠損）を追加（[Issue #29](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/29)）。答えられる興味と答えられない興味が1つの `query` に混ざったとき、答えられた候補と一緒に答えられなかった側面を返す。既存クライアントを壊さない optional 追加
+- 載せるのは**求めているデータの種類**を指す語から判定できる2つ（ジャンル指定の飲食・渋谷の観光データ未公開）。**対象エリア外の地名は部分欠損にしない**（出発地・経路として書かれた地名を欠損と誤認するため）
+
+#### 削除
+
+- §3.1 の「既知の制限（スタブ）」を削除。上記の `gaps` で解消したため。**ただし画面での表示方法はフロントエンド担当と未合意**で、提案は [API_REQUIREMENTS.md](./API_REQUIREMENTS.md) §1 に記載
 
 ### [1.0.0] - 2026-08-17
 

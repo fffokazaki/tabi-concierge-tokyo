@@ -1,11 +1,11 @@
 ---
 title: "API_REQUIREMENTS"
-version: "1.0.0"
+version: "1.1.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-16"
 updated: "2026-08-17"
-changeImpact: "low"
+changeImpact: "medium"
 ---
 
 # フロントエンドが必要とするAPI要件（プラン画面）
@@ -63,6 +63,11 @@ changeImpact: "low"
     url: string;
     matchReason: string;   // 適合理由
   }>;
+  gaps?: Array<{          // 答えられなかった側面（Issue #29）。無いときはキーごと省かれる
+    status: "unanswered";
+    reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | "other";
+    message: string;
+  }>;
 } | {
   status: "unanswered";
   reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | "other";  // 閉じた列挙（API.md §4）
@@ -73,6 +78,29 @@ changeImpact: "low"
 ### 備考
 - API.md §4 のとおり、このツールは「実行クエリ」を持たない。出典には検索条件（`query`/`area`/`category`）をそのまま使う想定。
 - `limit` は **既定 4・上限 10 で確定**（API.md §3.1）。既定値は「1ルートあたり3〜4停留地」という本書の想定に合わせたもの。範囲外は 400 で、黙って丸められない。
+
+### 🔴 未合意: `gaps`（部分欠損）の画面での出し方
+
+本書 §1 の想定どおり、フロントエンドは `trip.interests` を**1つの自然文にまとめて送る**。すると「上野の美術館とラーメン」のように、答えられる興味と答えられない興味が1つの `query` に混ざる。以前はこの場合、答えられる候補だけが返り、**ラーメン側の欠損は応答のどこにも現れなかった**。
+
+[Issue #29](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/29) で、`answered` に `gaps` を載せるようにした（バックエンド実装済み）。**画面での出し方はまだ Sho と合意していない。** 以下は Okazaki からの提案で、確定ではない。
+
+載るのは**求めているデータの種類**を指す語から判定できる2つだけ。ジャンル指定の飲食（`insufficient_granularity`）と、渋谷の観光データ未公開（`data_not_published`）。対象エリア外の地名は**載せない**（「新宿のホテルから上野の美術館へ」の新宿は出発地であって、新宿のデータを求めてはいないため）。
+
+**提案する扱い**:
+
+| 状況 | 画面 |
+| --- | --- |
+| `gaps` が無い | 今までどおり。何も足さない |
+| `gaps` がある | ルートは通常どおり表示し、**その下に「この興味には答えられませんでした」の注記**を `message` つきで出す |
+| `status: "unanswered"` | 従来どおり「該当するオープンデータがありません」＋ `message`。エラー表示にはしない |
+
+**提案の意図**: `gaps` をエラー扱いにしたくない。データが無いことは本プロジェクトでは**正常な出力**（DOMAIN.md §8 不変条件4）で、むしろ「どのデータが公開されていないか」を利用者に見せることが企画の芯の半分にあたる（DOMAIN.md §7 の「未回答 → データ公開リクエスト」）。赤いエラーバナーにすると、この意味が伝わらない。
+
+**Sho に確認したいこと**:
+1. 上記の「ルートの下に注記」で良いか。それとも興味チップ側に印を付けるほうが自然か
+2. `message` はバックエンドが返す日本語をそのまま出す前提でよいか（英語表示は Issue #17 の多言語化と合わせて後日）
+3. `gaps` を**無視した実装**でも画面は壊れないが、その場合は欠損が利用者に見えない。表示は必須と考えてよいか
 
 ---
 
@@ -198,6 +226,13 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 | `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物しか返らない。** 無ければ `unanswered`。別エリアの施設で代替されることはないので、画面は返ってきた `name` をそのまま信用してよい |
 
 ## Changelog
+
+### [1.1.0] - 2026-08-17
+
+#### 追加
+
+- §1 の出力に `gaps`（部分欠損）を追記（[Issue #29](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/29)）。バックエンドは実装済み
+- §1 に「🔴 未合意: `gaps` の画面での出し方」を追加。**Okazaki からの提案であり、Sho との合意は未了**。確認したい3点を明記した
 
 ### [1.0.0] - 2026-08-17
 

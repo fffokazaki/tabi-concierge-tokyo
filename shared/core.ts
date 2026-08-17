@@ -93,7 +93,24 @@ export type DatasetCandidate = {
 };
 
 export type SearchDatasetsOutput =
-  | { status: "answered"; candidates: NonEmpty<DatasetCandidate> }
+  | {
+      status: "answered";
+      candidates: NonEmpty<DatasetCandidate>;
+      /**
+       * **答えられた候補と一緒に返す、答えられなかった側面**（Issue #29）。
+       *
+       * 答えられる興味と答えられない興味を1つの `query` に混ぜられる（「上野の美術館とラーメン」）と、
+       * 以前は美術館の候補だけを返し、ラーメン側の欠損は応答のどこにも現れなかった。
+       * DOMAIN.md §8 不変条件4 が制約するのは応答であって文書なので、
+       * 「文書に既知の制限として書く」では不変条件を満たしたことにならない。
+       *
+       * 欠損が無いときは**キーごと省く**。`NonEmpty` にしてあるので `gaps: []` は表現できない
+       * （空配列を返すと、呼び出し側が「欠損の有無」を長さで判定する羽目になる）。
+       *
+       * 追加は optional なので、既存クライアントは無視しても壊れない。
+       */
+      gaps?: NonEmpty<Unanswered>;
+    }
   | Unanswered;
 
 // ---------------------------------------------------------------------------
