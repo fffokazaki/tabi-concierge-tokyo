@@ -11,12 +11,13 @@
 ## アーキテクチャ
 
 ```
-📱 旅コンシェルジュTOKYO（フロントエンド / React）
-        ⇅
-🔌 MCP（最小3ツール: データセット検索・集計・出典取得）
-        ⇅
-🧠 オープンデータ・コンシェルジュ（メタデータRAG＋Text-to-SQL＋出典強制）
+📱 旅コンシェルジュTOKYO（React SPA） ── /api/*（JSON） ──┐
+🤖 AI クライアント（Claude Desktop 等） ── /mcp（未実装） ─┤
+                                                          ⇅
+🧠 オープンデータ・コンシェルジュ（worker/core/ — 検索・集計・出典強制）
 ```
+
+コア3操作（`search_datasets` / `aggregate_dataset` / `get_provenance`）を単一の Cloudflare Worker が二面公開する（ADR-008）。現時点の中身は固定データによるスタブで、メタデータRAG / Text-to-SQL への差し替えを予定している。
 
 - 回答には出典（東京都オープンデータカタログのデータセットリンク）を100%強制付与
 - CC BY 4.0の出典表示義務を設計レベルで自動達成
@@ -88,7 +89,7 @@ docs/                 # AI仕様駆動開発ドキュメント（索引は docs/
 .github/skills/       # プロジェクト固有の開発規約スキル
 ```
 
-アプリケーションのディレクトリ（`frontend/` `mcp-server/` `data/`）は **Phase 2（POC 実装）で作成予定**でまだ存在しない。構成と各ディレクトリの責務は [MASTER.md](docs/MASTER.md) の「ディレクトリ構造」を参照（更新箇所を1つに保つため、README では再掲しない）。
+アプリケーションのディレクトリは実装済み: `src/`（React）、`worker/`（Hono ＋ `worker/core/`）、`shared/`（共有型）、`data/`（オープンデータのスナップショット）、`scripts/`（取り込みツール）、`migrations/`（D1 スキーマ）。構成と各ディレクトリの責務は [MASTER.md](docs/MASTER.md) の「ディレクトリ構造」を参照（更新箇所を1つに保つため、README では再掲しない）。
 
 ## スケジュール
 
@@ -120,6 +121,65 @@ npm run typecheck
 `npm run dev` は `worker/` のコードを**本番と同じ workerd 上で**実行する。`/api/health` の `runtime` が `Cloudflare-Workers` を返すことで確認できる。
 
 テストも同じ考え方で、`worker/` は本番と同じ workerd 上で走らせる。設定を2つに分けている理由と、片方だけ走らせるコマンドは [TESTING.md](docs/04-quality/TESTING.md)「テスト環境（実装の実態）」にある。
+
+### API の確認方法
+
+コア3操作（仕様の SSOT は [API.md](docs/02-design/API.md) §3・§4）は、次の3通りで確かめられる。以下の応答例はすべて実測（2026-08-17・スタブ）。
+
+**① 開発用 API コンソール（推奨）** — `npm run dev` で開いた画面の下部「開発メモ」にある。3操作をフォームから叩き、HTTP ステータス・所要時間・生の JSON を確認できる。検索候補をクリックすると `datasetId` が集計・出典フォームへ引き継がれる。**入力は検証せずそのまま送る**ので、範囲外の `limit` や空の `datasetIds` で 400 の経路も試せる。開発ビルド限定で、本番には含まれない。
+
+**② curl** — `npm run dev` を起動した状態で:
+
+```bash
+# 疎通確認（runtime が "Cloudflare-Workers" なら workerd 上で動いている）
+curl -s localhost:5173/api/health
+```
+
+```bash
+# 1. データセット検索
+curl -s localhost:5173/api/search-datasets \
+  -H 'content-type: application/json' \
+  -d '{"query":"上野の寺社をめぐりたい","area":"上野"}'
+# → {"status":"answered","candidates":[{"datasetId":"t131067d0000000251","title":"名所・史跡",...}]}
+```
+
+```bash
+# 2. 集計・抽出（datasetId は検索の候補から）
+curl -s localhost:5173/api/aggregate-dataset \
+  -H 'content-type: application/json' \
+  -d '{"datasetId":"t131067d0000000251","intent":"上野の寺社を1件"}'
+# → {"status":"answered","result":{"name":"寛永寺",...},"query":"固定データ抽出（スタブ）: ..."}
+```
+
+```bash
+# 3. 出典取得（query は必須。実行クエリまたは検索条件を渡す）
+curl -s localhost:5173/api/provenance \
+  -H 'content-type: application/json' \
+  -d '{"datasetIds":["t131067d0000000251"],"query":"上野の寺社（検索条件）"}'
+# → {"status":"answered","sources":[{"datasetId":...,"license":"CC BY 4.0","retrievedAt":"2026-08-16",...}]}
+```
+
+**「データが無い」は HTTP エラーではない**ことに注意。答えられない問いは **200** で `status: "unanswered"` ＋ 理由分類が返る（このプロジェクトの中心設計）:
+
+```bash
+curl -s localhost:5173/api/search-datasets \
+  -H 'content-type: application/json' \
+  -d '{"query":"上野でラーメンが食べたい","area":"上野"}'
+# → {"status":"unanswered","reason":"insufficient_granularity","message":"該当するオープンデータがありません。..."}
+```
+
+400 になるのは**入力の形の違反だけ**（必須項目の欠落・`limit` の範囲外など）:
+
+```bash
+curl -s localhost:5173/api/search-datasets \
+  -H 'content-type: application/json' \
+  -d '{"query":"上野","limit":0}'
+# → HTTP 400 {"error":"invalid_request","message":"\"limit\" は 1〜10 の整数で指定してください"}
+```
+
+**③ テスト** — `npm run test:worker` が workerd 上で 3 ルート × answered / unanswered・出典7フィールド・400 の境界を検証している（`worker/api.test.ts`）。
+
+> デプロイ先（workers.dev）は**手動デプロイ**のため、ローカルより古いことがある。API の確認はローカル（`npm run dev`）を基準にする。
 
 ## 資料
 
