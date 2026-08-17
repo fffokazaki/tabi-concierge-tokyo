@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.13.0"
+version: "1.14.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-17"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 25
+ace_entry_count: 27
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -246,8 +246,18 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-28-3 | 日本語の部分一致は語の境界を見ない — 語彙リストは誤爆の除外とセットで書く | data-processing | [playbook/data-processing.md#ace-28-3](./playbook/data-processing.md#ace-28-3) |
 | ACE-28-4 | `tsc` の include が要るのは「どこからも import されていないファイル」— import 済みなら検査される | data-processing | [playbook/data-processing.md#ace-28-4](./playbook/data-processing.md#ace-28-4) |
 | ACE-28-5 | 同期のスタブを Hono に載せるときは、戻り値の型と `await` で「後から async にする」に備える | tooling | [playbook/tooling.md#ace-28-5](./playbook/tooling.md#ace-28-5) |
+| ACE-34-1 | デバッグ用の画面は「検証しないこと」が仕様 — 通常のフォームの作法を持ち込まない | tooling | [playbook/tooling.md#ace-34-1](./playbook/tooling.md#ace-34-1) |
+| ACE-34-2 | レビューツールの規約指摘は、そのリポジトリの実績と照合してから採否を決める | process | [playbook/process.md#ace-34-2](./playbook/process.md#ace-34-2) |
 
 ## Changelog
+
+### [1.14.0] - 2026-08-17
+
+#### 追加
+
+- ACE-34-1: デバッグ用の画面は「検証しないこと」が仕様 — 通常のフォームの作法を持ち込まない（Issue #33 / PR #34）
+- ACE-34-2: レビューツールの規約指摘は、そのリポジトリの実績と照合してから採否を決める（Issue #33 / PR #34）
+
 
 ### [1.13.0] - 2026-08-17
 
