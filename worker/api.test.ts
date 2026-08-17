@@ -563,6 +563,17 @@ describe("未回答の gaps 記録", () => {
     ]);
   });
 
+  it("覆えなかったエリアは、応答全体のエリアではなく自分のエリアで記録される（Issue #52）", async () => {
+    // 「上野・渋谷」の応答全体のエリアは解決結果の「上野」。この行まで上野で記録すると、
+    // どのエリアに答えられなかったかが D1 から分からなくなる（それが Issue #52 の症状）
+    const body = expectAnswered(await search({ query: "上野・渋谷" }));
+    expect(body.gaps).toHaveLength(1);
+
+    expect(await readGapRows()).toEqual([
+      { question: "上野・渋谷", area: "渋谷", category: undefined, reason: "other" },
+    ]);
+  });
+
   it("aggregate_dataset / get_provenance の未回答も記録される", async () => {
     expectUnanswered(await aggregate({ datasetId: MEISHO.datasetId, intent: "新宿の寺を1件" }));
     expectUnanswered(await provenance({ datasetIds: ["存在しないID"], query: "上野の寺社" }));
