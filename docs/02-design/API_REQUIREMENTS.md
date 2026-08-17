@@ -3,11 +3,12 @@
 **作成**: Sho（フロントエンド） → Okazaki 向けの共有ドラフト
 **更新**: 2026-08-16 Okazaki 確認結果を反映（ProvenanceSource 3フィールド確定・`get_provenance` の `query` を必須化・API.md は PR #19 で §3.3 を修正済み）。同日、ADR-008 の二面公開を反映（下記注記参照）
 **更新**: 2026-08-17 Sho が `aggregate_dataset` の出力語彙について Okazaki の逆提案（`name`/`summary` の汎用語彙）に合意。§2 の入出力例を更新し、`Stop.place`/`Stop.note` へのマッピングはフロントエンド側の責務であることを明記
-**位置づけ**: [API.md](./API.md)（フロントエンド ↔ バックエンドの `/api/*` API 仕様、正式なSSOT）に対する、フロントエンド実装から見た具体化の提案。API.md を置き換えるものではなく、そこで「仮称・未確定」とされている3操作に対して、実際に画面が必要とする入出力の形を提案するものです。
+**更新**: 2026-08-17 コア3操作の `/api/*` スタブを実装（Issue #22）。本書の提案はほぼそのまま採用され、エンドポイントパスと入出力スキーマは [API.md](./API.md) §3 で**確定**した。本書は「提案」から「確定した仕様に対するフロントエンド側の視点」に位置づけが変わっている
+**位置づけ**: [API.md](./API.md)（フロントエンド ↔ バックエンドの `/api/*` API 仕様、正式なSSOT）に対する、フロントエンド実装から見た具体化。API.md を置き換えるものではありません。**入出力で食い違いがあれば API.md が正**です。
 
 **呼び出し経路の注記（ADR-008）**: フロントエンドが呼ぶのは **`/api/*`（JSON）** であり、MCP を直接話すことはありません（React 側に MCP クライアントを実装するのは ADR-008 で禁止）。本書で `search_datasets` 等と呼んでいるのは `worker/core/` の**コア操作名**で、`/mcp`（[MCP.md](./MCP.md)、AI クライアント向け開放面）でも同名ツールとして公開されます。本書の入出力提案は経路によらずコア操作のスキーマに対するものなので、内容はそのまま有効です。
 
-**現状**: `src/features/plan/` に「旅のプロフィール→プラン」画面は実装済みですが、**まだこの3ツールを呼んでいません**。`mockScenarios.ts` の静的な仮データで動いています（Step 3/5 でMCP接続予定）。このドキュメントは、接続する時にツールの入出力がどう見えてほしいかを、実装済みの型から逆算したものです。
+**現状**: `src/features/plan/` に「旅のプロフィール→プラン」画面は実装済みですが、**まだこの3操作を呼んでいません**。`mockScenarios.ts` の静的な仮データで動いています。一方、**バックエンド側の3エンドポイントは 2026-08-17 に呼べる状態になりました**（`worker/core/` の固定データによるスタブ。中身は Step 5 で本実装に差し替えるが、入出力の形は変えない）。したがって fetch 経路・ローディング・`unanswered` 表示の実装は、Step 5 を待たずに着手できます。
 
 **✅ 全体注記（確認済み）**: `ProvenanceSource` の3フィールド（`datasetId` / `license` / `query`）は Okazaki 確認済み（2026-08-16）。**3フィールドともドラフトの想定どおりで確定**。根拠は本書末尾の「ProvenanceSource フィールド確認結果」を参照。あわせて `get_provenance` の入力 `query` は optional から**必須**に修正した（API.md §4）。
 
@@ -36,7 +37,7 @@
   query: string;        // trip.interests・trip.notes から組み立てた自然文の質問
   area?: string;        // POC対象の代表エリア（例: "上野"、"渋谷"）
   category?: string;    // 例: "神社", "飲食店", "公共交通機関"
-  limit?: number;       // 候補件数の上限 ※API.md で未確定
+  limit?: number;       // 候補件数の上限。既定 4・上限 10（API.md §3.1 で確定）
 }
 ```
 
@@ -54,13 +55,14 @@
   }>;
 } | {
   status: "unanswered";
-  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | string;
+  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | "other";  // 閉じた列挙（API.md §4）
+  message: string;   // 画面に出せる日本語。何が無くて答えられなかったのか
 }
 ```
 
 ### 備考
 - API.md §4 のとおり、このツールは「実行クエリ」を持たない。出典には検索条件（`query`/`area`/`category`）をそのまま使う想定。
-- `limit` はまだ API.md でも未確定。フロントエンドとしては1ルートあたり3〜4停留地を想定しているので、候補は少なくともその数以上返る形が扱いやすい（要相談）。
+- `limit` は **既定 4・上限 10 で確定**（API.md §3.1）。既定値は「1ルートあたり3〜4停留地」という本書の想定に合わせたもの。範囲外は 400 で、黙って丸められない。
 
 ---
 
@@ -94,7 +96,8 @@
   query: string;       // 実行したクエリ。出典に必須（API.md §4）
 } | {
   status: "unanswered";
-  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | string;
+  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | "other";  // 閉じた列挙（API.md §4）
+  message: string;   // 画面に出せる日本語。何が無くて答えられなかったのか
 }
 ```
 
@@ -138,7 +141,8 @@
   }>;
 } | {
   status: "unanswered";
-  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | string;
+  reason: "data_not_published" | "insufficient_granularity" | "out_of_area" | "other";  // 閉じた列挙（API.md §4）
+  message: string;   // 画面に出せる日本語。何が無くて答えられなかったのか
 }
 ```
 
@@ -167,11 +171,18 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 
 ## 前提として確認したいこと（API.md 側で未定の項目）
 
-以下は API.md 自体が「未定」としている項目で、フロントエンドとして今すぐ必要というわけではありませんが、Step 5 の接続に向けて早めに握っておきたいものです。
+以下は API.md 自体が「未定」としている項目です。
 
-- MCPエンドポイントのURL・プロトコルバージョン
-- `search_datasets` の候補件数上限（`limit`）とスコアリング方法
-- エラーレスポンスの形（MCPのエラー表現に合わせる、とのことですが具体形は未定）
-- 複数データセット横断時の出典表記ルール（`get_provenance` が複数ソースを返す場合の画面表示をどう組み立てるか）。本書の提案入力は `datasetIds: string[]` に対し `query` が1つだが、出力は source ごとに `query` を持つ形になっており、この対応関係も横断ルールと合わせて要決定
+- MCPエンドポイントのURL・プロトコルバージョン（`/mcp` 面は Step 5 で実装。フロントエンドは `/api/*` を使うため直接の影響はない）
+- `search_datasets` のスコアリング方法（Step 5 のメタデータRAG で再設計。`limit` は下記のとおり確定済み）
 
-**解決済み**: `aggregate_dataset` の出力語彙（`name`/`summary` の汎用語彙、`Stop.place`/`Stop.note` へのマッピングはフロントエンド側）は 2026-08-17 に Sho が Okazaki の逆提案に合意。§2 を参照。
+### 解決済み（2026-08-17・Issue #22）
+
+| 項目 | 決定 |
+| ---- | ---- |
+| `aggregate_dataset` の出力語彙 | `name` / `summary` の汎用語彙。`Stop.place` / `Stop.note` へのマッピングはフロントエンド側（§2 参照） |
+| `search_datasets` の `limit` | 既定 4・上限 10。範囲外は 400（黙って丸めない）。既定値は1ルート3〜4停留地という本書 §1 の想定に合わせた |
+| エラーレスポンスの形 | `{ error: "invalid_request" \| "not_found" \| "internal_error", message?: string }`。400 は**入力の形の違反だけ**に使い、「データが無い」は `unanswered` ＋ HTTP 200（API.md §4）。500 も JSON で返るので、画面は常に JSON として読んでよい |
+| 複数データセット横断時の `query` の対応関係 | 入力の `query` を各 source に同じ値で複写する。同じ ID を重ねても出典は1件にまとまる。知らない `datasetId` が混ざったら既知のぶんだけ返さず全体を `unanswered` にする（画面上の並べ方はフロントエンド側の決定事項として残る） |
+| `category` の意味 | 絞り込みの述語ではなく**スコアリングのヒント**。ただし指定して1件も当たらなければ `unanswered` になる（無関係な候補は返らない） |
+| `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物しか返らない。** 無ければ `unanswered`。別エリアの施設で代替されることはないので、画面は返ってきた `name` をそのまま信用してよい |

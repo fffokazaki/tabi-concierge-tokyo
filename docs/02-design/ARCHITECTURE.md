@@ -1,11 +1,11 @@
 ---
 title: "ARCHITECTURE"
-version: "1.2.1"
+version: "1.2.2"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-16"
-changeImpact: "medium"
+updated: "2026-08-17"
+changeImpact: "low"
 ---
 
 # ARCHITECTURE.md - システムアーキテクチャ設計書
@@ -73,7 +73,7 @@ graph TD
 
 ### コンポーネント間通信
 
-> 操作名は仮称（スキーマの SSOT: [API.md](./API.md) §3。`/mcp` 面は [MCP.md](./MCP.md)）。
+> 操作名は 2026-08-17 に確定（スキーマの SSOT: [API.md](./API.md) §3。`/mcp` 面は [MCP.md](./MCP.md)）。
 
 ```mermaid
 graph LR
@@ -332,6 +332,12 @@ Phase 番号は [ROADMAP.md](../07-project-management/ROADMAP.md) に準拠す�
 | Phase 4（Final Stage 準備） | 〜2026-10-17 | 介助者モード・音声対応、都への API 公開提案、動的取り込みの検討 |
 
 ## Changelog
+
+### [1.2.2] - 2026-08-17
+
+#### 変更
+
+- コンポーネント間通信のコア操作名を「仮称」から確定済みへ更新（Issue #22）。`search_datasets` / `aggregate_dataset` / `get_provenance` の名称・パス・入出力スキーマは [API.md](./API.md) §3 で確定した
 
 ### [1.2.1] - 2026-08-16
 
