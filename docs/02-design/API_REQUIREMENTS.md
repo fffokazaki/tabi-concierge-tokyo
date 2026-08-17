@@ -1,6 +1,6 @@
 ---
 title: "API_REQUIREMENTS"
-version: "1.1.0"
+version: "1.2.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-16"
@@ -50,6 +50,8 @@ changeImpact: "medium"
   limit?: number;       // 候補件数の上限。既定 4・上限 10（API.md §3.1 で確定）
 }
 ```
+
+> **`trip.interests` は ASCII の識別子**（`"ramen"` / `"culture"` …）になった（[Issue #17](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/17)）。`query` を組み立てるときは `src/features/plan/labels.ts` の `INTEREST_LABELS` で日本語ラベルに変換する。バックエンドのマッチは日本語の部分一致なので、識別子をそのまま繋ぐと1件も当たらない。
 
 ### 提案する出力
 
@@ -226,6 +228,12 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 | `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物しか返らない。** 無ければ `unanswered`。別エリアの施設で代替されることはないので、画面は返ってきた `name` をそのまま信用してよい |
 
 ## Changelog
+
+### [1.2.0] - 2026-08-17
+
+#### 追加
+
+- §1 の入力に注記を追加（[Issue #17](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/17)）。`trip.interests` が ASCII の識別子になったため、`query` を組み立てるときは `INTEREST_LABELS` で日本語ラベルへ変換する必要がある（バックエンドのマッチは日本語の部分一致）
 
 ### [1.1.0] - 2026-08-17
 

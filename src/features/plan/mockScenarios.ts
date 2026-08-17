@@ -15,7 +15,7 @@ export const MOCK_SCENARIOS: Scenario[] = [
   {
     id: "ramen",
     label: "浅草・上野+ラーメン",
-    interest: "ラーメン",
+    interest: "ramen",
     prompt: "「明日は浅草と上野、ラーメンが好き」",
     schedule: ["午前9:00", "午前11:30", "午後1:00"],
     stops: [
@@ -53,7 +53,7 @@ export const MOCK_SCENARIOS: Scenario[] = [
   {
     id: "nightlife",
     label: "渋谷ナイトライフ",
-    interest: "ナイトライフ",
+    interest: "nightlife",
     prompt: "「夜の渋谷、ナイトライフに興味あり」",
     schedule: ["午後6:00", "午後8:00", "午後10:00"],
     stops: [
@@ -91,7 +91,7 @@ export const MOCK_SCENARIOS: Scenario[] = [
   {
     id: "family",
     label: "家族でゆったり一日",
-    interest: "家族向け",
+    interest: "family",
     prompt: "「子連れで、落ち着いた家族の一日」",
     schedule: ["午前10:00", "午後1:00", "午後3:30"],
     stops: [
