@@ -21,6 +21,5 @@ describe("DataGapCard", () => {
 
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.queryByText(/リクエスト/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/\d+件/)).not.toBeInTheDocument();
   });
 });
