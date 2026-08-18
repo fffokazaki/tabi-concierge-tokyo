@@ -20,7 +20,9 @@ import type { Unanswered } from "../../../../shared/core";
 export function DataGapCard({ gaps }: { gaps: Unanswered[] }) {
   return (
     <div className="data-gap-card" role="status">
-      <p className="data-gap-card__title">一部の興味には答えられませんでした</p>
+      {/* 「一部」を名乗らない。エリア・フォールバックで全体が代替表示になっているとき（Issue #50・#54）、
+          「一部は答えられた」という主張になってしまう。詳細は各 gap の message に委ねる */}
+      <p className="data-gap-card__title">答えられなかった点があります</p>
       <ul className="data-gap-card__list">
         {gaps.map((gap) => (
           <li key={`${gap.reason}:${gap.message}`}>{gap.message}</li>

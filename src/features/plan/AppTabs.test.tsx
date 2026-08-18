@@ -132,7 +132,7 @@ describe("answered — 応答由来のルートと出典", () => {
     await waitFor(() => expect(screen.getByText("寛永寺")).toBeInTheDocument());
     expect(screen.getByText(/表示件数に合わせて.*1件を伏せています/)).toBeInTheDocument();
     // gaps は無いので「該当データなし」を示す DataGapCard は出ない
-    expect(screen.queryByText("一部の興味には答えられませんでした")).not.toBeInTheDocument();
+    expect(screen.queryByText("答えられなかった点があります")).not.toBeInTheDocument();
     // 4件目（絹本著色元三大師画像）自体は伏せられて画面に出ない
     expect(screen.queryByText("絹本著色元三大師画像")).not.toBeInTheDocument();
   });
@@ -158,7 +158,7 @@ describe("answered — 応答由来のルートと出典", () => {
     });
     await createBriefing(fetchImpl);
 
-    await waitFor(() => expect(screen.getByText("一部の興味には答えられませんでした")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("答えられなかった点があります")).toBeInTheDocument());
     expect(screen.getByText(/「ラーメン」の粒度では答えられません/)).toBeInTheDocument();
     // 欠損があってもルート自体は出る
     expect(screen.getByText("寛永寺")).toBeInTheDocument();
