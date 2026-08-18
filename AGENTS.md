@@ -34,7 +34,8 @@ PoC 段階のため軽量な運用を採用している。判断の背景は [AD
 
 ## ドキュメントを変更したとき
 
-- frontmatter を持つ文書（`MASTER.md` / `PROJECT.md` / `ARCHITECTURE.md` / `DOMAIN.md` / `PATTERNS.md` / `TESTING.md` / `DEPLOYMENT.md` / `DECISION_TREE.md` / `FALLBACK.md` / `PLAYBOOK.md`）を変更したら、`version`・`updated`・`changeImpact` と末尾の Changelog を**同時に**更新する
+- **`docs/` 配下の文書はすべて frontmatter を持つ**（例外は `docs/08-knowledge/playbook/*.md`。あれは `/ace-curate` が追記する子ファイルで、メタデータは親の `PLAYBOOK.md` が持つ）。変更したら `version`・`updated`・`changeImpact` と末尾の Changelog を**同時に**更新する
+- 新しく `docs/` に文書を足すときも frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を付ける
 - `version` は SemVer。節の追加・方針変更は minor、文言修正は patch。`changeImpact` は小文字（`low` / `medium` / `high`）
 - 冒頭に「⚠️ テンプレート未具体化」の注記がある文書は、まだ本プロジェクト向けに書き換えられていない。**そこに書かれている技術（DB・REST/GraphQL・コンテナ等）を本プロジェクトの決定と誤認しない**
 
@@ -46,13 +47,15 @@ PoC 段階のため軽量な運用を採用している。判断の背景は [AD
 | Worker | Hono（`worker/`）。ローカルも本番も **workerd** で動く（Node ではない） |
 | ビルド | Vite 8 ＋ `@cloudflare/vite-plugin`。ツールチェーンは Node 24（`.nvmrc`） |
 | デプロイ先 | Cloudflare Workers（アカウント `opendata`）。<https://tabi-concierge-tokyo.opendata-002.workers.dev> |
+| デプロイ方法 | **手動**。`npm run deploy`（= `wrangler deploy`）をローカルから実行する。`.github/workflows/ci.yml` は検証（typecheck / test / build）だけを行い、**デプロイはしない**。**いつ実行するかは [DEPLOYMENT.md](docs/05-operations/DEPLOYMENT.md) §3 で契機を定めた**（`worker/` `shared/` を変更したらデプロイ、`migrations/` なら先に `db:migrate`）。契機を決めていなかったため本番が43コミット遅れる事故があった（Issue #46） |
 | 接続（`/api/*`） | **接続済み**。プラン画面が `search_datasets` → `aggregate_dataset` → `get_provenance` の3操作を呼ぶ（Issue #31・`buildPlan.ts`）。中身は `worker/core/` の固定データによるスタブ（Issue #22）で、D1 を引く本実装（Text-to-SQL）は Step 5 |
 | 接続（`/mcp`） | **未着手**（Step 5）。`createMcpHandler`（ステートレス。**Durable Objects は使わない**）を使う想定 |
-| データベース | Cloudflare D1 ※Step 2 で導入 |
+| データベース | Cloudflare D1（`tabi-concierge-tokyo`・導入済み）。スキーマは `migrations/`、取り込みは `scripts/`。開発は `npm run db:reset:local` |
+| Python 実行環境 | **未確認**。「現状の構成では Cloudflare 上で Python が使えない」という報告があるが、本リポジトリ内に検証記録はなく未確認（実装で Python を前提にする前に要確認） |
 | 認証 | **実装しない**（POC 段階） |
 | コンテナ | 使用しない（サーバーレス） |
 
-> **workerd は Node ではない**。`worker/` のコードで `fs` / `net` を前提にしたライブラリは動かない。ローカル確認は必ず `npm run dev`（workerd 上で動く）で行い、`node` で直接実行しない。
+> **workerd は Node ではない**。`worker/` のコードで `fs` / `net` を前提にしたライブラリは動かない。ローカル確認は必ず `npm run dev`（workerd 上で動く）で行い、`node` で直接実行しない。テストは `@cloudflare/vitest-pool-workers` を使う。
 
 > **`search_datasets` の area フォールバック**: キーワードが1件も当たらないとき代表エリア収録データセットをそのまま返す経路が、答えられていないことを見落としていた欠陥（[Issue #50](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/50)）は [PR #51](https://github.com/fffokazaki/tabi-concierge-tokyo/pull/51) で修正・デプロイ済み。挙動の詳細は [API.md](docs/02-design/API.md) §3.1 を参照（実装が変わるたびにここへ転記すると陳腐化するため、詳細はそちらに一本化する）。
 >
