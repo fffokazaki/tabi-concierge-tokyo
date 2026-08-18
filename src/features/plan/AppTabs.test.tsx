@@ -119,7 +119,9 @@ describe("answered — 応答由来のルートと出典", () => {
     await createBriefing(fetchImpl);
 
     await waitFor(() => expect(screen.getByText("寛永寺")).toBeInTheDocument());
-    expect(screen.getByText(/出典のあるマナー情報はまだありません/)).toBeInTheDocument();
+    expect(screen.getByText(/出典のあるマナー情報はありません/)).toBeInTheDocument();
+    // 「まだ」を使わない — 調査済み・存在しないことを確認済みという意味にする（Issue #67）
+    expect(screen.queryByText(/まだありません/)).not.toBeInTheDocument();
     expect(screen.queryByText(/鳥居をくぐる前に一礼/)).not.toBeInTheDocument();
   });
 

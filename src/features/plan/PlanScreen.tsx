@@ -134,9 +134,12 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
               <EtiquetteList tips={displayedEtiquette} />
             ) : (
               /* 仮のマナー文を出すのは出典なしの回答にあたる（CLAUDE.md 絶対ルール #2）。
-                 出典のあるデータを確保するまでは、無いことをそのまま書く。Issue #43 */
+                 「まだ無い」ではなく「調査済み・存在しないことを確認済み」と書く（Issue #67）。
+                 カタログ外の出典で埋めることもしない（ADR-010）。文言は worker/core/search-gaps.ts の
+                 etiquetteUnanswered と同じ語り口に揃えてある */
               <p className="route-status">
-                出典のあるマナー情報はまだありません。カタログに該当データを確認できていないためです。
+                出典のあるマナー情報はありません。訪日観光客向けのマナー・作法の解説にあたるデータは、東京都オープンデータカタログに存在しないことを確認済みです（2026-08-17
+                調査）。都へのデータ公開リクエストの候補として記録しています。
               </p>
             )}
           </>
