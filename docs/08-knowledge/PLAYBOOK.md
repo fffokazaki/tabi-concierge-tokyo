@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.17.0"
+version: "1.18.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-18"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 43
+ace_entry_count: 46
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -264,8 +264,25 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-57-3 | 同じ文型の入力でも、対象範囲の内か外かで過検知の倒し方は逆になる | architecture | [playbook/architecture.md#ace-57-3](./playbook/architecture.md#ace-57-3) |
 | ACE-57-4 | 対処案が併記された Issue では、案の魅力ではなく受け入れ条件が案を選ぶ | process | [playbook/process.md#ace-57-4](./playbook/process.md#ace-57-4) |
 | ACE-57-5 | レビューが挙げた反例は、真偽値ではなく応答全文を出して読む | process | [playbook/process.md#ace-57-5](./playbook/process.md#ace-57-5) |
+| ACE-62-1 | 応答の共通の書き出しも主張を運ぶ — 分岐で真偽が変わるなら使い分けて契約に書く | architecture | [playbook/architecture.md#ace-62-1](./playbook/architecture.md#ace-62-1) |
+| ACE-62-2 | 文言の嘘を直す判断をしたら、同じ言い回しを grep して姉妹分岐へ同時適用する | process | [playbook/process.md#ace-62-2](./playbook/process.md#ace-62-2) |
+| ACE-62-3 | 文言契約のテストは完全一致で固定し、到達性は副作用で確かめる | testing | [playbook/testing.md#ace-62-3](./playbook/testing.md#ace-62-3) |
 
 ## Changelog
+
+### [1.18.0] - 2026-08-18
+
+#### 追加
+
+- ACE-62-1: 応答の共通の書き出しも主張を運ぶ — 分岐で真偽が変わるなら使い分けて契約に書く（Issue #59 / PR #62）
+- ACE-62-2: 文言の嘘を直す判断をしたら、同じ言い回しを grep して姉妹分岐へ同時適用する（Issue #59 / PR #62。取り残しは2回起きた）
+- ACE-62-3: 文言契約のテストは完全一致で固定し、到達性は副作用で確かめる（Issue #59 / PR #62）
+
+#### カウンター更新
+
+- ACE-51-1: Helpful +1（レビューが末尾フォールバックの到達性を数え上げて Warning を確定した根拠）
+- ACE-51-3: Helpful +1（分類ガード・末尾フォールバックの文言を「実際に照合した集合の記述」へ直す判断の下敷き）
+- ACE-51-4: Helpful +1（否定アサートの判別力が他分岐の文言に依存していた指摘の根拠）
 
 ### [1.17.0] - 2026-08-18
 
