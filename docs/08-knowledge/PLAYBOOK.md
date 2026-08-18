@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.19.0"
+version: "1.20.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-18"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 49
+ace_entry_count: 51
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -270,8 +270,22 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-64-1 | 名称に構造があるなら、照合は包含ではなく構造に合わせて狭める | data-processing | [playbook/data-processing.md#ace-64-1](./playbook/data-processing.md#ace-64-1) |
 | ACE-64-2 | 参照側に設定を再掲しない — 定義側のフラグ＋前提が崩れたら生成を止める | architecture | [playbook/architecture.md#ace-64-2](./playbook/architecture.md#ace-64-2) |
 | ACE-64-3 | 文書が断定した実測値は、その実測を再現するテストで固定する | documentation-quality | [playbook/documentation-quality.md#ace-64-3](./playbook/documentation-quality.md#ace-64-3) |
+| ACE-66-1 | 埋められない看板機能は、欠損の記録頻度を還元の根拠に変える（エスカレーション） | architecture | [playbook/architecture.md#ace-66-1](./playbook/architecture.md#ace-66-1) |
+| ACE-66-2 | 調査済みの断定は、調査の範囲・粒度に文言を一致させる | documentation-quality | [playbook/documentation-quality.md#ace-66-2](./playbook/documentation-quality.md#ace-66-2) |
 
 ## Changelog
+
+### [1.20.0] - 2026-08-18
+
+#### 追加
+
+- ACE-66-1: 埋められない看板機能は、欠損の記録頻度を還元の根拠に変える — エスカレーション（Issue #43 / PR #66 / ADR-010）
+- ACE-66-2: 調査済みの断定は、調査の範囲・粒度に文言を一致させる（Issue #43 / PR #66）
+
+#### カウンター更新
+
+- ACE-51-3: Helpful +1（`data_not_published` の文言を調査範囲へ絞る判断の下敷き）
+- ACE-62-3: Helpful +1（マナー欠損の message を完全一致の文言契約テストで固定）
 
 ### [1.19.0] - 2026-08-18
 
