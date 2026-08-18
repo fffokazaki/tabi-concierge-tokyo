@@ -519,6 +519,33 @@ describe("aggregateDataset（直接呼び出し）", () => {
 
     expect(output.status).toBe("unanswered");
   });
+
+  it("既知のエリア名が無い answered は、固定サンプル先頭という選定根拠を query に明記する（Issue #78）", async () => {
+    const output = await aggregateDataset({ datasetId: MEISHO_ID, intent: "寺社を1件" }, capturingGapRecorder());
+
+    expect(output.status).toBe("answered");
+    if (output.status !== "answered") return;
+    // 「エリア無指定」と書かない。確認したのは既知の語彙に当たらなかったことだけ（未知の
+    // 地名が書かれていてもこの経路に来る）で、無指定と断定すると実態を超える
+    expect(output.query).toContain("既知のエリア名が intent から見つからず");
+    expect(output.query).toContain("固定サンプルの先頭を選定");
+  });
+
+  it("answered の query は経路によらず、intent の内容と照合していないことを明記する（Issue #78）", async () => {
+    // エリアで絞った行も「内容が合うか」は見ていない。無指定経路だけに明記すると、
+    // エリア指定ありの応答が対比で「照合済み」に見えてしまう
+    const noArea = await aggregateDataset({ datasetId: MEISHO_ID, intent: "寺社を1件" }, capturingGapRecorder());
+    const withArea = await aggregateDataset(
+      { datasetId: MEISHO_ID, intent: "上野の寺社を1件" },
+      capturingGapRecorder(),
+    );
+
+    for (const output of [noArea, withArea]) {
+      expect(output.status).toBe("answered");
+      if (output.status !== "answered") return;
+      expect(output.query).toContain("intent の内容との照合はしていない");
+    }
+  });
 });
 
 describe("getProvenance（直接呼び出し）", () => {

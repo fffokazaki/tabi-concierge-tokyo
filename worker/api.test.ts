@@ -392,11 +392,17 @@ describe("POST /api/aggregate-dataset", () => {
     // 実行クエリは省略不可（API.md §4）。どのスナップショットの何行目かを辿れること
     expect(body.query).toContain(MEISHO.datasetId);
     expect(body.query).toContain("ヘッダを除く 3 行目");
+    // 行の選定根拠も query から辿れること（Issue #78）
+    expect(body.query).toContain("固定サンプルのうち「上野」の最初の1件");
   });
 
   it("集計意図のエリアで返す行が変わる", async () => {
     const body = expectAnswered(await aggregate({ datasetId: MEISHO.datasetId, intent: "浅草の寺社を1件" }));
     expect(body.result.name).toBe("浅草寺");
+    // 行番号と選定根拠が同じ sample から組み立てられていること。selection だけ差し替えて
+    // 行番号を samples[0] から採るような取り違えをここで捕まえる（Issue #78 レビュー S1）
+    expect(body.query).toContain("ヘッダを除く 27 行目");
+    expect(body.query).toContain("固定サンプルのうち「浅草」の最初の1件");
   });
 
   it("指定したエリアの固定データが無いデータセットでも、別エリアの行を返さない", async () => {
@@ -425,6 +431,9 @@ describe("POST /api/aggregate-dataset", () => {
   it("エリアの指定が無ければ先頭の固定データを返す", async () => {
     const body = expectAnswered(await aggregate({ datasetId: MEISHO.datasetId, intent: "寺社を1件" }));
     expect(body.result.name).toBe("寛永寺");
+    // 先頭のサンプルは intent と照合して選ばれたわけではない。その事実が query から読めること（Issue #78）
+    expect(body.query).toContain("既知のエリア名が intent から見つからず、固定サンプルの先頭を選定");
+    expect(body.query).toContain("intent の内容との照合はしていない");
   });
 
   it("クロス集計表からは地物を抽出できないので unanswered を返す", async () => {
