@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.21.0"
+version: "1.22.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-18"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 55
+ace_entry_count: 59
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -276,8 +276,21 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-69-2 | 部分一致の haystack に絞り込みキーを混ぜない — 「新宿」は「宿」に当たる | data-processing | [playbook/data-processing.md#ace-69-2](./playbook/data-processing.md#ace-69-2) |
 | ACE-69-3 | 既知欠損との重複排除は、語のクラスではなく「報告された1件」との対応で畳む | architecture | [playbook/architecture.md#ace-69-3](./playbook/architecture.md#ace-69-3) |
 | ACE-69-4 | 頻度が根拠になる記録は、1リクエスト内の入力重複を正規化してから積む | data-processing | [playbook/data-processing.md#ace-69-4](./playbook/data-processing.md#ace-69-4) |
+| ACE-73-1 | 理由を1つしか運べない応答には、理由が覆っていない欠損を optional の gaps で併走させる | architecture | [playbook/architecture.md#ace-73-1](./playbook/architecture.md#ace-73-1) |
+| ACE-73-2 | message が前提にする文脈が消える場所では、その文言を使わない（載せない判断も設計） | architecture | [playbook/architecture.md#ace-73-2](./playbook/architecture.md#ace-73-2) |
+| ACE-73-3 | 生成系コマンドの失敗フォールバックに、劣化したプレースホルダを渡さない | process | [playbook/process.md#ace-73-3](./playbook/process.md#ace-73-3) |
+| ACE-74-1 | 「移動のみ」リファクタは、旧版との行単位照合で機械的に証明する | process | [playbook/process.md#ace-74-1](./playbook/process.md#ace-74-1) |
 
 ## Changelog
+
+### [1.22.0] - 2026-08-18
+
+#### 追加
+
+- ACE-73-1: 理由を1つしか運べない応答には、理由が覆っていない欠損を optional の gaps で併走させる（Issue #70 / PR #73）
+- ACE-73-2: message が前提にする文脈が消える場所では、その文言を使わない（載せない判断も設計）（Issue #70 / PR #73）
+- ACE-73-3: 生成系コマンドの失敗フォールバックに、劣化したプレースホルダを渡さない（PR #73）
+- ACE-74-1: 「移動のみ」リファクタは、旧版との行単位照合で機械的に証明する（Issue #71 / PR #74）
 
 ### [1.21.0] - 2026-08-18
 
