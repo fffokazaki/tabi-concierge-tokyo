@@ -169,6 +169,32 @@ const shibuyaSightseeingUnanswered = (): Unanswered =>
   );
 
 /**
+ * マナー・作法の問いの語（Issue #43・ADR-010）。
+ *
+ * **調査で確認した語だけを載せる**（DATABASE.md §2「マナー解説のデータ欠損」・2026-08-17）。
+ * 未調査の語（「礼儀」等）で `data_not_published` を返すのは推測になる。調査済みでも
+ * 「参拝」は要求の語ではなく行為の語（「浅草寺に参拝したい」は寺社データで答えるべき問い）
+ * なので載せない。「ピクトグラム」は利用者の質問文に現れない検索用語なので載せない。
+ */
+const ETIQUETTE_TERMS = ["マナー", "作法", "エチケット", "おもてなし"];
+
+/**
+ * マナー解説の調査済み欠損（Issue #43・ADR-010）。
+ *
+ * カタログ約9,600件に存在しないことを確認済みなので、最も強い分類 `data_not_published` を
+ * 使ってよい（迷ったら使わない、の例外条件を満たしている）。この欠損はカタログ外の出典で
+ * 埋めず、**データ公開リクエストへの還元（エスカレーション）として扱う**。記録される旨を
+ * message に書くのは、未回答が握りつぶされていないことを利用者に伝えるため
+ * （DOMAIN.md §8 不変条件4）。問い合わせのたびに `gaps` へ積まれる記録の頻度が、
+ * そのまま公開リクエストの根拠データになる（DOMAIN.md §7）。
+ */
+const etiquetteUnanswered = (): Unanswered =>
+  unanswered(
+    "data_not_published",
+    "該当するオープンデータがありません。訪日観光客向けのマナー・作法に相当するデータは、東京都オープンデータカタログに存在しないことを確認済みです（2026-08-17 調査）。この未回答は記録され、東京都へのデータ公開リクエストの題材になります。",
+  );
+
+/**
  * エリアだけで絞った一覧を返すとき、訊かれた内容に答えられていないことを添える（Issue #50）。
  *
  * `other` を使う。`data_not_published`（最も強い分類）は「カタログ側に無いことを確かめてある」
@@ -366,6 +392,10 @@ function collectPartialGaps(area: ResolvedArea, genre: string | undefined, hayst
   // （`usable` で除外済み）なので、ジャンルの問いは必ず未回答のまま残っている
   if (genre) gaps.push(cuisineGenreUnanswered(genre));
 
+  // マナー・作法の問いが混ざっているとき、それに答えるデータは10件のどれにも無い
+  // （カタログ全体に無いことを調査済み）ので、必ず未回答のまま残っている（Issue #43）
+  if (findFirstTerm(haystack, ETIQUETTE_TERMS)) gaps.push(etiquetteUnanswered());
+
   if (area.kind === "representative" && area.area === "渋谷" && findFirstTerm(haystack, SHIBUYA_SIGHTSEEING_TERMS)) {
     gaps.push(shibuyaSightseeingUnanswered());
   }
@@ -520,6 +550,11 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   const usable = genre ? matched.filter((entry) => entry.datasetId !== RESTAURANT_DATASET_ID) : matched;
   if (genre && usable.length === 0) return cuisineGenreUnanswered(genre);
 
+  // マナー・作法の問いにキーワードが1件も当たらなければ、調査済みの欠損として返す
+  // （Issue #43・ADR-010）。エリア・フォールバックより手前に置くのはジャンル判定と同じ理由 —
+  // 後ろに回すと「浅草のマナー」に浅草の一覧を返して欠損が消える
+  if (usable.length === 0 && findFirstTerm(haystack, ETIQUETTE_TERMS)) return etiquetteUnanswered();
+
   const gaps = collectPartialGaps(area, genre, haystack);
 
   const selected = usable.slice(0, limit);
@@ -549,9 +584,10 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   // 記録は `recorded` が `gaps` から作るので、ここで添えれば D1 にも入る。
   //
   // 返す配列は最大3つの出所を連結したもので、**それぞれ空になる条件が違う**。
-  //  1. `gaps`（`collectPartialGaps` の語からの判定）— ここでは必ず空。集める2つはどちらも
+  //  1. `gaps`（`collectPartialGaps` の語からの判定）— ここでは必ず空。集める3つはいずれも
   //     このフォールバックより手前で `unanswered` として return されている（ジャンル指定の
-  //     飲食は上の `genre && usable.length === 0`、渋谷の観光語は直前の分岐。条件は同一）。
+  //     飲食は上の `genre && usable.length === 0`、マナー語はその直後、渋谷の観光語は
+  //     直前の分岐。条件は同一）。
   //     spread は、将来 `collectPartialGaps` に語が増えたときに取り落とさないためだけに残す
   //  2. エリア・フォールバックの欠損 — エリア名のほかに何か訊かれていれば1件（Issue #50）
   //  3. 訊かれたエリアの取り落ち — 覆えなかったエリアの数だけ（Issue #52）

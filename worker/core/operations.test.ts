@@ -276,6 +276,84 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
 });
 
 /**
+ * マナー・作法の問い（Issue #43・ADR-010）。
+ *
+ * カタログ約9,600件に存在しないことを調査済み（DATABASE.md §2・2026-08-17）なので、
+ * 最も強い分類 data_not_published を使う。カタログ外の出典で埋めず、記録の頻度を
+ * データ公開リクエストの根拠にする（エスカレーション）。message は文言契約として
+ * 完全一致で固定する（ACE-62-3）。
+ */
+describe("マナー・作法の問い", () => {
+  const ETIQUETTE_MESSAGE =
+    "該当するオープンデータがありません。訪日観光客向けのマナー・作法に相当するデータは、東京都オープンデータカタログに存在しないことを確認済みです（2026-08-17 調査）。この未回答は記録され、東京都へのデータ公開リクエストの題材になります。";
+
+  it("マナーだけを訊かれたら、調査済みの data_not_published を返して記録する", async () => {
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "日本のマナーを知りたい" }, recorder);
+
+    expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    expect(output.reason).toBe("data_not_published");
+    expect(output.message).toBe(ETIQUETTE_MESSAGE);
+    expect(recorder.records).toEqual([
+      { question: "日本のマナーを知りたい", area: undefined, category: undefined, reason: "data_not_published" },
+    ]);
+  });
+
+  it("エリア付きでもエリアの一覧へ落とさない（ジャンル判定と同じ優先順）", async () => {
+    // 後ろに回すと「浅草のマナー」に浅草の一覧を返して欠損が消える
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "浅草のマナー" }, recorder);
+
+    expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    expect(output.reason).toBe("data_not_published");
+    expect(recorder.records).toEqual([
+      { question: "浅草のマナー", area: "浅草", category: undefined, reason: "data_not_published" },
+    ]);
+  });
+
+  it("キーワードが当たる問いに混ざっていたら、answered に欠損として添えて記録する", async () => {
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "上野の美術館と作法" }, recorder);
+
+    expect(output.status).toBe("answered");
+    if (output.status !== "answered") return;
+    expect(output.gaps).toBeDefined();
+    expect(output.gaps!.some((gap) => gap.reason === "data_not_published" && gap.message === ETIQUETTE_MESSAGE)).toBe(
+      true,
+    );
+    expect(recorder.records).toContainEqual({
+      question: "上野の美術館と作法",
+      area: "上野",
+      category: undefined,
+      reason: "data_not_published",
+    });
+  });
+
+  it("調査済みの語（エチケット・おもてなし）で発火する", async () => {
+    for (const query of ["エチケットを教えて", "おもてなしの情報"]) {
+      const output = await searchDatasets({ query }, capturingGapRecorder());
+      expect(output.status).toBe("unanswered");
+      if (output.status !== "unanswered") continue;
+      expect(output.reason).toBe("data_not_published");
+    }
+  });
+
+  it("「参拝」はマナー欠損にしない（行為の語。寺社の問いを奪わない）", async () => {
+    const output = await searchDatasets({ query: "上野で参拝したい" }, capturingGapRecorder());
+
+    // answered（寺社データが当たる）でも unanswered でもよいが、マナーの調査済み欠損として
+    // 応答・gaps のどちらにも出ないこと
+    if (output.status === "answered") {
+      expect(output.gaps?.some((gap) => gap.message === ETIQUETTE_MESSAGE) ?? false).toBe(false);
+    } else {
+      expect(output.message).not.toBe(ETIQUETTE_MESSAGE);
+    }
+  });
+});
+
+/**
  * 分類指定の空振りの文言（Issue #59）。
  *
  * 実装が知っているのは「照合した集合でキーワード表に当たらなかった」ことだけなので、
