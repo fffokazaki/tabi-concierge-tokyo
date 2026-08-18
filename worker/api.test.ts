@@ -359,6 +359,13 @@ describe("POST /api/search-datasets", () => {
       expect((await postJson("/api/search-datasets", { query: "上野", interests: [1] })).status).toBe(400);
       expect((await postJson("/api/search-datasets", { query: "上野", areas: ["  "] })).status).toBe(400);
     });
+
+    it("配列の上限（20件・要素100文字）を超えたら 400 を返す（黙って切り詰めない）", async () => {
+      // 要素数ぶんの欠損が gaps テーブルへ記録されるため、認証なしの公開 API で無制限に受けない
+      const tooMany = Array.from({ length: 21 }, (_, i) => `興味${i}`);
+      expect((await postJson("/api/search-datasets", { query: "上野", interests: tooMany })).status).toBe(400);
+      expect((await postJson("/api/search-datasets", { query: "上野", areas: ["あ".repeat(101)] })).status).toBe(400);
+    });
   });
 });
 
