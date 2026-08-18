@@ -41,6 +41,34 @@ const readOptionalString = (record: Record<string, unknown>, key: string): Parse
   return { ok: true, value: value.trim() };
 };
 
+/** 構造化入力の配列の上限。興味チップ・目的地の現実的な数を大きく超える入力は形の違反として弾く */
+export const MAX_LIST_ITEMS = 20;
+/** 構造化入力の要素の文字数上限。興味ラベル・地名の現実的な長さを大きく超える入力を弾く */
+export const MAX_LIST_ITEM_LENGTH = 100;
+
+/**
+ * 任意の文字列配列。未指定（undefined / null）は許すが、型違い・空文字の要素は弾く。
+ * 空配列は**通す**（`areas: []` は「目的地なし」の明示で、未指定とは意味が違う。API.md §3.1）。
+ *
+ * 上限を置くのは、要素数ぶんの欠損が `gaps` テーブルへ1行ずつ記録されるため（認証なしの
+ * 公開 API で無制限に受けると、1リクエストで D1 へ大量の行を積めてしまう）。
+ * 上限超過は黙って切り詰めず 400（`limit` と同じ方針）。
+ */
+const readOptionalStringArray = (record: Record<string, unknown>, key: string): ParseResult<string[] | undefined> => {
+  const value = record[key];
+  if (value === undefined || value === null) return { ok: true, value: undefined };
+  if (!Array.isArray(value) || !value.every((item): item is string => typeof item === "string" && item.trim() !== "")) {
+    return invalid(`"${key}" は空でない文字列の配列で指定してください`);
+  }
+  if (value.length > MAX_LIST_ITEMS) {
+    return invalid(`"${key}" は最大 ${MAX_LIST_ITEMS} 件までです`);
+  }
+  if (value.some((item) => item.trim().length > MAX_LIST_ITEM_LENGTH)) {
+    return invalid(`"${key}" の要素は ${MAX_LIST_ITEM_LENGTH} 文字以内で指定してください`);
+  }
+  return { ok: true, value: value.map((item) => item.trim()) };
+};
+
 /** 任意の整数。範囲外は黙って丸めず弾く（丸めると呼び出し側が指定の無効化に気づけない）。 */
 const readOptionalBoundedInteger = (
   record: Record<string, unknown>,
@@ -60,11 +88,27 @@ export function parseSearchDatasetsInput(body: unknown): ParseResult<SearchDatas
   const record = asRecord(body);
   if (!record) return invalid(NOT_AN_OBJECT);
 
-  const query = readRequiredString(record, "query");
+  const interests = readOptionalStringArray(record, "interests");
+  if (!interests.ok) return interests;
+
+  // 興味を構造化して送る場合（ADR-011）、自由文は無いことがある（興味チップだけ選んで
+  // 「その他のご希望」を書かない呼び出し）。それ以外では従来どおり必須
+  const hasInterests = (interests.value?.length ?? 0) > 0;
+  const query = hasInterests ? readOptionalString(record, "query") : readRequiredString(record, "query");
   if (!query.ok) return query;
 
   const area = readOptionalString(record, "area");
   if (!area.ok) return area;
+
+  const areas = readOptionalStringArray(record, "areas");
+  if (!areas.ok) return areas;
+
+  // 片方は絞り込みの単数指定・片方は訊かれた目的地の列で、意味が重なる。両方送られたとき
+  // どちらを信じるかを実装が黙って決めると、無視された側の指定に呼び出し側が気づけない。
+  // 空白のみの `area` は既存挙動どおり「未指定」と同じ扱いなので、衝突と見なさない
+  if (area.value && areas.value !== undefined) {
+    return invalid('"area" と "areas" は同時に指定できません（"areas" に一本化してください）');
+  }
 
   const category = readOptionalString(record, "category");
   if (!category.ok) return category;
@@ -74,7 +118,14 @@ export function parseSearchDatasetsInput(body: unknown): ParseResult<SearchDatas
 
   return {
     ok: true,
-    value: { query: query.value, area: area.value, category: category.value, limit: limit.value },
+    value: {
+      query: query.value ?? "",
+      area: area.value,
+      areas: areas.value,
+      interests: interests.value,
+      category: category.value,
+      limit: limit.value,
+    },
   };
 }
 

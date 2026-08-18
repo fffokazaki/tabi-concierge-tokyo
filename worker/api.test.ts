@@ -91,6 +91,17 @@ describe("POST /api/search-datasets", () => {
 
     // 上野を収録するのは8件。既定値で切られることを実際の件数で確かめる
     expect(body.candidates).toHaveLength(DEFAULT_SEARCH_LIMIT);
+    // エリアだけを訊かれているので欠損は足さない（Issue #50）
+    expect(body.gaps).toBeUndefined();
+  });
+
+  it("エリア名のほかに訊かれた内容があれば、応答の gaps に載って返る（Issue #50）", async () => {
+    // 興味チップ「ナイトライフ」＋その他のご希望「渋谷」でプランを作ると、この形の query になる。
+    // 以前は都市公園データが gaps なしの「回答あり」として返り、欠損が画面にも記録にも残らなかった
+    const body = expectAnswered(await search({ query: "ナイトライフ、渋谷" }));
+
+    expect(body.gaps).toHaveLength(1);
+    expect(body.gaps?.[0].reason).toBe("other");
   });
 
   it("limit で件数を変えられる（上限まで指定できる）", async () => {
@@ -115,6 +126,9 @@ describe("POST /api/search-datasets", () => {
   });
 
   it("質問文の代表エリアは対象外の地名より優先される", async () => {
+    // この query が `gaps` なしで通るのは、宿泊施設のキーワード「宿」が「新宿」に部分一致して
+    // キーワード経路で返るため。「宿」を締める（notWhen を足す等）と、Issue #50 の
+    // エリア・フォールバックへ落ちて欠損が1件付き、このテストと :249 の期待が変わる
     const body = expectAnswered(await search({ query: "新宿から上野へ行きたい" }));
     expect(body.candidates.length).toBeGreaterThan(0);
   });
@@ -208,6 +222,22 @@ describe("POST /api/search-datasets", () => {
       expect(Object.hasOwn(body, "gaps")).toBe(false);
     });
 
+    it("覆えなかったエリアは応答の gaps にも area 付きで載る（Issue #52）", async () => {
+      // D1 の記録は別のテストで見ている。ここはクライアントが受け取る契約のほう。
+      // 応答整形の変更で `area` が落ちても、記録だけ見ていると気づけない
+      const body = expectAnswered(await search({ query: "上野・渋谷" }));
+
+      expect(body.gaps).toEqual([
+        {
+          status: "unanswered",
+          reason: "other",
+          message:
+            "「渋谷」について訊かれましたが、返した候補はいずれも「渋谷」を収録していません。候補は「上野」で絞り込んでいるためです。",
+          area: "渋谷",
+        },
+      ]);
+    });
+
     it("すべて答えられないクエリは unanswered のまま（answered ＋ 全部 gaps にしない）", async () => {
       // ここを answered にすると「答えがある」と嘘をつくことになる
       const body = expectUnanswered(await search({ query: "上野でラーメンが食べたい", area: "上野" }));
@@ -282,6 +312,68 @@ describe("POST /api/search-datasets", () => {
   it("area・category の型違いは 400 を返す", async () => {
     expect((await postJson("/api/search-datasets", { query: "上野", area: 1 })).status).toBe(400);
     expect((await postJson("/api/search-datasets", { query: "上野", category: [] })).status).toBe(400);
+  });
+
+  describe("構造化入力（interests / areas・ADR-011）", () => {
+    it("areas で目的地を明示すると、出発地の代表エリアが欠損に載らない（Issue #58）", async () => {
+      const body = expectAnswered(
+        await search({ query: "渋谷から上野の美術館へ行きたい", areas: ["上野"] }),
+      );
+
+      expect(body.candidates.length).toBeGreaterThan(0);
+      expect(Object.hasOwn(body, "gaps")).toBe(false);
+    });
+
+    it("interests で興味を送ると、答えていない興味が gaps に載る（Issue #53）", async () => {
+      const body = expectAnswered(
+        await search({ query: "上野で夜遊びしたい", interests: ["ナイトライフ"] }),
+      );
+
+      expect(body.gaps).toHaveLength(1);
+      expect(body.gaps?.[0].message).toContain("ナイトライフ");
+    });
+
+    it("interests があれば query を省略できる（興味チップだけの呼び出し）", async () => {
+      const body = expectAnswered(await search({ interests: ["文化"] }));
+
+      expect(body.candidates.length).toBeGreaterThan(0);
+    });
+
+    it("interests が空配列なら、query 省略は従来どおり 400", async () => {
+      expect((await postJson("/api/search-datasets", { interests: [] })).status).toBe(400);
+    });
+
+    it("area と areas の同時指定は 400（どちらを信じるかを黙って決めない）", async () => {
+      const response = await postJson("/api/search-datasets", {
+        query: "美術館",
+        area: "上野",
+        areas: ["上野"],
+      });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({ error: "invalid_request" });
+    });
+
+    it("interests・areas の型違い・空文字の要素は 400 を返す", async () => {
+      expect((await postJson("/api/search-datasets", { query: "上野", interests: "文化" })).status).toBe(400);
+      expect((await postJson("/api/search-datasets", { query: "上野", interests: [1] })).status).toBe(400);
+      expect((await postJson("/api/search-datasets", { query: "上野", areas: ["  "] })).status).toBe(400);
+    });
+
+    it("unanswered でも、areas で明示された対象エリア外は gaps に載って返る（Issue #70）", async () => {
+      const body = expectUnanswered(await search({ query: "美術館を回りたい", areas: ["新宿", "池袋"] }));
+
+      expect(body.reason).toBe("out_of_area");
+      expect(body.gaps).toHaveLength(1);
+      expect(body.gaps?.[0].area).toBe("池袋");
+    });
+
+    it("配列の上限（20件・要素100文字）を超えたら 400 を返す（黙って切り詰めない）", async () => {
+      // 要素数ぶんの欠損が gaps テーブルへ記録されるため、認証なしの公開 API で無制限に受けない
+      const tooMany = Array.from({ length: 21 }, (_, i) => `興味${i}`);
+      expect((await postJson("/api/search-datasets", { query: "上野", interests: tooMany })).status).toBe(400);
+      expect((await postJson("/api/search-datasets", { query: "上野", areas: ["あ".repeat(101)] })).status).toBe(400);
+    });
   });
 });
 
@@ -521,6 +613,18 @@ describe("未回答の gaps 記録", () => {
     expect(await readGapRows()).toEqual([]);
   });
 
+  it("unanswered の gaps も D1 へ1行ずつ入る（主理由と合わせて複数行・Issue #70）", async () => {
+    // コアの偽レコーダーで通っても、本番相当の D1 バッチ書き込みで追加欠損だけ落ちる
+    // リグレッションはここでしか検出できない
+    const body = expectUnanswered(await search({ query: "ラーメンが食べたい", areas: ["上野", "新宿"] }));
+    expect(body.gaps).toHaveLength(1);
+
+    expect(await readGapRows()).toEqual([
+      { question: "ラーメンが食べたい", area: "上野", category: undefined, reason: "insufficient_granularity" },
+      { question: "ラーメンが食べたい", area: "新宿", category: undefined, reason: "out_of_area" },
+    ]);
+  });
+
   it("部分欠損つきの answered では gaps が増える（Issue #29 の gaps を記録に落とす）", async () => {
     // AC の「answered → gaps は増えない」は #29 より前に書かれたもの。
     // 部分欠損を持つ answered まで増えないことにすると、#29 で可視化したばかりの
@@ -535,6 +639,46 @@ describe("未回答の gaps 記録", () => {
         category: undefined,
         reason: "insufficient_granularity",
       },
+    ]);
+  });
+
+  it("マナーの調査済み欠損も HTTP 経由で D1 に記録される（Issue #43・ADR-010）", async () => {
+    // 記録の頻度がデータ公開リクエストの根拠になる設計なので、永続化の回帰は本質的
+    expectUnanswered(await search({ query: "日本のマナーを知りたい" }));
+
+    expect(await readGapRows()).toEqual([
+      { question: "日本のマナーを知りたい", area: undefined, category: undefined, reason: "data_not_published" },
+    ]);
+  });
+
+  it("キーワードが当たる問いに混ざったマナー欠損も D1 に記録される（Issue #43）", async () => {
+    const body = expectAnswered(await search({ query: "上野の美術館と作法", area: "上野" }));
+    expect(body.gaps).toHaveLength(1);
+
+    expect(await readGapRows()).toEqual([
+      { question: "上野の美術館と作法", area: "上野", category: undefined, reason: "data_not_published" },
+    ]);
+  });
+
+  it("エリア・フォールバックの欠損も記録される（Issue #50）", async () => {
+    // 応答ボディに載ることは別のテストで見ている。ここは HTTP 経由で実際に D1 の行が増えるか。
+    // 記録器の組み立て漏れ（`worker/index.ts` の配線）はボディだけ見ていても通ってしまう
+    const body = expectAnswered(await search({ query: "ナイトライフ、渋谷" }));
+    expect(body.gaps).toHaveLength(1);
+
+    expect(await readGapRows()).toEqual([
+      { question: "ナイトライフ、渋谷", area: "渋谷", category: undefined, reason: "other" },
+    ]);
+  });
+
+  it("覆えなかったエリアは、応答全体のエリアではなく自分のエリアで記録される（Issue #52）", async () => {
+    // 「上野・渋谷」の応答全体のエリアは解決結果の「上野」。この行まで上野で記録すると、
+    // どのエリアに答えられなかったかが D1 から分からなくなる（それが Issue #52 の症状）
+    const body = expectAnswered(await search({ query: "上野・渋谷" }));
+    expect(body.gaps).toHaveLength(1);
+
+    expect(await readGapRows()).toEqual([
+      { question: "上野・渋谷", area: "渋谷", category: undefined, reason: "other" },
     ]);
   });
 

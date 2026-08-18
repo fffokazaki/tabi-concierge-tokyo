@@ -42,6 +42,19 @@ export interface DatasetDef {
    * めぐりん停留所は所在地列が空で地名が名称にしかないため "name" を使う。
    */
   areaFrom?: "address" | "name";
+  /**
+   * エリア継承（Issue #36）の根拠データセット。名称からエリアを判定できなかった停留所に、
+   * このデータセットの分類済み施設名が末尾一致すれば、その施設のエリアを継承する。
+   *
+   * ここ（定義側）で宣言するのは、seed.ts に生 ID を再掲すると typo・ID 変更が
+   * 「継承 0 件のまま無言で完走」になるため。`areaFrom: "name"` との両立は seed.ts が
+   * 拒否する（継承で付いたエリアがさらに継承の根拠になる連鎖を防ぐ。根拠は必ず
+   * オープンデータの住所列に着地させる）。
+   *
+   * 対象を No.1・No.2 に限定しているのは、停留所名に現れるのが観光施設名であることを
+   * 実測済みのため（銭湯名・飲食店名まで索引に入れると偶然の一致の面が広がる）。
+   */
+  areaInheritanceSource?: true;
 }
 
 export const CATALOG_BASE = "https://catalog.data.metro.tokyo.lg.jp";
@@ -59,6 +72,7 @@ export const DATASETS: DatasetDef[] = [
     sourceEncoding: "shift_jis",
     shape: "taito_legacy",
     defaultCategory: "名所・史跡",
+    areaInheritanceSource: true,
   },
   {
     no: 2,
@@ -70,6 +84,7 @@ export const DATASETS: DatasetDef[] = [
     sourceEncoding: "shift_jis",
     shape: "taito_legacy",
     defaultCategory: "文化観光施設",
+    areaInheritanceSource: true,
   },
   {
     no: 3,

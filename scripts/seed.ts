@@ -11,7 +11,7 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseCsvRecords } from "./lib/csv.ts";
-import { resolveArea, resolveAreaFromName } from "./lib/area.ts";
+import { resolveArea, resolveAreaFromName, inheritAreaFromFacility, type FacilityAreaSource } from "./lib/area.ts";
 import { isCircleYes } from "./lib/flags.ts";
 import { DATASETS, catalogUrl, type DatasetDef } from "./lib/datasets.ts";
 
@@ -25,6 +25,8 @@ interface Spot {
   lon: number | null;
   note: string;
   sourceRow: number;
+  /** エリアを他データセットの施設から継承した場合の根拠（Issue #36）。SQL コメントとログに出す */
+  areaInheritedFrom?: FacilityAreaSource;
 }
 
 /** 東京都本土の範囲。台東区の X/Y は経度・緯度の並びが自治体標準と逆のため、取り違えをここで落とす */
@@ -156,7 +158,9 @@ const errors: string[] = [];
 const stats: Record<string, { total: number; areas: Record<string, number>; geo: number }> = {};
 let totalSpots = 0;
 
-for (const def of DATASETS) {
+// 1パス目: 全データセットの Spot を生成する（SQL 出力の前に、エリア継承の索引を
+// データセット横断で作る必要があるため。Issue #36）
+const parsed = DATASETS.map((def) => {
   const csv = readFileSync(`data/${def.id}/data.csv`, "utf-8");
   const meta = JSON.parse(readFileSync(`data/${def.id}/meta.json`, "utf-8"));
   const recs = parseCsvRecords(csv);
@@ -166,7 +170,48 @@ for (const def of DATASETS) {
     const s = toSpot(def, rec, i + 1);
     if (s) spots.push(s);
   });
+  return { def, meta, recCount: recs.length, spots };
+});
 
+// エリア継承（Issue #36）: 名称からの判定が付かなかっためぐりん停留所が、住所つき
+// データセット（datasets.ts の areaInheritanceSource）で分類済みの施設名で終わるなら、
+// その施設のエリアを継承する。索引は DATASETS の定義順（No.1 名所・史跡 が先）で、
+// 同名・同エリアの根拠はこの順の先頭に決まる（inheritAreaFromFacility の契約）
+const inheritanceSources = parsed.filter(({ def }) => def.areaInheritanceSource);
+const facilityIndex: FacilityAreaSource[] = inheritanceSources.flatMap(({ def, spots }) =>
+  spots
+    .filter((s): s is Spot & { area: string } => s.area !== null)
+    .map((s) => ({ name: s.name, area: s.area, datasetTitle: def.title, sourceRow: s.sourceRow })),
+);
+
+// 継承の前提が崩れたら黙って0件で完走せず、生成を止める（座標検証と同じ機構）
+if (inheritanceSources.length === 0) {
+  errors.push("エリア継承（Issue #36）: areaInheritanceSource のデータセットが1件もない");
+}
+for (const { def, spots } of inheritanceSources) {
+  if (def.areaFrom === "name") {
+    // 継承で付いたエリアがさらに継承の根拠になる連鎖を許すと、根拠が住所列に着地しなくなる
+    errors.push(`[${def.id}] areaInheritanceSource と areaFrom: "name" は両立できない`);
+  }
+  if (!spots.some((s) => s.area !== null)) {
+    errors.push(`[${def.id}] エリア継承の根拠データセットに分類済みの施設が1件もない`);
+  }
+}
+
+const inherited: Spot[] = [];
+for (const { def, spots } of parsed) {
+  if (def.areaFrom !== "name") continue; // 住所ベースの分類は触らない（回帰させない）
+  for (const s of spots) {
+    if (s.area !== null) continue;
+    const source = inheritAreaFromFacility(s.name, facilityIndex);
+    if (!source) continue;
+    s.area = source.area;
+    s.areaInheritedFrom = source;
+    inherited.push(s);
+  }
+}
+
+for (const { def, meta, recCount, spots } of parsed) {
   // 座標の検証。1件でも範囲外なら生成を止める（黙って通すと全件がインド洋へ飛ぶ）
   for (const s of spots) {
     if (s.lat !== null && (s.lat < LAT_RANGE[0] || s.lat > LAT_RANGE[1]))
@@ -187,13 +232,19 @@ for (const def of DATASETS) {
         q(meta.resourceUrl),
         q(meta.retrievedAt),
         q(def.updateFrequency),
-        recs.length,
+        recCount,
         def.shape === "statistics" ? 0 : 1,
       ].join(", ") +
       ");",
   );
 
   for (const s of spots) {
+    if (s.areaInheritedFrom) {
+      // 継承根拠を生成物にも残す（どのデータセットのどの行から継承したか。Issue #36）
+      lines.push(
+        `-- area「${s.areaInheritedFrom.area}」は「${s.areaInheritedFrom.name}」（${s.areaInheritedFrom.datasetTitle} ${s.areaInheritedFrom.sourceRow}行目）から継承`,
+      );
+    }
     lines.push(
       `INSERT INTO spots (dataset_id, name, category, area, address, lat, lon, note, source_row) VALUES (` +
         [
@@ -227,6 +278,14 @@ writeFileSync("db/seed.generated.sql", lines.join("\n"), "utf-8");
 
 console.log("生成: db/seed.generated.sql");
 console.log(`datasets ${DATASETS.length} 件 / spots ${totalSpots} 件\n`);
+if (inherited.length) {
+  console.log(`エリア継承（Issue #36）: ${inherited.length} 件`);
+  for (const s of inherited) {
+    const src = s.areaInheritedFrom!;
+    console.log(`  ${s.name} → ${src.area}（根拠: ${src.name} / ${src.datasetTitle} ${src.sourceRow}行目）`);
+  }
+  console.log();
+}
 console.log("データセット別の内訳（エリア分類）:");
 for (const [title, s] of Object.entries(stats)) {
   const areaStr = Object.entries(s.areas)

@@ -1,11 +1,11 @@
 ---
 title: "API_REQUIREMENTS"
-version: "1.4.1"
+version: "1.5.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-16"
 updated: "2026-08-18"
-changeImpact: "low"
+changeImpact: "medium"
 ---
 
 # フロントエンドが必要とするAPI要件（プラン画面）
@@ -61,6 +61,12 @@ changeImpact: "low"
 ```
 
 > **`trip.interests` は ASCII の識別子**（`"ramen"` / `"culture"` …）になった（[Issue #17](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/17)）。`query` を組み立てるときは `src/features/plan/labels.ts` の `INTEREST_LABELS` で日本語ラベルに変換する。バックエンドのマッチは日本語の部分一致なので、識別子をそのまま繋ぐと1件も当たらない。
+
+### 🟡 提案: 構造化入力への移行（`interests` / `areas`・ADR-011）
+
+「`trip.interests` を1つの自然文にまとめて送る」という本節の前提には、**答えていない興味が沈黙する**構造上の問題がある（[Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53)。キーワードが1件でも当たると `answered` になり、興味を複数選ぶほど欠損が消える）。
+
+バックエンドは `interests?: string[]`（興味の配列・日本語ラベル）と `areas?: string[]`（目的地エリアの配列）を **optional で受け付ける**ようになった（[API.md](./API.md) §3.1・[ADR-011](../06-reference/DECISIONS.md)）。フロントエンドが `buildQuery` で畳み込む代わりに `interests: trip.interests.map(t => INTEREST_LABELS[t])` と `query: trip.notes` を分けて送れば、**答えられなかった興味が興味ごとに `gaps` に載る**。送信側の変更は Okazaki からの提案で、**Sho との合意は未了**（残作業は Issue #53 に記載）。既存の畳み込み送信も従来どおり動く。
 
 ### 提案する出力
 
@@ -240,17 +246,23 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 
 ## Changelog
 
-### [1.4.1] - 2026-08-18
+### [1.5.1] - 2026-08-18
 
 #### 修正
 
 - gaps 注記の見出し文言を「一部の興味には答えられませんでした」から「答えられなかった点があります」へ変更。エリア・フォールバックで全体が代替表示になっているケース（Issue #50・#54）だと「一部」が誤った主張になるため。`DataGapCard.tsx` の実装に合わせた
 
-### [1.4.0] - 2026-08-18
+### [1.5.0] - 2026-08-18
 
 #### 変更
 
 - §1「🔴 未合意」を「✅ 解決済み」に更新。`gaps` の画面表示は `DataGapCard`（コミット `59fe6dd`）で実装済みであることを反映し、Sho への確認3点への回答を記録した
+
+### [1.4.0] - 2026-08-18
+
+#### 追加
+
+- §1 に「🟡 提案: 構造化入力への移行（`interests` / `areas`・ADR-011）」を追加（[Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53)・[Issue #58](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/58)）。バックエンドは受け付け済み・optional。「`trip.interests` を1つの自然文にまとめて送る」前提の見直し提案で、**Sho との合意は未了**
 
 ### [1.3.0] - 2026-08-17
 

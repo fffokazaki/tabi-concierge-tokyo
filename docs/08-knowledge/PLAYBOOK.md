@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.15.0"
+version: "1.22.0"
 status: "approved"
 created: "2026-08-15"
-updated: "2026-08-17"
+updated: "2026-08-18"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 33
+ace_entry_count: 59
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -254,8 +254,124 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-39-2 | `git stash` を使った「戻して落ちるか」検証は HEAD 基準 — ベース基準で見たいなら checkout する | testing | [playbook/testing.md#ace-39-2](./playbook/testing.md#ace-39-2) |
 | ACE-40-1 | 書き込みの副作用は「読み戻すテスト」と「無効化して落ちるか」の二段で確かめる | testing | [playbook/testing.md#ace-40-1](./playbook/testing.md#ace-40-1) |
 | ACE-44-1 | 「本番から落ちる」前提を持つモジュールは、置き場所そのものが契約になっている | architecture | [playbook/architecture.md#ace-44-1](./playbook/architecture.md#ace-44-1) |
+| ACE-51-1 | ガードは「見ているフィールド」と「置かれた分岐」の両方で到達性を確かめる | architecture | [playbook/architecture.md#ace-51-1](./playbook/architecture.md#ace-51-1) |
+| ACE-51-2 | 「すべての経路で同じ」型の不変条件を破るときは、コードのコメントと設計文書を同時に grep する | documentation-quality | [playbook/documentation-quality.md#ace-51-2](./playbook/documentation-quality.md#ace-51-2) |
+| ACE-51-3 | 欠損・未回答の message には、実測で確かめたことだけを書く | architecture | [playbook/architecture.md#ace-51-3](./playbook/architecture.md#ace-51-3) |
+| ACE-51-4 | 公開 API 経由で内部関数の境界を測るテストは、入力がその関数に到達しているか確かめる | testing | [playbook/testing.md#ace-51-4](./playbook/testing.md#ace-51-4) |
+| ACE-51-5 | 自分が読まない設定ファイルの同期漏れは、それを読むモデルが見つける | process | [playbook/process.md#ace-51-5](./playbook/process.md#ace-51-5) |
+| ACE-57-1 | 「訊かれたのに答えていない」は、入力で拾い落としたものではなく出力が覆っていないもので判定する | architecture | [playbook/architecture.md#ace-57-1](./playbook/architecture.md#ace-57-1) |
+| ACE-57-2 | 「応答から記録を導出する」設計に行ごとの差分が要るなら、応答側に構造化して持たせる | architecture | [playbook/architecture.md#ace-57-2](./playbook/architecture.md#ace-57-2) |
+| ACE-57-3 | 同じ文型の入力でも、対象範囲の内か外かで過検知の倒し方は逆になる | architecture | [playbook/architecture.md#ace-57-3](./playbook/architecture.md#ace-57-3) |
+| ACE-57-4 | 対処案が併記された Issue では、案の魅力ではなく受け入れ条件が案を選ぶ | process | [playbook/process.md#ace-57-4](./playbook/process.md#ace-57-4) |
+| ACE-57-5 | レビューが挙げた反例は、真偽値ではなく応答全文を出して読む | process | [playbook/process.md#ace-57-5](./playbook/process.md#ace-57-5) |
+| ACE-62-1 | 応答の共通の書き出しも主張を運ぶ — 分岐で真偽が変わるなら使い分けて契約に書く | architecture | [playbook/architecture.md#ace-62-1](./playbook/architecture.md#ace-62-1) |
+| ACE-62-2 | 文言の嘘を直す判断をしたら、同じ言い回しを grep して姉妹分岐へ同時適用する | process | [playbook/process.md#ace-62-2](./playbook/process.md#ace-62-2) |
+| ACE-62-3 | 文言契約のテストは完全一致で固定し、到達性は副作用で確かめる | testing | [playbook/testing.md#ace-62-3](./playbook/testing.md#ace-62-3) |
+| ACE-64-1 | 名称に構造があるなら、照合は包含ではなく構造に合わせて狭める | data-processing | [playbook/data-processing.md#ace-64-1](./playbook/data-processing.md#ace-64-1) |
+| ACE-64-2 | 参照側に設定を再掲しない — 定義側のフラグ＋前提が崩れたら生成を止める | architecture | [playbook/architecture.md#ace-64-2](./playbook/architecture.md#ace-64-2) |
+| ACE-64-3 | 文書が断定した実測値は、その実測を再現するテストで固定する | documentation-quality | [playbook/documentation-quality.md#ace-64-3](./playbook/documentation-quality.md#ace-64-3) |
+| ACE-66-1 | 埋められない看板機能は、欠損の記録頻度を還元の根拠に変える（エスカレーション） | architecture | [playbook/architecture.md#ace-66-1](./playbook/architecture.md#ace-66-1) |
+| ACE-66-2 | 調査済みの断定は、調査の範囲・粒度に文言を一致させる | documentation-quality | [playbook/documentation-quality.md#ace-66-2](./playbook/documentation-quality.md#ace-66-2) |
+| ACE-69-1 | 呼び出し側が構造で持つ情報は、畳み込む前に受ける — 推測での復元はフォールバック | architecture | [playbook/architecture.md#ace-69-1](./playbook/architecture.md#ace-69-1) |
+| ACE-69-2 | 部分一致の haystack に絞り込みキーを混ぜない — 「新宿」は「宿」に当たる | data-processing | [playbook/data-processing.md#ace-69-2](./playbook/data-processing.md#ace-69-2) |
+| ACE-69-3 | 既知欠損との重複排除は、語のクラスではなく「報告された1件」との対応で畳む | architecture | [playbook/architecture.md#ace-69-3](./playbook/architecture.md#ace-69-3) |
+| ACE-69-4 | 頻度が根拠になる記録は、1リクエスト内の入力重複を正規化してから積む | data-processing | [playbook/data-processing.md#ace-69-4](./playbook/data-processing.md#ace-69-4) |
+| ACE-73-1 | 理由を1つしか運べない応答には、理由が覆っていない欠損を optional の gaps で併走させる | architecture | [playbook/architecture.md#ace-73-1](./playbook/architecture.md#ace-73-1) |
+| ACE-73-2 | message が前提にする文脈が消える場所では、その文言を使わない（載せない判断も設計） | architecture | [playbook/architecture.md#ace-73-2](./playbook/architecture.md#ace-73-2) |
+| ACE-73-3 | 生成系コマンドの失敗フォールバックに、劣化したプレースホルダを渡さない | process | [playbook/process.md#ace-73-3](./playbook/process.md#ace-73-3) |
+| ACE-74-1 | 「移動のみ」リファクタは、旧版との行単位照合で機械的に証明する | process | [playbook/process.md#ace-74-1](./playbook/process.md#ace-74-1) |
 
 ## Changelog
+
+### [1.22.0] - 2026-08-18
+
+#### 追加
+
+- ACE-73-1: 理由を1つしか運べない応答には、理由が覆っていない欠損を optional の gaps で併走させる（Issue #70 / PR #73）
+- ACE-73-2: message が前提にする文脈が消える場所では、その文言を使わない（載せない判断も設計）（Issue #70 / PR #73）
+- ACE-73-3: 生成系コマンドの失敗フォールバックに、劣化したプレースホルダを渡さない（PR #73）
+- ACE-74-1: 「移動のみ」リファクタは、旧版との行単位照合で機械的に証明する（Issue #71 / PR #74）
+
+### [1.21.0] - 2026-08-18
+
+#### 追加
+
+- ACE-69-1: 呼び出し側が構造で持つ情報は、畳み込む前に受ける — 推測での復元はフォールバック（Issue #53 #58 / PR #69 / ADR-011）
+- ACE-69-2: 部分一致の haystack に絞り込みキーを混ぜない — 「新宿」は「宿」に当たる（PR #69）
+- ACE-69-3: 既知欠損との重複排除は、語のクラスではなく「報告された1件」との対応で畳む（PR #69）
+- ACE-69-4: 頻度が根拠になる記録は、1リクエスト内の入力重複を正規化してから積む（PR #69）
+
+### [1.20.0] - 2026-08-18
+
+#### 追加
+
+- ACE-66-1: 埋められない看板機能は、欠損の記録頻度を還元の根拠に変える — エスカレーション（Issue #43 / PR #66 / ADR-010）
+- ACE-66-2: 調査済みの断定は、調査の範囲・粒度に文言を一致させる（Issue #43 / PR #66）
+
+#### カウンター更新
+
+- ACE-51-3: Helpful +1（`data_not_published` の文言を調査範囲へ絞る判断の下敷き）
+- ACE-62-3: Helpful +1（マナー欠損の message を完全一致の文言契約テストで固定）
+
+### [1.19.0] - 2026-08-18
+
+#### 追加
+
+- ACE-64-1: 名称に構造があるなら、照合は包含ではなく構造に合わせて狭める（Issue #36 / PR #64）
+- ACE-64-2: 参照側に設定を再掲しない — 定義側のフラグ＋前提が崩れたら生成を止める（Issue #36 / PR #64）
+- ACE-64-3: 文書が断定した実測値は、その実測を再現するテストで固定する（Issue #36 / PR #64）
+
+#### カウンター更新
+
+- ACE-37-1: Helpful +1（継承の照合でも括弧内の路線名を先に落とす同じ判断を再利用し、テストで固定した）
+
+### [1.18.0] - 2026-08-18
+
+#### 追加
+
+- ACE-62-1: 応答の共通の書き出しも主張を運ぶ — 分岐で真偽が変わるなら使い分けて契約に書く（Issue #59 / PR #62）
+- ACE-62-2: 文言の嘘を直す判断をしたら、同じ言い回しを grep して姉妹分岐へ同時適用する（Issue #59 / PR #62。取り残しは2回起きた）
+- ACE-62-3: 文言契約のテストは完全一致で固定し、到達性は副作用で確かめる（Issue #59 / PR #62）
+
+#### カウンター更新
+
+- ACE-51-1: Helpful +1（レビューが末尾フォールバックの到達性を数え上げて Warning を確定した根拠）
+- ACE-51-3: Helpful +1（分類ガード・末尾フォールバックの文言を「実際に照合した集合の記述」へ直す判断の下敷き）
+- ACE-51-4: Helpful +1（否定アサートの判別力が他分岐の文言に依存していた指摘の根拠）
+
+### [1.17.0] - 2026-08-18
+
+#### 追加
+
+- ACE-57-1: 「訊かれたのに答えていない」は、入力で拾い落としたものではなく出力が覆っていないもので判定する（Issue #52 / PR #57）
+- ACE-57-2: 「応答から記録を導出する」設計に行ごとの差分が要るなら、応答側に構造化して持たせる（Issue #52 / PR #57）
+- ACE-57-3: 同じ文型の入力でも、対象範囲の内か外かで過検知の倒し方は逆になる（Issue #52 / PR #57。別 Issue #58 に分離）
+- ACE-57-4: 対処案が併記された Issue では、案の魅力ではなく受け入れ条件が案を選ぶ（Issue #52 / PR #57）
+- ACE-57-5: レビューが挙げた反例は、真偽値ではなく応答全文を出して読む（Issue #52 / PR #57。別 Issue #59 の発見経路）
+
+#### カウンター更新
+
+- ACE-39-1: Helpful +1（判定を広げると誤検知の性質が変わる件。代表エリアの過検知をどちらへ倒すかの下敷きにした）
+- ACE-51-2: Helpful +1（「この経路の gaps は必ず1件」を撤回する際、コードのコメントと API.md を同時に grep して直した）
+- ACE-51-3: Helpful +1（取り落ちの message で「該当するオープンデータがありません」を使わない判断に再利用）
+
+### [1.16.0] - 2026-08-18
+
+#### 追加
+
+- ACE-51-1: ガードは「見ているフィールド」と「置かれた分岐」の両方で到達性を確かめる（Issue #50 / PR #51）
+- ACE-51-2: 「すべての経路で同じ」型の不変条件を破るときは、コードのコメントと設計文書を同時に grep する（Issue #50 / PR #51）
+- ACE-51-3: 欠損・未回答の message には、実測で確かめたことだけを書く（Issue #50 / PR #51）
+- ACE-51-4: 公開 API 経由で内部関数の境界を測るテストは、入力がその関数に到達しているか確かめる（Issue #50 / PR #51）
+- ACE-51-5: 自分が読まない設定ファイルの同期漏れは、それを読むモデルが見つける（Issue #50 / PR #51。PR #49 のレビュー中に判明）
+
+#### カウンター更新
+
+- ACE-28-1: Helpful +1（出典つきフォールバックが誤答の説得力を上げる、を `search_datasets` 側でも踏んだ）
+- ACE-28-2: Helpful +1（修正を戻して新規テストが落ちることを確認する手順を実行した）
+- ACE-28-3: Helpful +1（銭湯のキーワード「夜」が「夜遊び」に部分一致してガードを無効化していた）
+- ACE-39-1: Helpful +1（判定を広げると過検知の性質が変わる、を区切り記号の網羅で踏んだ）
+
 
 ### [1.15.0] - 2026-08-17
 
