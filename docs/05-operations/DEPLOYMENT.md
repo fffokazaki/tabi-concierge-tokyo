@@ -1,6 +1,6 @@
 ---
 title: "DEPLOYMENT"
-version: "1.4.5"
+version: "1.4.6"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -205,6 +205,7 @@ npm run deploy  # vite build → wrangler deploy
 
 | 日時 | Version ID | 内容 | 確認 |
 | --- | --- | --- | --- |
+| 2026-08-18 | `f4a09425-4bb5-4988-856a-ee4ed554af3a` | マナー・作法の問いを調査済み欠損（`data_not_published`）としてデータ公開リクエストへ還元（#43 / PR #66 / ADR-010）。`worker/core/operations.ts` のみの変更で、`migrations/` は未変更のためマイグレーション・シードは実行していない | 下記チェックリスト全項目 OK。加えて `POST /api/search-datasets` にマナー単独（`{"query":"日本のマナーを知りたい"}`）と混在（`{"query":"上野の美術館と作法"}`）を投げ、前者が `data_not_published` の全体応答・後者が `answered` ＋ `gaps` 添付で返ること、**本番 D1 の `gaps` に両方の `data_not_published` 行が入ること**を確認。伝播直後の1回目は旧版が応答した（`other` の記録が1行残っており、旧版でも記録自体は動いていた） |
 | 2026-08-18 | （Worker 未変更・`npm run db:seed` のみ） | めぐりん停留所の施設名からのエリア継承（#36 / PR #64）。`scripts/` の変更で spots 3 件の `area` が変わるためリモート D1 へ再シード。`migrations/` 未変更のため migrate は実行せず、`worker/` 未変更のため deploy も実行していない | リモート D1 を実測: めぐりんのエリア別件数が 上野 18・浅草 14・判定不能 40（継承前は 上野 15・判定不能 43）、総 `spots` 1,645 件・`gaps` 17 行が保持されていることを確認 |
 | 2026-08-18 | `93877284-fa41-4c66-934c-e8ca9d817a20` | 分類指定の空振り・最後のフォールバックの `message` を「実際に照合した集合の記述」へ変更（#59 / PR #62）。`worker/core/operations.ts` のみの変更で、`migrations/` は未変更のためマイグレーション・シードは実行していない | 下記チェックリスト全項目 OK。加えて `POST /api/search-datasets` に `{"query":"上野","category":"公園"}`（分類ガード）と `{"query":"演劇"}`（最後のフォールバック）を投げ、両分岐とも新文言（「見つかりませんでした」書き出し・断定なし）で返ること、**および本番 D1 の `gaps` に `上野/公園/other` と `演劇/null/other` の行が入ること**を確認。伝播待ちは不要だった（1回目で新版が応答） |
 | 2026-08-18 | `e227f4bd-27d1-4cb9-bbc8-bd5836dc4c89` | 訊かれたエリアの取り落ちを欠損として残す修正（#52 / PR #57）。`worker/core/operations.ts` と `shared/core.ts` の変更で、`migrations/` は未変更のためマイグレーション・シードは実行していない | 下記チェックリスト全項目 OK（`spots` 1,645 件も確認）。加えて `POST /api/search-datasets` に `{"query":"上野・渋谷"}` を投げ、応答の `gaps` に `area: "渋谷"` が載ること、**および本番 D1 の `gaps` に `上野・渋谷 / 渋谷 / other` の行が入ること**を確認。伝播待ちは不要だった（1回目で新版が応答） |
@@ -398,6 +399,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.4.6] - 2026-08-18
+
+#### 追加
+
+- §3「デプロイ記録」に 2026-08-18 の反映（Version ID `f4a09425-4bb5-4988-856a-ee4ed554af3a`）を追記。Issue #43 / PR #66（ADR-010・マナーのエスカレーション）の `worker/` 変更を §3「いつデプロイするか」の契機に従って反映した
 
 ### [1.4.5] - 2026-08-18
 
