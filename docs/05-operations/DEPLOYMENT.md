@@ -1,11 +1,11 @@
 ---
 title: "DEPLOYMENT"
-version: "1.4.9"
+version: "1.4.10"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-18"
-changeImpact: "high"
+changeImpact: "low"
 ---
 
 # DEPLOYMENT.md - デプロイメント・運用ガイド
@@ -205,6 +205,7 @@ npm run deploy  # vite build → wrangler deploy
 
 | 日時 | Version ID | 内容 | 確認 |
 | --- | --- | --- | --- |
+| 2026-08-18 | `bc0c7593-5bd5-4c40-84e1-0d13157d257f` | `aggregate_dataset` の `query` に行の選定根拠と「intent の内容との照合はしていない」を明記（#78 / PR #79）。`worker/core/operations.ts` のみの変更で、`migrations/` は未変更のためマイグレーション・シードは実行していない | チェックリスト4項目 OK（health の runtime / SPA 200 / showcase 200 / api 404）。加えて `POST /api/aggregate-dataset` に無エリア（`寺社を1件`）と浅草指定（`浅草の寺社を1件`）を投げ、両経路の `query` に新しい選定根拠と未照合の明記が載ること、浅草側の行番号（27行目）と選定根拠が同じ sample から出ていることを確認。`search_datasets` の疎通も確認。伝播直後の1回目は旧版が応答し、約20秒後の再実行で新版を確認した。**本番 D1 の実測は行っていない** — `gaps` の記録経路は本変更で触れておらず（`answered` は記録対象外のまま）、テストで担保 |
 | 2026-08-18 | `8553395f-a161-4fda-87e6-1274b2c708a8` | プラン画面のペース別表示件数とデータギャップ表示（PR #49）。**`src/` のみの変更**だが、フロントエンドはデプロイしないと画面に出ないためデプロイ（§3「いつデプロイするか」）。`worker/` `shared/` `migrations/` は未変更のため、マイグレーション・シードは実行していない | `/api/health` OK。`index.html` が新バンドル（`assets/index-C6r66paK.js`）を指し、ローカルビルドとハッシュ一致。バンドル内に #54 の見出し「答えられなかった点があります」と、表示上限の注記「〜件を伏せています」が含まれることを確認 |
 | 2026-08-18 | `5b6f5f35-428f-4670-a81b-29d442fc58a4` | `operations.ts` を `search-gaps.ts` と分割（#71 / PR #74・挙動変更なしの移動のみ）。`worker/` の変更のためデプロイ。`migrations/` 未変更のためマイグレーション・シードは実行していない | `/api/health` OK。#70 の代表入力（`{"interests":["ラーメン"],"areas":["上野","新宿"]}`）が分割前と同一応答（`insufficient_granularity` + gaps 新宿）であることを確認 |
 | 2026-08-18 | `d6afba6e-1451-4499-b00f-db06bf82d02c` | `unanswered` 応答に `gaps` を追加（#70 / PR #73）。`worker/` と `shared/core.ts` の変更のためデプロイ。`migrations/` 未変更のためマイグレーション・シードは実行していない | `/api/health` OK。`{"query":"","interests":["ラーメン"],"areas":["上野","新宿"]}` が `unanswered(insufficient_granularity)` + `gaps` に新宿（`out_of_area`・`area` 付き）で返ることを確認（本番 D1 への記録経路は同一実装のためテストで担保） |
@@ -403,6 +404,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.4.10] - 2026-08-18
+
+#### 追加
+
+- §3「デプロイ記録」に 2026-08-18 の反映（Version ID `bc0c7593-5bd5-4c40-84e1-0d13157d257f`）を追記。Issue #78 / PR #79 の `worker/` 変更を §3「いつデプロイするか」の契機に従って反映した。確認欄には実施した範囲だけを書き、本番 D1 の実測を行っていないことと理由（記録経路に変更なし）を明記した
 
 ### [1.4.9] - 2026-08-18
 
