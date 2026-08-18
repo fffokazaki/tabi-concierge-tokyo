@@ -50,7 +50,9 @@ describe("searchDatasets（直接呼び出し）", () => {
  * **渋谷だけの問題ではない**ので、収録データセットが8件ある上野・浅草も見る（渋谷は1件）。
  *
  * **この手当てが効くのは「キーワードが1件も当たらなかった」経路だけ**。1件でも当たると
- * キーワード経路で `answered` になり、答えていない興味は残らない（Issue #53・未修正）。
+ * キーワード経路で `answered` になり、`query` に畳み込まれた興味の取り落ちは残らない。
+ * 興味の取り落ちを報告できるのは構造化入力 `interests` を送った呼び出し（Issue #53／ADR-011。
+ * 下の「構造化入力: interests」を参照）。
  * ここのテストが渋谷で通るのは、渋谷を収録するのが都市公園1件だけで、「夜遊び」に部分一致する
  * 銭湯（キーワードに「夜」）が `inArea` から外れるため。判定が正しいからではない。
  */
@@ -240,11 +242,13 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
     ]);
   });
 
-  it("出発地として書かれた代表エリアも欠損として報告する（過検知の側に倒す）", async () => {
+  it("query だけの呼び出しでは、出発地として書かれた代表エリアも欠損として報告する（過検知の側に倒す）", async () => {
     // 「渋谷から上野の美術館へ」の渋谷は出発地かもしれないが、渋谷は POC の対象エリアなので
     // 「渋谷のデータも欲しい」の可能性が残る。対象エリア外の新宿（そもそも答えられない）とは
-    // 事情が違うため、Issue #29 と逆に過検知の側へ倒す。区別には質問文を構造化して受ける
-    // 入口が要るので Issue #58 に分けた。倒す向きを明示するためにテストで固定しておく
+    // 事情が違うため、Issue #29 と逆に過検知の側へ倒す。質問文の形だけでは出発地と目的地を
+    // 見分けられないため、これは Issue #58 で**確定した仕様** — 区別を知っている呼び出し側は
+    // `areas`（構造化入力）で目的地を明示する（下の「構造化入力: areas」を参照）。
+    // 質問文からの抽出は Step 5 の LLM 側の仕事
     const recorder = capturingGapRecorder();
     const output = await searchDatasets({ query: "渋谷から上野の美術館へ行きたい" }, recorder);
 
@@ -272,6 +276,170 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
 
     expect(expectAnswered(output).gaps).toBeUndefined();
     expect(recorder.records).toEqual([]);
+  });
+});
+
+/**
+ * 構造化入力 `areas`（Issue #58／ADR-011）。
+ *
+ * 質問文の形だけでは「渋谷から〜」（出発地）と「渋谷を回りたい」（目的地）を見分けられない。
+ * 区別を知っているのは呼び出し側なので、目的地の配列を畳み込む前の形で受け、
+ * `areas` があるときは質問文からのエリア推測を行わない。
+ */
+describe("構造化入力: areas（訊かれた目的地）", () => {
+  it("出発地として質問文に書かれた代表エリアを、欠損として報告しない", async () => {
+    // query だけなら渋谷が過検知される質問（上のテスト）。目的地を areas で明示すれば、
+    // 出発地の渋谷は「訊かれた」に数えられない
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "渋谷から上野の美術館へ行きたい", areas: ["上野"] }, recorder);
+
+    expect(expectAnswered(output).gaps).toBeUndefined();
+    expect(recorder.records).toEqual([]);
+  });
+
+  it("複数の目的地のうち、候補が覆っていないものは従来どおり欠損にする", async () => {
+    // areas は過検知を消すための入力であって、取り落ちの報告（Issue #52）を消す入力ではない
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "美術館を回りたい", areas: ["上野", "渋谷"] }, recorder);
+
+    const body = expectAnswered(output);
+    expect(body.gaps).toHaveLength(1);
+    expect(body.gaps?.[0].area).toBe("渋谷");
+    expect(recorder.records).toEqual([
+      { question: "美術館を回りたい", area: "渋谷", category: undefined, reason: "other" },
+    ]);
+  });
+
+  it("空配列は「目的地なし」の明示で、質問文からの推測に落とさない", async () => {
+    // 未指定（undefined）なら質問文から渋谷・上野を拾う質問。空配列は「推測しないでほしい」
+    // という意思表示なので、どちらのエリアも「訊かれた」に数えない
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "渋谷から上野の美術館へ行きたい", areas: [] }, recorder);
+
+    expect(expectAnswered(output).gaps).toBeUndefined();
+    expect(recorder.records).toEqual([]);
+  });
+
+  it("目的地と明示された対象エリア外は、欠損として報告する", async () => {
+    // 質問文から拾った対象エリア外は出発地と見分けられないので報告しない（Issue #29）が、
+    // areas に入れた地名は呼び出し側が目的地だと言っている。報告しないと新宿だけが黙って消える
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "美術館を回りたい", areas: ["上野", "新宿"] }, recorder);
+
+    const body = expectAnswered(output);
+    expect(body.gaps).toHaveLength(1);
+    expect(body.gaps?.[0].reason).toBe("out_of_area");
+    expect(body.gaps?.[0].area).toBe("新宿");
+    expect(recorder.records).toEqual([
+      { question: "美術館を回りたい", area: "新宿", category: undefined, reason: "out_of_area" },
+    ]);
+  });
+
+  it("代表エリアが1つも無ければ、応答全体を out_of_area で返す", async () => {
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "美術館を回りたい", areas: ["新宿"] }, recorder);
+
+    expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    expect(output.reason).toBe("out_of_area");
+    expect(output.message).toContain("新宿");
+    expect(recorder.records).toEqual([
+      { question: "美術館を回りたい", area: "新宿", category: undefined, reason: "out_of_area" },
+    ]);
+  });
+
+  it("絞り込みに使うのは areas の最初の代表エリア（呼び出し側の並び順を尊重する）", async () => {
+    // 質問文推測の「定義順（上野→浅草→渋谷）」と違い、構造化入力は並び順に意図があるとみなす
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "公園", areas: ["渋谷", "上野"] }, recorder);
+
+    const body = expectAnswered(output);
+    // 渋谷で絞り込むので、先頭は渋谷区の都市公園（上野なら台東区のデータセットが来る）
+    expect(body.candidates[0].title).toContain("都市公園");
+  });
+});
+
+/**
+ * 構造化入力 `interests`（Issue #53／ADR-011）。
+ *
+ * 興味を自然文（`query`）に畳み込むと、キーワードが1件でも当たった時点で `answered` になり、
+ * 答えていない興味は応答のどこにも残らない。畳み込む前の配列で受ければ、興味ごとに
+ * 「返した候補が覆っているか」を判定できる。判定は既存のキーワード表との照合だけで、
+ * 自然文の分解（形態素解析）はスタブに持ち込まない。
+ */
+describe("構造化入力: interests（訊かれた興味）", () => {
+  it("キーワードが当たった経路でも、覆えなかった興味を gaps に載せて記録する", async () => {
+    // 「夜遊び」に銭湯のキーワード「夜」が部分一致して answered になる質問（Issue #53 の実測）。
+    // query に畳み込むと沈黙するが、interests で送れば「ナイトライフに答えていない」が残る
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "上野で夜遊びしたい", interests: ["ナイトライフ"] }, recorder);
+
+    const body = expectAnswered(output);
+    expect(body.gaps).toHaveLength(1);
+    expect(body.gaps?.[0].reason).toBe("other");
+    expect(body.gaps?.[0].message).toContain("ナイトライフ");
+    expect(recorder.records).toEqual([
+      { question: "ナイトライフ、上野で夜遊びしたい", area: "上野", category: undefined, reason: "other" },
+    ]);
+  });
+
+  it("答えられた興味と答えられなかった興味を区別して返す", async () => {
+    // 「文化」は文化観光施設のキーワードに当たるが、「ショッピング」はどのキーワードにも
+    // 当たらない。query 無し・興味チップだけの呼び出し（境界は interests があれば query を
+    // 省略できる）
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "", interests: ["ショッピング", "文化"] }, recorder);
+
+    const body = expectAnswered(output);
+    expect(body.gaps).toHaveLength(1);
+    expect(body.gaps?.[0].message).toContain("ショッピング");
+    expect(body.gaps?.[0].message).not.toContain("文化");
+    expect(recorder.records).toEqual([
+      { question: "ショッピング、文化", area: undefined, category: undefined, reason: "other" },
+    ]);
+  });
+
+  it("すべての興味に答えられていれば、ノイズになる欠損を足さない", async () => {
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "上野の美術館", interests: ["文化"] }, recorder);
+
+    expect(expectAnswered(output).gaps).toBeUndefined();
+    expect(recorder.records).toEqual([]);
+  });
+
+  it("ジャンル指定の飲食の興味は、粒度不足の欠損と二重に報告しない", async () => {
+    // 「ラーメン」は collectPartialGaps が insufficient_granularity で報告済み。
+    // 興味の取り落ちとしても載せると、同じ欠損が2件になり記録も二重に積まれる
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "浅草の寺", interests: ["ラーメン"] }, recorder);
+
+    const body = expectAnswered(output);
+    expect(body.gaps).toHaveLength(1);
+    expect(body.gaps?.[0].reason).toBe("insufficient_granularity");
+  });
+
+  it("マナー・作法の興味は、調査済み欠損と二重に報告しない", async () => {
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "上野の美術館", interests: ["マナー"] }, recorder);
+
+    const body = expectAnswered(output);
+    expect(body.gaps).toHaveLength(1);
+    expect(body.gaps?.[0].reason).toBe("data_not_published");
+  });
+
+  it("エリア・フォールバックに落ちても、興味ごとの欠損が載る", async () => {
+    // 渋谷×ナイトライフはキーワードが1件も当たらない（都市公園のみ）。従来の
+    // 「質問文の語に当たるデータセットが無かった」という総括ではなく、どの興味に
+    // 答えていないかが興味単位で残る
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "", interests: ["ナイトライフ"], areas: ["渋谷"] }, recorder);
+
+    const body = expectAnswered(output);
+    expect(body.gaps).toHaveLength(1);
+    expect(body.gaps?.[0].message).toContain("ナイトライフ");
+    expect(recorder.records).toEqual([
+      { question: "ナイトライフ", area: "渋谷", category: undefined, reason: "other" },
+    ]);
   });
 });
 
