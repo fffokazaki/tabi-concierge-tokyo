@@ -519,6 +519,30 @@ describe("aggregateDataset（直接呼び出し）", () => {
 
     expect(output.status).toBe("unanswered");
   });
+
+  it("エリア無指定の answered は、先頭行という選定根拠を query に明記する（Issue #78）", async () => {
+    const output = await aggregateDataset({ datasetId: MEISHO_ID, intent: "寺社を1件" }, capturingGapRecorder());
+
+    expect(output.status).toBe("answered");
+    if (output.status !== "answered") return;
+    expect(output.query).toContain("エリア無指定のため先頭行");
+  });
+
+  it("answered の query は経路によらず、intent の内容と照合していないことを明記する（Issue #78）", async () => {
+    // エリアで絞った行も「内容が合うか」は見ていない。無指定経路だけに明記すると、
+    // エリア指定ありの応答が対比で「照合済み」に見えてしまう
+    const noArea = await aggregateDataset({ datasetId: MEISHO_ID, intent: "寺社を1件" }, capturingGapRecorder());
+    const withArea = await aggregateDataset(
+      { datasetId: MEISHO_ID, intent: "上野の寺社を1件" },
+      capturingGapRecorder(),
+    );
+
+    for (const output of [noArea, withArea]) {
+      expect(output.status).toBe("answered");
+      if (output.status !== "answered") return;
+      expect(output.query).toContain("intent の内容との照合はしていない");
+    }
+  });
 });
 
 describe("getProvenance（直接呼び出し）", () => {

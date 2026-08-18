@@ -385,11 +385,15 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
  * 出典に添える「実行したクエリ」。
  *
  * スタブは SQL を実行していないので、SQL 風の文字列を返すと「実行した」という嘘になる。
- * 実際に行ったこと（どのスナップショットの何行目を固定で返したか）をそのまま書く。
+ * 実際に行ったこと（どのスナップショットの何行目を、どう選んで固定で返したか）をそのまま書く。
  * 行番号はヘッダを除いたデータ行の番号なので、辿る人が1行ずれないよう出力にも明記する。
+ *
+ * 「intent の内容との照合はしていない」は選定根拠の側ではなくここに置く。スタブの抽出は
+ * どの経路でも内容を照合していない（エリアで絞るだけ）ので、経路ごとの書き分けに任せると
+ * 書き漏れた経路が「照合済み」に見えてしまう（Issue #78）。
  */
-const describeQuery = (entry: CatalogEntry, sample: CatalogSample): string =>
-  `固定データ抽出（スタブ）: data/${entry.datasetId}/data.csv（${entry.retrievedAt} 取得・全${entry.rowCount}行）のヘッダを除く ${sample.sourceRow} 行目。Step 5 で Text-to-SQL に置き換える。`;
+const describeQuery = (entry: CatalogEntry, sample: CatalogSample, selection: string): string =>
+  `固定データ抽出（スタブ）: data/${entry.datasetId}/data.csv（${entry.retrievedAt} 取得・全${entry.rowCount}行）のヘッダを除く ${sample.sourceRow} 行目（${selection}。intent の内容との照合はしていない）。Step 5 で Text-to-SQL に置き換える。`;
 
 /**
  * 集計・抽出。固定データから1件を返す。
@@ -451,17 +455,20 @@ function computeAggregateDataset(input: AggregateDatasetInput): AggregateDataset
     );
   }
 
-  const extracted = (sample: CatalogSample): AggregateDatasetOutput => ({
+  const extracted = (sample: CatalogSample, selection: string): AggregateDatasetOutput => ({
     status: "answered",
     result: { name: sample.name, summary: sample.summary },
-    query: describeQuery(entry, sample),
+    query: describeQuery(entry, sample, selection),
   });
 
   const intendedArea = findRepresentativeArea(input.intent);
-  if (!intendedArea) return extracted(entry.samples[0]);
+  // エリア無指定は先頭行を代表として返す（スタブ）。返す行に intent との適合根拠が無い
+  // ことは describeQuery が query に明記する（Issue #78。#50 と同じく、検証していない
+  // ものを検証済みに見せない）。内容適合そのものは Step 5（Issue #32）で解消する
+  if (!intendedArea) return extracted(entry.samples[0], "エリア無指定のため先頭行");
 
   const sample = entry.samples.find((candidate) => candidate.area === intendedArea);
-  if (sample) return extracted(sample);
+  if (sample) return extracted(sample, `「${intendedArea}」の行のうち最初の1件`);
 
   return entry.areas.includes(intendedArea)
     ? // `areas` にあるのに固定データが無い ＝ スタブ側の欠落。データそのものの欠損と混ぜない

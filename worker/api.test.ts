@@ -392,6 +392,8 @@ describe("POST /api/aggregate-dataset", () => {
     // 実行クエリは省略不可（API.md §4）。どのスナップショットの何行目かを辿れること
     expect(body.query).toContain(MEISHO.datasetId);
     expect(body.query).toContain("ヘッダを除く 3 行目");
+    // 行の選定根拠も query から辿れること（Issue #78）
+    expect(body.query).toContain("「上野」の行のうち最初の1件");
   });
 
   it("集計意図のエリアで返す行が変わる", async () => {
@@ -425,6 +427,9 @@ describe("POST /api/aggregate-dataset", () => {
   it("エリアの指定が無ければ先頭の固定データを返す", async () => {
     const body = expectAnswered(await aggregate({ datasetId: MEISHO.datasetId, intent: "寺社を1件" }));
     expect(body.result.name).toBe("寛永寺");
+    // 先頭行は intent と照合して選ばれたわけではない。その事実が query から読めること（Issue #78）
+    expect(body.query).toContain("エリア無指定のため先頭行");
+    expect(body.query).toContain("intent の内容との照合はしていない");
   });
 
   it("クロス集計表からは地物を抽出できないので unanswered を返す", async () => {

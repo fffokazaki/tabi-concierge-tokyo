@@ -1,11 +1,11 @@
 ---
 title: "API"
-version: "1.6.0"
+version: "1.6.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-18"
-changeImpact: "medium"
+changeImpact: "low"
 ---
 
 # API.md - API設計書（フロントエンド ↔ バックエンド `/api/*`）
@@ -131,7 +131,7 @@ changeImpact: "medium"
 - **過検知した分も `gaps` テーブルに積まれる。** `"上野に行きたい"` `"渋谷区"` `"上野駅"` `"浅草周辺"` はいずれも残余が残るため欠損が1件付き、D1 に `other` の行が入る。実際にはエリアの一覧が答えである問いなので、**[DOMAIN.md](./DOMAIN.md) §7 の集計では `other` を額面どおり読めない**（データ公開リクエストへの還元時に差し引く必要がある）。`message` が「質問文の語に当たるデータセットが無かった」＝実際に行ったことしか書いていないので、応答そのものは嘘にならない
 - **この経路の行を他の `other` と区別する列は無い。** `gaps` の列は `question` / `area` / `category` / `reason` / `created_at` だけで、`other` の産出元は他にもある（分類の空振り・最終フォールバック・`aggregate_dataset` の未知 ID とスタブの行欠落・`get_provenance` の未知 ID）。この経路の行は `reason = 'other' AND area IS NOT NULL AND category IS NULL` で概ね取り出せるが、**`aggregate_dataset` の `other` と混ざる**（プランの主経路では `intent` に同じ `query` を渡すので `question` も `area` も一致する）。分離が必要になった時点で `reason` の細分＝マイグレーションが要る
 - **残余は判定にのみ使い、`message` には埋め込まない。** フロントエンドは興味ラベルと自由文を「、」で連結して送るため（[API_REQUIREMENTS.md](./API_REQUIREMENTS.md) §1）、残余は `"ナイトライフ、で夜遊びしたい"` のような壊れた文字列になる。欠損を可視化するための文が、新たな意味不明な文字列の出所になってはいけない
-- **`aggregate_dataset` はこの経路の候補でも質問文との適合を見ない**（エリア指定があればその行に絞るだけ）。したがって欠損を添えても、旅程には無関係な地物が出典つきで載る。Step 5（Text-to-SQL 化）で候補の妥当性そのものを直す対象
+- **`aggregate_dataset` はこの経路の候補でも質問文との適合を見ない**（エリア指定があればその行に絞るだけ）。したがって欠損を添えても、旅程には無関係な地物が出典つきで載る。Step 5（Text-to-SQL 化）で候補の妥当性そのものを直す対象。照合していない事実は応答の `query` に明記される（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)・§3.2）
 - **複数の代表エリアはこの判定では拾えない。** `"上野・渋谷"` はどちらもエリア名なので残余が空になり、この経路は「エリアだけの質問」と答える。それは正しい（内容は訊かれていない）が、渋谷に答えていないことは別の判定が見る（下記「訊かれたエリアの取り落ち」・[Issue #52](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/52)）
 - **この手当てが効くのは「キーワードが1件も当たらなかった」経路だけ**。1件でも当たるとキーワード経路で `answered` になり、`query` に畳み込まれた興味の取り落ちは残らない。`"ナイトライフ、上野で夜遊びしたい"` は銭湯のキーワード「夜」が「夜遊び」に部分一致するため `gaps` なしで銭湯を返す（渋谷で効くのは、渋谷を収録するのが都市公園1件だけで銭湯が候補集合から外れるためで、判定が正しいからではない）。**興味チップを複数選ぶほど何かが当たるので、実際に旅程が組み上がるケースほど発火しない** — この非対称の解消が構造化入力 `interests`（[Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53)／ADR-011）で、興味を畳み込む前の配列で送ればキーワード経路でも興味ごとの取り落ちが載る（上記「部分欠損」）。フロントエンドの送信側対応は未着手（Issue #53 に残作業として記載）
 
@@ -181,8 +181,9 @@ query="上野・渋谷"（修正前）
 | 出力（回答あり） | `{ status: "answered", result: { name, summary }, query: string }` |
 | 出力（回答なし） | `{ status: "unanswered", reason, message }` |
 | 出力語彙 | `result` は **`name` / `summary` の汎用語彙**（設計原則4）。`Stop.place` / `Stop.note` へのマッピングはフロントエンド側の責務（2026-08-17 合意） |
-| `query` | 実行したクエリ。**省略不可**（§4）。スタブは SQL を実行していないため、SQL 風の文字列ではなく「どのスナップショットのヘッダを除く何行目を固定で返したか」を記録する |
+| `query` | 実行したクエリ。**省略不可**（§4）。スタブは SQL を実行していないため、SQL 風の文字列ではなく「どのスナップショットのヘッダを除く何行目を、どう選んで固定で返したか」を記録する。行の選定根拠（エリアで絞った最初の1件 / エリア無指定のため先頭行）と、**intent の内容との照合はしていない**ことを必ず含む（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)） |
 | `intent` のエリア | **指定されたエリアの地物しか返さない。** 一致する行が無ければ `unanswered`（そのデータセットが当該エリアを収録していなければ `data_not_published`）。対象エリア外の地名は `search_datasets` と同じく `out_of_area`。別エリアの行で代替すると、本物の出典がついた誤答になる |
+| `intent` にエリアが無い場合 | 先頭の固定行を代表として返す。**intent の内容との照合はどの経路でも行っていない**（内容側のガードは飲食店データセットへのジャンル指定のみ）。選定が収録順に依存する事実は `query` に明記して読み取れるようにする（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)）。内容適合そのものは Step 5（[Issue #32](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/32)・Text-to-SQL）で解消する |
 | 未確定 | 対応する集計操作の範囲（Step 5 で確定）、`result` に集計値そのもの（件数・平均等）を載せる形 |
 
 ### 3.3 `get_provenance` — 出典取得（`POST /api/provenance`・確定）
@@ -314,6 +315,12 @@ query="上野・渋谷"（修正前）
 - **サンドボックス環境**: 未定
 
 ## Changelog
+
+### [1.6.1] - 2026-08-18
+
+#### 変更
+
+- §3.2 に「`intent` にエリアが無い場合」の行を追加（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)）。先頭の固定行を代表として返す挙動と、intent の内容との照合をどの経路でも行っていない事実を明記。あわせて `query` の説明に、行の選定根拠と内容未照合の明記が必ず含まれることを追記
 
 ### [1.6.0] - 2026-08-18
 
