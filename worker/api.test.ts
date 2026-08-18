@@ -568,6 +568,24 @@ describe("未回答の gaps 記録", () => {
     ]);
   });
 
+  it("マナーの調査済み欠損も HTTP 経由で D1 に記録される（Issue #43・ADR-010）", async () => {
+    // 記録の頻度がデータ公開リクエストの根拠になる設計なので、永続化の回帰は本質的
+    expectUnanswered(await search({ query: "日本のマナーを知りたい" }));
+
+    expect(await readGapRows()).toEqual([
+      { question: "日本のマナーを知りたい", area: undefined, category: undefined, reason: "data_not_published" },
+    ]);
+  });
+
+  it("キーワードが当たる問いに混ざったマナー欠損も D1 に記録される（Issue #43）", async () => {
+    const body = expectAnswered(await search({ query: "上野の美術館と作法", area: "上野" }));
+    expect(body.gaps).toHaveLength(1);
+
+    expect(await readGapRows()).toEqual([
+      { question: "上野の美術館と作法", area: "上野", category: undefined, reason: "data_not_published" },
+    ]);
+  });
+
   it("エリア・フォールバックの欠損も記録される（Issue #50）", async () => {
     // 応答ボディに載ることは別のテストで見ている。ここは HTTP 経由で実際に D1 の行が増えるか。
     // 記録器の組み立て漏れ（`worker/index.ts` の配線）はボディだけ見ていても通ってしまう
