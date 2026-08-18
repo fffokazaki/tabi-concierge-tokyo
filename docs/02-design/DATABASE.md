@@ -1,6 +1,6 @@
 ---
 title: "DATABASE"
-version: "1.4.2"
+version: "1.4.3"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -156,7 +156,7 @@ npm run db:seed              # リモートへシード投入（--remote）
 - **これは都への還元（データ公開リクエスト）の題材として、飲食店の粒度不足より強い**。「公開すると宣言されているデータのリンクが切れている」は、カタログ運用そのものへの具体的な指摘になる
 - 提出物では、マナー欄が空であることを隠さず「出典のあるマナー情報はありません」と表示している（[Issue #31](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/31)。文言は[Issue #67](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/67)で「まだ」を除き、調査済みで存在しないことが伝わる形に修正した）。**推測で埋めない**（[DOMAIN.md](./DOMAIN.md) §8 不変条件3）
 
-> **決定済み（[ADR-010](../06-reference/DECISIONS.md)・2026-08-18）**: 外部情報の引用（案B）・出典種別の型分け（案C）は**採らない**。マナー・作法の問いには調査済みの `data_not_published` を返し、記録の頻度をデータ公開リクエストの根拠にする（エスカレーション）。実装は `worker/core/operations.ts` の `etiquetteUnanswered`。
+> **決定済み（[ADR-010](../06-reference/DECISIONS.md)・2026-08-18）**: 外部情報の引用（案B）・出典種別の型分け（案C）は**採らない**。マナー・作法の問いには調査済みの `data_not_published` を返し、記録の頻度をデータ公開リクエストの根拠にする（エスカレーション）。実装は `worker/core/search-gaps.ts` の `etiquetteUnanswered`。
 
 ### 渋谷エリアの制約（2026-08-16 調査）
 
@@ -275,6 +275,12 @@ No.9「R6国・地域別外国人旅行者行動特性調査」はクロス集�
 - アクセス制御・暗号化の要件は現時点で該当なし（[CONSTRAINTS.md](../01-context/CONSTRAINTS.md) §5）
 
 ## Changelog
+
+### [1.4.3] - 2026-08-18
+
+#### 修正
+
+- ADR-010 注記の実装参照先を `worker/core/operations.ts` から `worker/core/search-gaps.ts` へ修正。#71（PR #74）で `etiquetteUnanswered` を含む語彙・エリア解決・欠損生成が同ファイルへ分離されたため（Futoshi が PR #77 のレビューで指摘）
 
 ### [1.4.2] - 2026-08-18
 
