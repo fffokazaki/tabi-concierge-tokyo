@@ -29,15 +29,6 @@ interface Spot {
   areaInheritedFrom?: FacilityAreaSource;
 }
 
-/**
- * エリア継承の根拠にする、住所を持つデータセット（Issue #36）。
- *
- * No.1 名所・史跡 / No.2 文化観光施設。停留所名に現れるのは観光施設名なので、
- * この2件で足りることを実測済み（対象を広げるのは、取りこぼしが実測で見つかってから。
- * 銭湯名・飲食店名まで索引に入れると、完全一致でも偶然の包含が起きる面が広がる）。
- */
-const AREA_INHERITANCE_SOURCE_IDS = ["t131067d0000000251", "t131067d0000000236"];
-
 /** 東京都本土の範囲。台東区の X/Y は経度・緯度の並びが自治体標準と逆のため、取り違えをここで落とす */
 const LAT_RANGE = [35.4, 35.9] as const;
 const LON_RANGE = [138.9, 139.95] as const;
@@ -182,15 +173,30 @@ const parsed = DATASETS.map((def) => {
   return { def, meta, recCount: recs.length, spots };
 });
 
-// エリア継承（Issue #36）: 名称からの判定が付かなかっためぐりん停留所に、住所つき
-// データセットで分類済みの施設名が完全一致で含まれるなら、その施設のエリアを継承する
-const facilityIndex: FacilityAreaSource[] = parsed
-  .filter(({ def }) => AREA_INHERITANCE_SOURCE_IDS.includes(def.id))
-  .flatMap(({ def, spots }) =>
-    spots
-      .filter((s) => s.area !== null)
-      .map((s) => ({ name: s.name, area: s.area as string, datasetTitle: def.title, sourceRow: s.sourceRow })),
-  );
+// エリア継承（Issue #36）: 名称からの判定が付かなかっためぐりん停留所が、住所つき
+// データセット（datasets.ts の areaInheritanceSource）で分類済みの施設名で終わるなら、
+// その施設のエリアを継承する。索引は DATASETS の定義順（No.1 名所・史跡 が先）で、
+// 同名・同エリアの根拠はこの順の先頭に決まる（inheritAreaFromFacility の契約）
+const inheritanceSources = parsed.filter(({ def }) => def.areaInheritanceSource);
+const facilityIndex: FacilityAreaSource[] = inheritanceSources.flatMap(({ def, spots }) =>
+  spots
+    .filter((s): s is Spot & { area: string } => s.area !== null)
+    .map((s) => ({ name: s.name, area: s.area, datasetTitle: def.title, sourceRow: s.sourceRow })),
+);
+
+// 継承の前提が崩れたら黙って0件で完走せず、生成を止める（座標検証と同じ機構）
+if (inheritanceSources.length === 0) {
+  errors.push("エリア継承（Issue #36）: areaInheritanceSource のデータセットが1件もない");
+}
+for (const { def, spots } of inheritanceSources) {
+  if (def.areaFrom === "name") {
+    // 継承で付いたエリアがさらに継承の根拠になる連鎖を許すと、根拠が住所列に着地しなくなる
+    errors.push(`[${def.id}] areaInheritanceSource と areaFrom: "name" は両立できない`);
+  }
+  if (!spots.some((s) => s.area !== null)) {
+    errors.push(`[${def.id}] エリア継承の根拠データセットに分類済みの施設が1件もない`);
+  }
+}
 
 const inherited: Spot[] = [];
 for (const { def, spots } of parsed) {
