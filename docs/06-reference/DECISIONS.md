@@ -1,6 +1,6 @@
 ---
 title: "DECISIONS"
-version: "1.2.0"
+version: "1.3.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -447,6 +447,56 @@ Issue #43 は選択肢を4つ挙げていた: A. カタログから探す（→ 
 
 ---
 
+## ADR-011: 「何を訊かれたか」は構造化入力で受け、質問文からの推測はフォールバックに留める
+
+### ステータス
+
+承認済み（2026-08-18）
+
+### コンテキスト
+
+`search_datasets` の欠損判定には、自然文 `query` からの推測に**構造上解けない**取り違えが2つ残っていた。
+
+- **興味の取り落ちの沈黙**（[Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53)）: フロントエンドは興味チップを1つの自然文に畳み込んで送る（`buildQuery`）。キーワードが1件でも当たると `answered` になり、答えていない興味は応答のどこにも残らない。**興味を複数選ぶほど何かが当たるので、実際に旅程が組み上がるケースほど欠損が沈黙する**
+- **出発地の過検知**（[Issue #58](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/58)）: 「渋谷から上野へ」の渋谷（出発地）と「上野と渋谷を回りたい」の渋谷（目的地）は質問文の形だけでは見分けられず、過検知の側に倒してあった
+
+どちらも解消には自然文の分解（形態素解析）が要るが、スタブに分解規則を作り込むと Step 5 で LLM が担う分解と二重になる（Issue #29 以来の方針）。
+
+### 決定
+
+1. **`search_datasets` に構造化入力 `interests?: string[]`（興味の配列）と `areas?: string[]`（目的地エリアの配列）を optional で追加する。** 呼び出し側は畳み込む前の構造化データを持っている（`trip.interests` は discrete、目的地も UI 上は選択値）ので、畳み込んでから推測で復元するのではなく、**畳み込む前の形をそのまま受ける**
+2. **`areas` があるときは質問文からのエリア推測を行わない**（空配列は「目的地なし」の明示）。`interests` は候補マッチに使い、**返した候補が覆っていない興味を1件ずつ `gaps` に載せる**。判定は既存のキーワード表との照合だけで、**形態素解析は持ち込まない**
+3. **`query` だけの呼び出しは従来どおり推測で倒したままにする**（興味の取り落ちは沈黙・出発地は過検知）。自然文からの抽出は Step 5 の LLM 側の仕事で、スタブでは解かない（Issue #58 の案(b)を query 経路のフォールバックとして採用）
+
+### 理由
+
+- **区別を知っているのは呼び出し側。** 「どれが興味でどれが目的地か」はフロントエンドが構造として持っている情報で、自然文に畳み込んだ時点で失われる。失われる前に受けるのが、推測の精度を上げるより確実
+- **optional 追加なので既存クライアントを壊さない。** フロントエンドの送信側対応（`src/`・担当合意が必要）を待たずにバックエンドを先行できる
+- **スタブに分解規則を作り込まない方針（Issue #29・#50・#53 で繰り返し確認）と両立する。** 構造化入力の照合は列挙済みのキーワード表と代表エリア名だけで済む
+
+### 影響
+
+- **ポジティブ**:
+  - 構造化して呼べば、興味の取り落とし・出発地の過検知が解消する（`/mcp` の AI クライアントは Step 5 で最初からこの形で呼べる）
+  - `gaps` テーブルの `other` の過検知分（DOMAIN.md §7 で差し引く対象）が、構造化呼び出しの普及に応じて減る
+- **ネガティブ**:
+  - フロントエンドが対応するまで、プラン画面経由の呼び出しは従来の精度のまま（Issue #53 に残作業として記載）
+  - `search_datasets` の入力が2系統（自然文／構造化）になり、仕様の説明が長くなる
+
+### AIへの指示
+
+- **必須**: 欠損判定の精度を上げたい場合、まず構造化入力で受けられないかを検討する。質問文からの推測規則（形態素解析・品詞判定・助詞の解釈）をスタブに足すのは禁止
+- **禁止**: `areas` があるのに質問文からエリアを拾うこと。`interests` の要素を分解・正規化すること
+- **参照すべきファイル**: [API.md](../02-design/API.md) §3.1（入出力の SSOT）／`worker/core/operations.ts`
+
+### 関連
+
+- [Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53)（興味の取り落としの沈黙）
+- [Issue #58](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/58)（出発地の過検知）
+- [Issue #29](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/29)・[Issue #50](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/50)・[Issue #52](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/52)（同じ根から分かれた欠損判定の系譜）
+
+---
+
 ## ADR-XXX: [タイトル]
 
 ### ステータス
@@ -531,8 +581,15 @@ AIツール（Claude Code、GitHub Copilot 等）の知識カットオフによ�
 | ADR-008 | 単一 Worker で `/api/*` と `/mcp` を二面公開 | 2026-08-15 | 承認済み | チームshiwata |
 | ADR-009 | `main` の運用保留・PoC 期間は `develop` を単一の統合ブランチに | 2026-08-17 | 承認済み | チームshiwata |
 | ADR-010 | マナー解説はカタログ外から補わず、調査済み欠損としてデータ公開リクエストへ還元 | 2026-08-18 | 承認済み | チームshiwata |
+| ADR-011 | 「何を訊かれたか」は構造化入力で受け、質問文からの推測はフォールバックに留める | 2026-08-18 | 承認済み | チームshiwata |
 
 ## Changelog
+
+### [1.3.0] - 2026-08-18
+
+#### 追加
+
+- ADR-011: 「何を訊かれたか」は構造化入力で受け、質問文からの推測はフォールバックに留める（[Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53)・[Issue #58](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/58)）。`search_datasets` に `interests` / `areas` を optional で追加し、スタブに形態素解析を持ち込まない方針を維持する
 
 ### [1.2.0] - 2026-08-18
 

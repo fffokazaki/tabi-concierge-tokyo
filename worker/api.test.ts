@@ -313,6 +313,60 @@ describe("POST /api/search-datasets", () => {
     expect((await postJson("/api/search-datasets", { query: "上野", area: 1 })).status).toBe(400);
     expect((await postJson("/api/search-datasets", { query: "上野", category: [] })).status).toBe(400);
   });
+
+  describe("構造化入力（interests / areas・ADR-011）", () => {
+    it("areas で目的地を明示すると、出発地の代表エリアが欠損に載らない（Issue #58）", async () => {
+      const body = expectAnswered(
+        await search({ query: "渋谷から上野の美術館へ行きたい", areas: ["上野"] }),
+      );
+
+      expect(body.candidates.length).toBeGreaterThan(0);
+      expect(Object.hasOwn(body, "gaps")).toBe(false);
+    });
+
+    it("interests で興味を送ると、答えていない興味が gaps に載る（Issue #53）", async () => {
+      const body = expectAnswered(
+        await search({ query: "上野で夜遊びしたい", interests: ["ナイトライフ"] }),
+      );
+
+      expect(body.gaps).toHaveLength(1);
+      expect(body.gaps?.[0].message).toContain("ナイトライフ");
+    });
+
+    it("interests があれば query を省略できる（興味チップだけの呼び出し）", async () => {
+      const body = expectAnswered(await search({ interests: ["文化"] }));
+
+      expect(body.candidates.length).toBeGreaterThan(0);
+    });
+
+    it("interests が空配列なら、query 省略は従来どおり 400", async () => {
+      expect((await postJson("/api/search-datasets", { interests: [] })).status).toBe(400);
+    });
+
+    it("area と areas の同時指定は 400（どちらを信じるかを黙って決めない）", async () => {
+      const response = await postJson("/api/search-datasets", {
+        query: "美術館",
+        area: "上野",
+        areas: ["上野"],
+      });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({ error: "invalid_request" });
+    });
+
+    it("interests・areas の型違い・空文字の要素は 400 を返す", async () => {
+      expect((await postJson("/api/search-datasets", { query: "上野", interests: "文化" })).status).toBe(400);
+      expect((await postJson("/api/search-datasets", { query: "上野", interests: [1] })).status).toBe(400);
+      expect((await postJson("/api/search-datasets", { query: "上野", areas: ["  "] })).status).toBe(400);
+    });
+
+    it("配列の上限（20件・要素100文字）を超えたら 400 を返す（黙って切り詰めない）", async () => {
+      // 要素数ぶんの欠損が gaps テーブルへ記録されるため、認証なしの公開 API で無制限に受けない
+      const tooMany = Array.from({ length: 21 }, (_, i) => `興味${i}`);
+      expect((await postJson("/api/search-datasets", { query: "上野", interests: tooMany })).status).toBe(400);
+      expect((await postJson("/api/search-datasets", { query: "上野", areas: ["あ".repeat(101)] })).status).toBe(400);
+    });
+  });
 });
 
 describe("POST /api/aggregate-dataset", () => {
