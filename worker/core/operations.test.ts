@@ -558,18 +558,69 @@ describe("構造化入力: interests（訊かれた興味）", () => {
     ]);
   });
 
-  it("unanswered の早期 return では、構造化入力由来の欠損が記録に残らない（既知の制限・Issue #70）", async () => {
-    // ジャンル判定が unanswered を返すと、目的地と明示された新宿の out_of_area は
-    // 応答にも記録にも残らない（unanswered は理由を1つしか運べない）。この取りこぼしは
-    // Issue #70 で扱う。ここでは現挙動を固定し、#70 の対応時にこのテストを書き換える
+  it("unanswered の早期 return でも、areas で明示された対象エリア外は gaps と記録に残る（Issue #70）", async () => {
+    // ジャンル判定が unanswered を返しても、目的地と明示された新宿の out_of_area は
+    // 落とさない。unanswered の reason は1つしか運べないため、理由が覆っていない
+    // 構造化欠損は unanswered 側の gaps に載せる
     const recorder = capturingGapRecorder();
     const output = await searchDatasets({ query: "", interests: ["ラーメン"], areas: ["上野", "新宿"] }, recorder);
 
     expect(output.status).toBe("unanswered");
     if (output.status !== "unanswered") return;
     expect(output.reason).toBe("insufficient_granularity");
+    expect(output.gaps).toHaveLength(1);
+    expect(output.gaps?.[0].reason).toBe("out_of_area");
+    expect(output.gaps?.[0].area).toBe("新宿");
     expect(recorder.records).toEqual([
       { question: "ラーメン", area: "上野", category: undefined, reason: "insufficient_granularity" },
+      { question: "ラーメン", area: "新宿", category: undefined, reason: "out_of_area" },
+    ]);
+  });
+
+  it("応答全体が out_of_area のとき、理由が報告する地名を除いた残りの目的地が gaps に残る", async () => {
+    // areas に代表エリアが1つも無い場合、理由に載るのは先頭の1件だけ。2件目以降を
+    // 落とすと「新宿・池袋を回りたい」の池袋だけが応答からも記録からも消える
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "美術館を回りたい", areas: ["新宿", "池袋"] }, recorder);
+
+    expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    expect(output.reason).toBe("out_of_area");
+    expect(output.message).toContain("新宿");
+    expect(output.gaps).toHaveLength(1);
+    expect(output.gaps?.[0].area).toBe("池袋");
+    expect(recorder.records).toEqual([
+      { question: "美術館を回りたい", area: "新宿", category: undefined, reason: "out_of_area" },
+      { question: "美術館を回りたい", area: "池袋", category: undefined, reason: "out_of_area" },
+    ]);
+  });
+
+  it("分類の空振りでも、areas で明示された対象エリア外は gaps に残る", async () => {
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets(
+      { query: "動物園に行きたい", areas: ["上野", "新宿"], category: "動物園" },
+      recorder,
+    );
+
+    expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    expect(output.reason).toBe("other");
+    expect(output.gaps).toHaveLength(1);
+    expect(output.gaps?.[0].area).toBe("新宿");
+  });
+
+  it("unanswered に興味ごとの欠損は載せない（未回答が全体を覆っている）", async () => {
+    // 興味別の欠損 message は「返した候補」を前提にしており、候補が存在しない未回答の
+    // 文脈では嘘になる。興味は記録の question 列に畳み込まれて残る（Issue #70 の判断）
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "", interests: ["ナイトライフ", "ラーメン"] }, recorder);
+
+    expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    expect(output.reason).toBe("insufficient_granularity");
+    expect(Object.hasOwn(output, "gaps")).toBe(false);
+    expect(recorder.records).toEqual([
+      { question: "ナイトライフ、ラーメン", area: undefined, category: undefined, reason: "insufficient_granularity" },
     ]);
   });
 });

@@ -1,6 +1,6 @@
 ---
 title: "API"
-version: "1.5.0"
+version: "1.6.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -67,10 +67,10 @@ changeImpact: "medium"
 | ---- | ---- |
 | 入力 | `{ query: string, area?: string, areas?: string[], interests?: string[], category?: string, limit?: number }`。`query` は必須（空文字・空白のみは 400）。ただし **`interests` を1件以上送る場合のみ省略できる**（興味チップだけ選んで自由文を書かない呼び出し）。`areas` / `interests` は構造化入力（下記「構造化入力」・[ADR-011](../06-reference/DECISIONS.md)） |
 | 出力（回答あり） | `{ status: "answered", candidates: Array<{ datasetId, title, provider, url, matchReason }>, gaps?: Array<{ status: "unanswered", reason, message, area? }> }`。`candidates` は**必ず1件以上**（型でも非空を強制。DOMAIN.md §8 不変条件1） |
-| 出力（回答なし） | `{ status: "unanswered", reason, message }`（§4 参照） |
+| 出力（回答なし） | `{ status: "unanswered", reason, message, gaps?: Array<{ status: "unanswered", reason, message, area? }> }`（§4 参照）。`gaps` は**理由が覆っていない別の欠損**（[Issue #70](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/70)）: `reason` は1つしか運べないため、`areas` で目的地と明示された対象エリア外はここに載せる（理由が報告する地名は除く）。現状載るのは `areas` 由来の `out_of_area` だけで、興味ごとの欠損は載せない（未回答は「何も答えていない」を全体として述べており、興味別の message は候補が存在しない文脈では書けない。興味は記録の `question` 列に残る）。無いときはキーごと省く |
 | `gaps` | **答えられた候補と一緒に返す、答えられなかった側面**（下記）。欠損が無いときは**キーごと省く**（`gaps: []` は返さない）。要素は `unanswered` 応答と同じ形・同じ文言に、`area?`（その欠損がどのエリアについてのものか。応答全体のエリアと違うときだけ入る）を足したもの |
 | `area` | 代表エリア（上野・浅草・渋谷）以外も**受け付ける**。対象エリア外は 400 ではなく `unanswered("out_of_area")` で返す。未指定なら質問文から代表エリア名を拾う（**明示指定が質問文より優先**）。**候補の絞り込みに使うのは1エリアだけ**で、質問文に複数の代表エリアがある場合は定義順（上野→浅草→渋谷）の最初のもの。絞り込みに使わなかったエリアは、返した候補が収録していなければ `gaps` に載る（下記「訊かれたエリアの取り落ち」）。**`areas` との同時指定は 400**（どちらを信じるかを実装が黙って決めない） |
-| `areas` | **目的地として訊かれた**エリアの配列（構造化入力・[Issue #58](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/58)）。これを送ると質問文からのエリア推測を**行わない**（空配列は「目的地なし」の明示で、未指定とは意味が違う）。絞り込みに使うのは**最初の代表エリア1つ**（並び順は呼び出し側の意図として尊重する。質問文推測の「定義順」と違う点に注意）。代表エリア以外の要素は目的地と明示されたエリア外として扱い、他に代表エリアがあって **`answered` を返す場合は** `out_of_area` の欠損を添える（1つも無ければ応答全体が `unanswered("out_of_area")`。応答全体が別理由の `unanswered` になる経路では報告されない — 「理由を1つしか運べない」既知の制限。[Issue #70](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/70)）。要素は正規化される（前後空白・空要素・重複の除去） |
+| `areas` | **目的地として訊かれた**エリアの配列（構造化入力・[Issue #58](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/58)）。これを送ると質問文からのエリア推測を**行わない**（空配列は「目的地なし」の明示で、未指定とは意味が違う）。絞り込みに使うのは**最初の代表エリア1つ**（並び順は呼び出し側の意図として尊重する。質問文推測の「定義順」と違う点に注意）。代表エリア以外の要素は目的地と明示されたエリア外として扱い、`out_of_area` の欠損として添える — **応答全体が `unanswered` でも落とさない**（`unanswered` 側の `gaps`・[Issue #70](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/70)。代表エリアが1つも無ければ応答全体が `unanswered("out_of_area")` になり、理由が報告する地名を除いた残りが `gaps` に載る）。要素は正規化される（前後空白・空要素・重複の除去） |
 | `interests` | 興味の配列（構造化入力・[Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53)）。要素は**日本語の表示ラベル**（例 `"ナイトライフ"`。`"culture"` のようなドメイン値の識別子はキーワード表に当たらず、取り落ちの欠損になるだけ — マッチは日本語の部分一致のため）。候補のマッチに使うほか、**返した候補が覆っていない興味を1件ずつ `gaps` に載せる**（下記「部分欠損」）。要素は正規化される（前後空白・空要素・重複の除去） |
 | 配列の上限 | `areas` / `interests` は**最大 20 件・要素 100 文字**。超過は黙って切り詰めず 400（`limit` と同じ方針。要素数ぶんの欠損が `gaps` テーブルへ記録されるため、認証なしの公開 API で無制限に受けない） |
 | `category` | **絞り込みの述語ではなくスコアリングのヒント**。ただし指定して1件も当たらない場合はエリアだけの候補へ落とさず `unanswered` を返す（指定を黙って捨てないため）。その `message` は**実際に照合した集合**（エリアで絞り込んだ候補か、全10件のキーワード表か）で当たらなかったことだけを述べ、「10件に対応するものが無い」とは断定しない（[Issue #59](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/59)。エリアで絞り込んでいた場合、絞り込みの外に該当データが実在しうる） |
@@ -103,7 +103,7 @@ changeImpact: "medium"
 ```
 
 - **語から判定する欠損は、実測で「答えられない」と言い切れる既知の欠損だけ**。ジャンル指定の飲食（`insufficient_granularity`）・マナー・作法（`data_not_published`・[Issue #43](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/43)／[ADR-010](../06-reference/DECISIONS.md)）・渋谷の観光データ未公開（`data_not_published`）の3つで、いずれも `unanswered` として返すときと**同じ値**を返す。マナーの語彙は**カタログに無いことを調査で確認した語**（マナー・作法・エチケット・おもてなし）に限る。自然文を興味に分解することはしない（分解は Step 5 の LLM 側の仕事で、スタブに作り込むと二重になる）
-- **構造化入力 `interests` を送った呼び出しでは、興味ごとの取り落ちも載せる**（[Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53)／[ADR-011](../06-reference/DECISIONS.md)）。返した候補のキーワード表に当たらなかった興味を、`other` の欠損として1件ずつ添える（`"ナイトライフ"` の例: `「ナイトライフ」について訊かれましたが、返した候補のキーワードには「ナイトライフ」の語に当たるものがありませんでした。`）。「無い」と断定しない — 実装が知っているのは照合の結果だけで、答えになるデータの実在は判定していない（Issue #59 と同じ判断）。既知の欠損（ジャンル・マナー・渋谷の観光）として**実際に報告された**興味は二重に載せない（ジャンルは報告される1語に対応する興味だけを畳む。`["ラーメン", "寿司"]` の寿司のように報告に対応しない興味は `other` の取り落ちとして載せる）。**`query` に畳み込んだ興味にはこの判定は効かない**（キーワードが1件でも当たると `answered` になり、どの興味に答えたかを判定できない — それが Issue #53 の症状そのもの）。応答全体が別理由の `unanswered` になる経路では興味の取り落ちも報告されない（[Issue #70](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/70)）
+- **構造化入力 `interests` を送った呼び出しでは、興味ごとの取り落ちも載せる**（[Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53)／[ADR-011](../06-reference/DECISIONS.md)）。返した候補のキーワード表に当たらなかった興味を、`other` の欠損として1件ずつ添える（`"ナイトライフ"` の例: `「ナイトライフ」について訊かれましたが、返した候補のキーワードには「ナイトライフ」の語に当たるものがありませんでした。`）。「無い」と断定しない — 実装が知っているのは照合の結果だけで、答えになるデータの実在は判定していない（Issue #59 と同じ判断）。既知の欠損（ジャンル・マナー・渋谷の観光）として**実際に報告された**興味は二重に載せない（ジャンルは報告される1語に対応する興味だけを畳む。`["ラーメン", "寿司"]` の寿司のように報告に対応しない興味は `other` の取り落ちとして載せる）。**`query` に畳み込んだ興味にはこの判定は効かない**（キーワードが1件でも当たると `answered` になり、どの興味に答えたかを判定できない — それが Issue #53 の症状そのもの）。応答全体が `unanswered` になる経路では興味ごとの欠損は載せない（未回答が「何も答えていない」を全体として覆っている — [Issue #70](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/70) の判断。`areas` 由来の対象エリア外は同じ経路でも `unanswered` 側の `gaps` に載る点と扱いが違う）
 - **対象エリア外の地名（`out_of_area`）は、質問文から拾ったものは部分欠損にしない。** 「新宿のホテルから上野の美術館へ」の新宿は**出発地**であって、新宿のデータを求めてはいない。「新宿について訊かれた」と「新宿を経路として書いた」を見分ける手段がスタブに無いため、報告すると答えられている応答にノイズを足すことになる。上記3つは**求めているデータの種類**を指す語なので、散文中の言及と取り違えにくい。なお**エリア外そのものを訊かれたときの `unanswered("out_of_area")` は従来どおり**（`{ area: "新宿" }` など）。**例外は `areas` で目的地と明示された場合**（Issue #58）— 呼び出し側が目的地だと言っているので見分けの問題が無く、`out_of_area` の欠損（`area` にその地名を持つ）として載せる。載せないと「上野・新宿を回りたい」の新宿だけが応答から黙って消える
 - **エリアだけで絞った候補を返す経路では、`other` の欠損を1件添える**（[Issue #50](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/50)）。上記3つと同時には起きない（いずれもこの経路より手前で `unanswered` として返るため）。ただし**この経路の `gaps` が必ず1件とは限らない** — 下記「訊かれたエリアの取り落ち」の欠損が同時に付く（`"上野・渋谷の公園"` は2件）。詳細は下記
 - **訊かれた代表エリアを候補が覆っていない場合も、`other` の欠損を1件ずつ添える**（[Issue #52](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/52)）。この欠損だけ `area` を持ち、応答全体のエリアとは別のエリアを指す。詳細は下記
@@ -314,6 +314,12 @@ query="上野・渋谷"（修正前）
 - **サンドボックス環境**: 未定
 
 ## Changelog
+
+### [1.6.0] - 2026-08-18
+
+#### 追加
+
+- `search_datasets` の `unanswered` 応答に optional の `gaps` を追加（[Issue #70](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/70)）。`reason` は1つしか運べないため、`areas` で目的地と明示された対象エリア外の欠損を `unanswered` でも落とさず添え、記録にも1行ずつ残す。興味ごとの欠損は載せない（未回答が全体を覆っており、興味別 message は候補の無い文脈では書けない — 興味は記録の `question` 列に残る）
 
 ### [1.5.0] - 2026-08-18
 
