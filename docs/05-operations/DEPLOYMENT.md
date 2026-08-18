@@ -1,6 +1,6 @@
 ---
 title: "DEPLOYMENT"
-version: "1.4.8"
+version: "1.4.9"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -205,6 +205,7 @@ npm run deploy  # vite build → wrangler deploy
 
 | 日時 | Version ID | 内容 | 確認 |
 | --- | --- | --- | --- |
+| 2026-08-18 | `8553395f-a161-4fda-87e6-1274b2c708a8` | プラン画面のペース別表示件数とデータギャップ表示（PR #49）。**`src/` のみの変更**だが、フロントエンドはデプロイしないと画面に出ないためデプロイ（§3「いつデプロイするか」）。`worker/` `shared/` `migrations/` は未変更のため、マイグレーション・シードは実行していない | `/api/health` OK。`index.html` が新バンドル（`assets/index-C6r66paK.js`）を指し、ローカルビルドとハッシュ一致。バンドル内に #54 の見出し「答えられなかった点があります」と、表示上限の注記「〜件を伏せています」が含まれることを確認 |
 | 2026-08-18 | `5b6f5f35-428f-4670-a81b-29d442fc58a4` | `operations.ts` を `search-gaps.ts` と分割（#71 / PR #74・挙動変更なしの移動のみ）。`worker/` の変更のためデプロイ。`migrations/` 未変更のためマイグレーション・シードは実行していない | `/api/health` OK。#70 の代表入力（`{"interests":["ラーメン"],"areas":["上野","新宿"]}`）が分割前と同一応答（`insufficient_granularity` + gaps 新宿）であることを確認 |
 | 2026-08-18 | `d6afba6e-1451-4499-b00f-db06bf82d02c` | `unanswered` 応答に `gaps` を追加（#70 / PR #73）。`worker/` と `shared/core.ts` の変更のためデプロイ。`migrations/` 未変更のためマイグレーション・シードは実行していない | `/api/health` OK。`{"query":"","interests":["ラーメン"],"areas":["上野","新宿"]}` が `unanswered(insufficient_granularity)` + `gaps` に新宿（`out_of_area`・`area` 付き）で返ることを確認（本番 D1 への記録経路は同一実装のためテストで担保） |
 | 2026-08-18 | `aceb02d5-4dc2-4227-8831-884933dc54ca` | `search_datasets` に構造化入力 `interests` / `areas` を追加（#58・#53 / PR #69 / ADR-011）。`worker/` と `shared/core.ts` の変更で、`migrations/` は未変更のためマイグレーション・シードは実行していない | 下記チェックリスト全項目 OK。加えて `POST /api/search-datasets` に `{"query":"渋谷から上野の美術館へ行きたい","areas":["上野"]}`（gaps なし＝出発地の過検知が消える）と `{"query":"上野で夜遊びしたい","interests":["ナイトライフ"]}`（銭湯＋興味の取り落ち gap）を投げて確認、`area`＋`areas` 同時指定の 400 も確認。**本番 D1 の `gaps` に `ナイトライフ、上野で夜遊びしたい / 上野 / other` の行が入ること**を確認。伝播直後の1回目は旧版が応答した（旧仕様どおり query から渋谷を過検知した行が1行残っている） |
@@ -402,6 +403,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.4.9] - 2026-08-18
+
+#### 追加
+
+- デプロイ記録に PR #49（プラン画面のペース別表示件数・データギャップ表示）の反映を追記。`src/` のみの変更でデプロイした最初の記録
 
 ### [1.4.8] - 2026-08-18
 
