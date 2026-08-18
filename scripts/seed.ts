@@ -212,7 +212,6 @@ for (const { def, spots } of parsed) {
 }
 
 for (const { def, meta, recCount, spots } of parsed) {
-
   // 座標の検証。1件でも範囲外なら生成を止める（黙って通すと全件がインド洋へ飛ぶ）
   for (const s of spots) {
     if (s.lat !== null && (s.lat < LAT_RANGE[0] || s.lat > LAT_RANGE[1]))
