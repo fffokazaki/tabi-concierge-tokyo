@@ -181,9 +181,9 @@ query="上野・渋谷"（修正前）
 | 出力（回答あり） | `{ status: "answered", result: { name, summary }, query: string }` |
 | 出力（回答なし） | `{ status: "unanswered", reason, message }` |
 | 出力語彙 | `result` は **`name` / `summary` の汎用語彙**（設計原則4）。`Stop.place` / `Stop.note` へのマッピングはフロントエンド側の責務（2026-08-17 合意） |
-| `query` | 実行したクエリ。**省略不可**（§4）。スタブは SQL を実行していないため、SQL 風の文字列ではなく「どのスナップショットのヘッダを除く何行目を、どう選んで固定で返したか」を記録する。行の選定根拠（エリアで絞った最初の1件 / エリア無指定のため先頭行）と、**intent の内容との照合はしていない**ことを必ず含む（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)） |
+| `query` | 実行したクエリ。**省略不可**（§4）。スタブは SQL を実行していないため、SQL 風の文字列ではなく「どのスナップショットのヘッダを除く何行目を、どう選んで固定で返したか」を記録する。行の選定根拠（固定サンプルのうち当該エリアの最初の1件 / 既知のエリア名が見つからず固定サンプルの先頭）と、**intent の内容との照合はしていない**ことを必ず含む（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)） |
 | `intent` のエリア | **指定されたエリアの地物しか返さない。** 一致する行が無ければ `unanswered`（そのデータセットが当該エリアを収録していなければ `data_not_published`）。対象エリア外の地名は `search_datasets` と同じく `out_of_area`。別エリアの行で代替すると、本物の出典がついた誤答になる |
-| `intent` にエリアが無い場合 | 先頭の固定行を代表として返す。**intent の内容との照合はどの経路でも行っていない**（内容側のガードは飲食店データセットへのジャンル指定のみ）。選定が収録順に依存する事実は `query` に明記して読み取れるようにする（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)）。内容適合そのものは Step 5（[Issue #32](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/32)・Text-to-SQL）で解消する |
+| `intent` に既知のエリア名が無い場合 | 固定サンプルの先頭を代表として返す。「エリア無指定」とは断定しない — 判定は既知の語彙表（代表エリア・対象外エリア）への照合であって網羅ではなく、未知の地名（例: 巣鴨）が書かれていてもこの経路に落ちる。**intent の内容との照合はどの経路でも行っていない**（内容側のガードは飲食店データセットへのジャンル指定のみ）。選定が収録順に依存する事実は `query` に明記して読み取れるようにする（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)）。内容適合そのものは Step 5（[Issue #32](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/32)・Text-to-SQL）で解消する |
 | 未確定 | 対応する集計操作の範囲（Step 5 で確定）、`result` に集計値そのもの（件数・平均等）を載せる形 |
 
 ### 3.3 `get_provenance` — 出典取得（`POST /api/provenance`・確定）
@@ -320,7 +320,7 @@ query="上野・渋谷"（修正前）
 
 #### 変更
 
-- §3.2 に「`intent` にエリアが無い場合」の行を追加（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)）。先頭の固定行を代表として返す挙動と、intent の内容との照合をどの経路でも行っていない事実を明記。あわせて `query` の説明に、行の選定根拠と内容未照合の明記が必ず含まれることを追記
+- §3.2 に「`intent` に既知のエリア名が無い場合」の行を追加（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)）。固定サンプルの先頭を代表として返す挙動（「エリア無指定」とは断定しない — 判定は既知語彙への照合のみ）と、intent の内容との照合をどの経路でも行っていない事実を明記。あわせて `query` の説明に、行の選定根拠と内容未照合の明記が必ず含まれることを追記
 
 ### [1.6.0] - 2026-08-18
 

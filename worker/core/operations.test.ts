@@ -520,12 +520,15 @@ describe("aggregateDataset（直接呼び出し）", () => {
     expect(output.status).toBe("unanswered");
   });
 
-  it("エリア無指定の answered は、先頭行という選定根拠を query に明記する（Issue #78）", async () => {
+  it("既知のエリア名が無い answered は、固定サンプル先頭という選定根拠を query に明記する（Issue #78）", async () => {
     const output = await aggregateDataset({ datasetId: MEISHO_ID, intent: "寺社を1件" }, capturingGapRecorder());
 
     expect(output.status).toBe("answered");
     if (output.status !== "answered") return;
-    expect(output.query).toContain("エリア無指定のため先頭行");
+    // 「エリア無指定」と書かない。確認したのは既知の語彙に当たらなかったことだけ（未知の
+    // 地名が書かれていてもこの経路に来る）で、無指定と断定すると実態を超える
+    expect(output.query).toContain("既知のエリア名が intent から見つからず");
+    expect(output.query).toContain("固定サンプルの先頭を選定");
   });
 
   it("answered の query は経路によらず、intent の内容と照合していないことを明記する（Issue #78）", async () => {

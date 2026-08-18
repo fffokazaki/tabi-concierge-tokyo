@@ -462,13 +462,17 @@ function computeAggregateDataset(input: AggregateDatasetInput): AggregateDataset
   });
 
   const intendedArea = findRepresentativeArea(input.intent);
-  // エリア無指定は先頭行を代表として返す（スタブ）。返す行に intent との適合根拠が無い
-  // ことは describeQuery が query に明記する（Issue #78。#50 と同じく、検証していない
-  // ものを検証済みに見せない）。内容適合そのものは Step 5（Issue #32）で解消する
-  if (!intendedArea) return extracted(entry.samples[0], "エリア無指定のため先頭行");
+  // 既知のエリア名が見つからなければ固定サンプルの先頭を代表として返す（スタブ）。
+  // 「エリア無指定」と断定しない — 確認したのは既知の語彙表（代表・対象外）に当たらなかった
+  // ことだけで、未知の地名（例: 巣鴨）が書かれていてもここに来る。返す行に intent との
+  // 適合根拠が無いことは describeQuery が query に明記する（Issue #78。#50 と同じく、
+  // 検証していないものを検証済みに見せない）。内容適合そのものは Step 5（Issue #32）で解消する
+  if (!intendedArea) {
+    return extracted(entry.samples[0], "既知のエリア名が intent から見つからず、固定サンプルの先頭を選定");
+  }
 
   const sample = entry.samples.find((candidate) => candidate.area === intendedArea);
-  if (sample) return extracted(sample, `「${intendedArea}」の行のうち最初の1件`);
+  if (sample) return extracted(sample, `固定サンプルのうち「${intendedArea}」の最初の1件を選定`);
 
   return entry.areas.includes(intendedArea)
     ? // `areas` にあるのに固定データが無い ＝ スタブ側の欠落。データそのものの欠損と混ぜない
