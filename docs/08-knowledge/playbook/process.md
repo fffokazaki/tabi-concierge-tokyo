@@ -78,7 +78,7 @@ GitHub の closing keyword がデフォルトブランチへのマージでの�
 
 | Category | process | Origin | PR #51 / Issue #50（PR #49 のレビュー中に判明） |
 | Date | 2026-08-18 |
-| Helpful | 0 | Harmful | 0 |
+| Helpful | 1 | Harmful | 0 |
 | Status | active |
 
 **Insight**: ツールごとに指示ファイルを分けて「内容は同一」と宣言しているリポジトリでは、**自分が読まない側の同期漏れは構造的に見えない**。CLAUDE.md を読むレビュアーは CLAUDE.md しか検証せず、AGENTS.md の陳腐化は指摘の対象にならない。この盲点は注意力では埋まらないので、cross-model レビューを1本以上残すか、grep で機械的に潰す。
@@ -173,3 +173,37 @@ GitHub の closing keyword がデフォルトブランチへのマージでの�
 **Context**: PR #74 で Claude レビュアーが「構造は一貫しているがバイト単位は未検証」と正直に報告した。オーケストレータ側で照合スクリプトを実行し、差分が未使用 import 2行だけであることを確認してからマージした。テスト側は差分ゼロ（完全一致）。
 
 **Action**: 移動のみを主張するリファクタでは、(1) 移動をスクリプトで実施し（手写しを避ける）(2) マージ前に旧版との行包含チェックを回して差分を列挙し (3) 許容差分（export・import・ヘッダ）を PR 本文に明記する。テストファイルの分割は describe 単位の verbatim 移動に限ると AC「テスト変更なし」がそのまま成立する。
+
+---
+
+<a id="ace-49-1"></a>
+
+### ACE-49-1: 「push した」という申告は、PR の更新時刻ではなく remote の ref で確かめる
+
+| Category | process | Origin | PR #49 |
+| Date | 2026-08-18 |
+| Helpful | 0 | Harmful | 0 |
+| Status | active |
+
+**Insight**: 協働者から「修正版を push した」と連絡を受けたとき、`gh pr view` の `updated_at` は **review request でも動く**ため「更新されている＝push された」にならない。権威は `git ls-remote --heads origin <branch>` が返す OID だけ。申告を信じてレビューを始めると、前日と同じコミットを読み直すことになる。
+
+**Context**: PR #49。「修正4件を push しました」の連絡を受けたが、remote の head は前日のままだった（timeline に commit イベントが無く `review_requested` だけ）。**PR 本文が未編集だったこと**が「push 先を間違えた」ではなく「未 push」の切り分けを決めた — 本文編集は push 不要でできる操作なので、依頼した本文追記も未対応であることが、変更一式が手元に残っている証拠になった。
+
+**Action**: (1) `git fetch` 後に `git ls-remote --heads origin <branch>` で OID を確認する（`updated_at` を根拠にしない）(2) 期待した変更がその OID に含まれるかを `git show <sha>:<path>` で直接確かめる (3) 未 push と判定したら、相手側で走らせる確認コマンド（`git status -sb` / `git log --oneline origin/<branch>..HEAD`）を添えて返す。push 不要でできる操作（本文編集・ラベル）の有無は、原因切り分けの補助証拠になる。
+
+---
+
+<a id="ace-49-2"></a>
+
+### ACE-49-2: 統合ブランチから大きく遅れたブランチは、差分読解ではなく試験マージして検証する
+
+| Category | process | Origin | PR #49 |
+| Date | 2026-08-18 |
+| Helpful | 0 | Harmful | 0 |
+| Status | active |
+
+**Insight**: base が20コミット以上進んだブランチでは、差分を丁寧に読んでも「マージ後に壊れないか」は分からない。使い捨て worktree に base を取り込んでから typecheck / test / build を回すと、型の衝突・コンフリクト・**版番号の衝突**が一度に出る。読解では出てこない類の問題が出る。
+
+**Context**: PR #49 は develop から23コミット遅れていた。`git merge-tree` はテキスト衝突を1件（`API_REQUIREMENTS.md`）報告したが、それが「同日・同版番号の Changelog 衝突」だと分かったのは実際にマージして中身を開いたときだった。試験マージ後は typecheck / 373件 / build がすべて通り、`shared/core` への optional 追加（#58・#70）とは型が衝突しないことも確認できた。レビュー結論を「差分は妥当」ではなく「マージ後に通る」で出せた。
+
+**Action**: (1) `git worktree add <tmp> <branch>` で使い捨てツリーを作る (2) `node_modules` は symlink、gitignore 対象の生成物（`worker-configuration.d.ts` 等）はコピーで持ち込む (3) `git merge <base>` してから検証コマンドを回す (4) 終わったら `git worktree remove --force`。ビルドを伴う検証はオーケストレータが1つだけ実行する（並行ビルドは成果物ディレクトリを奪い合う）。

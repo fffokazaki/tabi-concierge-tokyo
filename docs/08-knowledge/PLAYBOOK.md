@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.22.0"
+version: "1.23.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-18"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 59
+ace_entry_count: 64
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -280,8 +280,27 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-73-2 | message が前提にする文脈が消える場所では、その文言を使わない（載せない判断も設計） | architecture | [playbook/architecture.md#ace-73-2](./playbook/architecture.md#ace-73-2) |
 | ACE-73-3 | 生成系コマンドの失敗フォールバックに、劣化したプレースホルダを渡さない | process | [playbook/process.md#ace-73-3](./playbook/process.md#ace-73-3) |
 | ACE-74-1 | 「移動のみ」リファクタは、旧版との行単位照合で機械的に証明する | process | [playbook/process.md#ace-74-1](./playbook/process.md#ace-74-1) |
+| ACE-49-1 | 「push した」という申告は、PR の更新時刻ではなく remote の ref で確かめる | process | [playbook/process.md#ace-49-1](./playbook/process.md#ace-49-1) |
+| ACE-49-2 | 統合ブランチから大きく遅れたブランチは、差分読解ではなく試験マージして検証する | process | [playbook/process.md#ace-49-2](./playbook/process.md#ace-49-2) |
+| ACE-49-3 | 二重管理文書の同期照合は、その PR が触った領域ではなく文書全体で行う | documentation-quality | [playbook/documentation-quality.md#ace-49-3](./playbook/documentation-quality.md#ace-49-3) |
+| ACE-49-4 | 文書の版番号はマージでは解決されない — 長命ブランチでは採番そのものが衝突する | documentation-quality | [playbook/documentation-quality.md#ace-49-4](./playbook/documentation-quality.md#ace-49-4) |
+| ACE-49-5 | 「〜を描画しない」型の否定アサーションは、本番データの実物を確認してから書く | testing | [playbook/testing.md#ace-49-5](./playbook/testing.md#ace-49-5) |
 
 ## Changelog
+
+### [1.23.0] - 2026-08-18
+
+#### 追加
+
+- ACE-49-1: 「push した」という申告は、PR の更新時刻ではなく remote の ref で確かめる（PR #49）
+- ACE-49-2: 統合ブランチから大きく遅れたブランチは、差分読解ではなく試験マージして検証する（PR #49）
+- ACE-49-3: 二重管理文書の同期照合は、その PR が触った領域ではなく文書全体で行う（PR #49）
+- ACE-49-4: 文書の版番号はマージでは解決されない — 長命ブランチでは採番そのものが衝突する（PR #49）
+- ACE-49-5: 「〜を描画しない」型の否定アサーションは、本番データの実物を確認してから書く（PR #49 / Issue #54）
+
+#### カウンター更新
+
+- ACE-51-5: Helpful +1（この規則があったため AGENTS.md の同期漏れを探しにいけた。ただし照合範囲が狭く、より古い3行は ACE-49-3 で拾い直した）
 
 ### [1.22.0] - 2026-08-18
 
