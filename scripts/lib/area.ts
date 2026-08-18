@@ -136,3 +136,64 @@ export function resolveAreaFromName(name: string): string | null {
 
 /** テスト・検証用。分類済みの町字一覧 */
 export const KNOWN_TOWNS = Object.keys(TOWN_TO_AREA);
+
+/**
+ * エリア継承の根拠。住所つきデータセットで分類済みの施設1件を指す。
+ * `datasetTitle` と `sourceRow` で「どのデータセットのどの行から継承したか」を辿れる形にする
+ * （Issue #36 の AC。根拠がオープンデータ側にあることがこの継承の成立条件）。
+ */
+export interface FacilityAreaSource {
+  name: string;
+  area: string;
+  datasetTitle: string;
+  /** ヘッダを除いたデータ行の番号（worker/core/operations.ts の `describeQuery` と同じ数え方） */
+  sourceRow: number;
+}
+
+/**
+ * 町字を含まない停留所名が、住所つきデータセットで分類済みの施設名で**終わる**なら、
+ * その施設のエリアを継承する（Issue #36）。
+ *
+ * めぐりん停留所は所在地列が全件空で、名称が施設名だけのもの（「東西(...)5寛永寺」）は
+ * `resolveAreaFromName` では判定できない。施設名を町字マッピングへ手で足すのは推測で
+ * 埋めることになる（CLAUDE.md 絶対ルール #1）。ここでは「停留所名に現れる施設名との
+ * 共起を、その停留所の所在の根拠として採る」**という判断を記録した上で**、住所を持つ
+ * データセットに実在する施設名とだけ突き合わせる — 町字マッピング（このファイル冒頭）と
+ * 同じく、判断は記録し、根拠はオープンデータ側に置く。
+ *
+ * - **末尾一致（endsWith）のみ。** 停留所名は「路線(括弧)＋番号＋施設名」の形なので、
+ *   実在の対応はすべて末尾一致で捕捉できる。包含（includes）まで緩めると、索引に
+ *   「上野駅」だけがある状態で「上野駅入谷口」に当たる類の偶然一致が起きる
+ *   （Issue #36 の検討点そのもの）
+ * - 括弧除去後に開き括弧・閉じ括弧が残る名称は**継承しない**。対応の取れない括弧は
+ *   `stripParenthesized` が削らずに返すため、路線名側の施設名が照合対象に残ってしまう
+ * - 複数の施設名が当たったら**最長一致**を採る（「奏楽堂」と「旧東京音楽学校奏楽堂」が
+ *   両方当たるなら長いほうが停留所名の意図に近い）
+ * - 最長どうしでエリアが食い違ったら **null**（どちらか決められないものを推測で
+ *   選ばない）。同名・同エリアが複数データセットにあれば**索引の並び順の先頭**を根拠に
+ *   採る — 呼び出し側（seed.ts）は索引を `DATASETS` の定義順（No.1 名所・史跡 が先）で
+ *   渡す契約。この順序が変わると DATABASE.md §2 の根拠表も追随が要る
+ * - 施設名側の括弧は落とさない。「下町風俗資料館付設展示場（旧吉田屋酒店）」の別称を
+ *   独立の索引項目にすると偶然の一致の面が広がるため、取りこぼす側（安全側）に倒す
+ *
+ * 適用は `resolveAreaFromName` が null を返した後段に限る。町字で判定できる停留所に
+ * まで施設照合を挟むと、判定の根拠が「町字か施設か」で行ごとに揺れる。なお
+ * `AMBIGUOUS_TOWNS`（浅草橋・元浅草）で null になった停留所も継承へ流れる — 現データで
+ * 施設名が末尾一致する例は無いが、他路線を足すときは「曖昧な町字＋施設名」の停留所が
+ * 町字の判断（代表エリア外）と矛盾しないかを確認すること。
+ */
+export function inheritAreaFromFacility(
+  stopName: string,
+  facilities: readonly FacilityAreaSource[],
+): FacilityAreaSource | null {
+  if (!stopName) return null;
+  const stripped = stripParenthesized(stopName);
+  if (/[（(）)]/.test(stripped)) return null;
+  const matches = facilities.filter((f) => f.name && stripped.endsWith(f.name));
+  if (matches.length === 0) return null;
+  const longest = Math.max(...matches.map((m) => m.name.length));
+  const best = matches.filter((m) => m.name.length === longest);
+  const areas = new Set(best.map((m) => m.area));
+  if (areas.size > 1) return null;
+  return best[0];
+}

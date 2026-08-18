@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractTown, resolveArea, resolveAreaFromName } from "./area.ts";
+import { extractTown, inheritAreaFromFacility, resolveArea, resolveAreaFromName } from "./area.ts";
 
 describe("extractTown", () => {
   it("都県・区のプレフィックスと丁目以降を落として町字だけ返す", () => {
@@ -136,5 +136,133 @@ describe("resolveArea", () => {
 
   it("未知の町字は null を返す（推測で埋めない）", () => {
     expect(resolveArea("架空町1丁目")).toBeNull();
+  });
+});
+
+describe("inheritAreaFromFacility（Issue #36・施設名からのエリア継承）", () => {
+  const facilities = [
+    { name: "寛永寺", area: "上野", datasetTitle: "名所・史跡", sourceRow: 3 },
+    { name: "東京国立博物館", area: "上野", datasetTitle: "文化観光施設", sourceRow: 22 },
+  ];
+
+  it("分類済み施設名で終わる停留所名は、その施設のエリアと根拠を返す", () => {
+    const source = inheritAreaFromFacility("東西(上野公園経由・三崎坂往復ルート)5寛永寺", facilities);
+    expect(source).toEqual({ name: "寛永寺", area: "上野", datasetTitle: "名所・史跡", sourceRow: 3 });
+  });
+
+  it("分類済み施設名を含まない停留所名は null（判定不能のまま。推測で埋めない）", () => {
+    expect(inheritAreaFromFacility("東西(上野公園経由・三崎坂往復ルート)12谷中銀座・よみせ通り", facilities)).toBeNull();
+    expect(inheritAreaFromFacility("", facilities)).toBeNull();
+  });
+
+  it("施設名で終わらない停留所名は継承しない（末尾一致。偶然の包含で誤爆しない）", () => {
+    // 索引に「上野駅」だけがある状態で「上野駅入谷口」へ根拠なく継承しない（Issue #36 の検討点）
+    const stationOnly = [{ name: "上野駅", area: "上野", datasetTitle: "名所・史跡", sourceRow: 40 }];
+    expect(inheritAreaFromFacility("2上野駅入谷口", stationOnly)).toBeNull();
+  });
+
+  it("括弧内の路線名は照合しない（経由地はその停留所の所在地ではない・Issue #30 と同じ判断）", () => {
+    // 施設名「寛永寺」が路線名側にだけ現れる停留所を、寛永寺の所在地と誤認しない
+    expect(inheritAreaFromFacility("東西(寛永寺経由ルート)12谷中銀座", facilities)).toBeNull();
+  });
+
+  it("対応の取れない括弧が残る名称は継承しない（安全側に倒す）", () => {
+    // 閉じ括弧が欠けると stripParenthesized は削らずに返すため、路線名側の施設名が末尾に残りうる
+    expect(inheritAreaFromFacility("東西(三崎坂往復ルート12寛永寺", facilities)).toBeNull();
+    expect(inheritAreaFromFacility("東西（三崎坂往復ルート12寛永寺", facilities)).toBeNull();
+  });
+
+  it("空の施設名は照合しない（endsWith('') は常に真のため索引側の防御が要る）", () => {
+    const withEmpty = [{ name: "", area: "上野", datasetTitle: "名所・史跡", sourceRow: 1 }];
+    expect(inheritAreaFromFacility("12谷中銀座", withEmpty)).toBeNull();
+  });
+
+  it("複数の施設名が当たったら最長一致を採る", () => {
+    const nested = [
+      { name: "奏楽堂", area: "上野", datasetTitle: "名所・史跡", sourceRow: 40 },
+      { name: "旧東京音楽学校奏楽堂", area: "上野", datasetTitle: "文化観光施設", sourceRow: 8 },
+    ];
+    const source = inheritAreaFromFacility("4旧東京音楽学校奏楽堂", nested);
+    expect(source?.name).toBe("旧東京音楽学校奏楽堂");
+  });
+
+  it("最長一致どうしでエリアが食い違ったら null（どちらか決められないものを選ばない）", () => {
+    const conflicted = [
+      { name: "観音堂", area: "上野", datasetTitle: "名所・史跡", sourceRow: 10 },
+      { name: "観音堂", area: "浅草", datasetTitle: "文化観光施設", sourceRow: 11 },
+    ];
+    expect(inheritAreaFromFacility("3観音堂", conflicted)).toBeNull();
+  });
+
+  it("同名・同エリアが複数あれば索引順の先頭を根拠に採る（呼び出し側が DATASETS 順で渡す契約）", () => {
+    const duplicated = [
+      { name: "旧東京音楽学校奏楽堂", area: "上野", datasetTitle: "名所・史跡", sourceRow: 35 },
+      { name: "旧東京音楽学校奏楽堂", area: "上野", datasetTitle: "文化観光施設", sourceRow: 12 },
+    ];
+    // 根拠（datasetTitle・sourceRow）まで検証する。索引順が変わると DATABASE.md §2 の表も追随が要る
+    expect(inheritAreaFromFacility("4旧東京音楽学校奏楽堂", duplicated)).toEqual({
+      name: "旧東京音楽学校奏楽堂",
+      area: "上野",
+      datasetTitle: "名所・史跡",
+      sourceRow: 35,
+    });
+  });
+});
+
+/**
+ * 実データでの継承結果の固定（Issue #36）。
+ *
+ * DATABASE.md §2 は「継承できたのは 3 件・いずれも上野」と根拠行つきで断定している。
+ * データや索引の作り方が変わって件数・根拠がずれたとき、文書だけが静かに嘘になるのを
+ * ここで止める（データを読むテストが scripts/ にあるのは catalog-samples.test.ts と同じ
+ * 実行環境の都合 — workerd ではファイルシステムを読めない）。
+ *
+ * 索引の構築手順（住所つきデータセット → resolveArea で分類済みの施設のみ・DATASETS
+ * 定義順）は seed.ts と同じ。ずらすと「テストは通るが seed の結果と違う」が起きるため、
+ * seed.ts 側を変えるときはここも揃えること。
+ */
+describe("実データでの継承結果（DATABASE.md §2 の固定）", () => {
+  it("継承できるのは 3 件・いずれも上野・根拠は No.1/No.2 の実在行", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { parseCsvRecords } = await import("./csv.ts");
+    const { DATASETS } = await import("./datasets.ts");
+
+    const facilities = DATASETS.filter((d) => d.areaInheritanceSource).flatMap((d) => {
+      const recs = parseCsvRecords(readFileSync(`data/${d.id}/data.csv`, "utf-8"));
+      return recs.flatMap((rec, i) => {
+        const name = rec["名称"];
+        const area = name ? resolveArea(rec["所在地"] ?? "") : null;
+        return name && area ? [{ name, area, datasetTitle: d.title, sourceRow: i + 1 }] : [];
+      });
+    });
+    expect(facilities.length).toBeGreaterThan(0);
+
+    const megurin = DATASETS.find((d) => d.areaFrom === "name");
+    expect(megurin).toBeDefined();
+    const stops = parseCsvRecords(readFileSync(`data/${megurin!.id}/data.csv`, "utf-8"));
+
+    const inherited = stops
+      .map((rec) => rec["名称"])
+      .filter((name): name is string => Boolean(name) && resolveAreaFromName(name!) === null)
+      .flatMap((name) => {
+        const source = inheritAreaFromFacility(name, facilities);
+        return source ? [{ stop: name, source }] : [];
+      });
+
+    // 並びは停留所 CSV の行順（東西めぐりんは 4 → 5 → 3 の順で収録されている）
+    expect(inherited).toEqual([
+      {
+        stop: "東西(上野公園経由・三崎坂往復ルート)4旧東京音楽学校奏楽堂",
+        source: { name: "旧東京音楽学校奏楽堂", area: "上野", datasetTitle: "名所・史跡", sourceRow: 35 },
+      },
+      {
+        stop: "東西(上野公園経由・三崎坂往復ルート)5寛永寺",
+        source: { name: "寛永寺", area: "上野", datasetTitle: "名所・史跡", sourceRow: 3 },
+      },
+      {
+        stop: "東西(上野公園経由・三崎坂往復ルート)3東京国立博物館",
+        source: { name: "東京国立博物館", area: "上野", datasetTitle: "文化観光施設", sourceRow: 22 },
+      },
+    ]);
   });
 });
