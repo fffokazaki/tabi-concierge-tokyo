@@ -283,6 +283,8 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
  * 渋谷区の都市公園・都立公園一覧は10件の中に実在する。
  */
 describe("分類指定の空振りの文言", () => {
+  // 文言は完全一致で固定する。「〜がありません」の言い換え（対応するものがない・存在しない等）で
+  // 断定が再混入しても、部分一致のアサートでは素通りするため
   it("エリアで絞り込んでいた場合、絞り込んだ集合で当たらなかったことだけを述べる", async () => {
     const recorder = capturingGapRecorder();
     const output = await searchDatasets({ query: "上野", category: "公園" }, recorder);
@@ -290,10 +292,10 @@ describe("分類指定の空振りの文言", () => {
     expect(output.status).toBe("unanswered");
     if (output.status !== "unanswered") return;
     expect(output.reason).toBe("other");
-    expect(output.message).toContain("「上野」で絞り込んだ候補");
-    expect(output.message).toContain("「公園」");
-    // 10件全体に無いという断定は、渋谷区の都市公園・都立公園一覧が実在するため事実に反する
-    expect(output.message).not.toContain("対応するものがありません");
+    // 「10件全体に無い」と断定しない。渋谷区の都市公園・都立公園一覧が10件の中に実在する
+    expect(output.message).toBe(
+      "該当するオープンデータが見つかりませんでした。「上野」で絞り込んだ候補には「公園」の語に当たるデータセットがありませんでした。",
+    );
 
     // 分類指定を黙って捨てない挙動は変えない（従来どおり unanswered("other") として記録される）
     expect(recorder.records).toEqual([
@@ -302,14 +304,35 @@ describe("分類指定の空振りの文言", () => {
   });
 
   it("エリア未指定なら、全10件のキーワードを照合して当たらなかったことを述べる", async () => {
-    const output = await searchDatasets({ query: "演劇", category: "劇場" }, capturingGapRecorder());
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "演劇", category: "劇場" }, recorder);
 
     expect(output.status).toBe("unanswered");
     if (output.status !== "unanswered") return;
     expect(output.reason).toBe("other");
-    expect(output.message).toContain("利用中の10データセットのキーワード");
-    expect(output.message).toContain("「劇場」");
-    expect(output.message).not.toContain("対応するものがありません");
+    expect(output.message).toBe(
+      "該当するオープンデータが見つかりませんでした。利用中の10データセットのキーワードには「劇場」の語に当たるものがありませんでした。",
+    );
+
+    // 文言だけでなく記録でも「分類ガードに到達した」ことを固定する（エリア未指定は area 列が空）
+    expect(recorder.records).toEqual([
+      { question: "演劇", area: undefined, category: "劇場", reason: "other" },
+    ]);
+  });
+
+  it("最後のフォールバックも「対応するものが無い」と断定しない（同じ判断の姉妹分岐）", async () => {
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "演劇" }, recorder);
+
+    expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    expect(output.reason).toBe("other");
+    expect(output.message).toBe(
+      "該当するオープンデータが見つかりませんでした。利用中の10データセットのキーワードには、質問文の語に当たるものがありませんでした。",
+    );
+    expect(recorder.records).toEqual([
+      { question: "演劇", area: undefined, category: undefined, reason: "other" },
+    ]);
   });
 });
 

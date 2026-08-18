@@ -283,6 +283,16 @@ function resolveArea(input: SearchDatasetsInput): ResolvedArea {
 }
 
 /**
+ * `out_of_area` を型として受け付けない `ResolvedArea`。
+ *
+ * 分類ガードは対象エリア外の早期 return より後にあるため `out_of_area` は届かないが、
+ * コメントだけの不変条件は分岐の並べ替えで黙って壊れる（壊れると対象エリア外の問いに
+ * 「利用中の10データセットのキーワードには〜」という嘘の文が出る）。`answeredCandidates` が
+ * `NonEmpty` で「候補ゼロの answered」を不可能にしているのと同じ型担保。
+ */
+type MatchedArea = Exclude<ResolvedArea, { kind: "out_of_area" }>;
+
+/**
  * 分類を明示されたのに1件も当たらなかったとき（Issue #59）。
  *
  * **「利用中の10データセットに無い」と書かない。** 実装が知っているのは「照合した集合で
@@ -291,17 +301,20 @@ function resolveArea(input: SearchDatasetsInput): ResolvedArea {
  * 渋谷区の都市公園・都立公園一覧は10件の中に実在する）。`areaOnlyFallbackUnanswered` と
  * 同じ判断で、**実際に照合した集合と結果だけを書く**。
  *
- * ここに来る `area` は `representative` か `unspecified` のみ（`out_of_area` は
- * `computeSearchDatasets` の冒頭で return 済み）。`unspecified` は全10件を照合しているが、
- * それでも「対応するものが無い」とは書かない。キーワードの照合に当たらないことと、
- * 分類に対応するデータが無いことは別だから（語彙が違うだけかもしれない）。
+ * 書き出しも「ありません」（存在の断定）ではなく「見つかりませんでした」（照合の結果）。
+ * 断定してよいのは無いことを確かめた分岐（ジャンル粒度・エリア外・渋谷の観光データ）だけで、
+ * ここはキーワード表に当たらなかっただけだから（API.md §4）。
+ *
+ * `unspecified` は全10件を照合しているが、それでも「対応するものが無い」とは書かない。
+ * キーワードの照合に当たらないことと、分類に対応するデータが無いことは別だから
+ * （語彙が違うだけかもしれない）。
  */
-const categoryMissUnanswered = (area: ResolvedArea, category: string): Unanswered =>
+const categoryMissUnanswered = (area: MatchedArea, category: string): Unanswered =>
   unanswered(
     "other",
     area.kind === "representative"
-      ? `該当するオープンデータがありません。「${area.area}」で絞り込んだ候補には「${category}」の語に当たるデータセットがありませんでした。`
-      : `該当するオープンデータがありません。利用中の10データセットのキーワードには「${category}」の語に当たるものがありませんでした。`,
+      ? `該当するオープンデータが見つかりませんでした。「${area.area}」で絞り込んだ候補には「${category}」の語に当たるデータセットがありませんでした。`
+      : `該当するオープンデータが見つかりませんでした。利用中の10データセットのキーワードには「${category}」の語に当たるものがありませんでした。`,
   );
 
 /** 質問文に現れたキーワードの数。多く当たったデータセットほど候補として上に出す。 */
@@ -557,9 +570,12 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
     }
   }
 
+  // 最後のフォールバック。ここに来るのはエリアも分類も無くキーワードが1件も当たらなかった
+  // 場合で、実装が知っているのは「全10件のキーワード表に当たらなかった」ことだけ。
+  // `categoryMissUnanswered` と同じ判断（Issue #59）で、「対応するものが無い」とは断定しない
   return unanswered(
     "other",
-    "該当するオープンデータがありません。利用中の10データセットに、この条件に対応するものがありません。",
+    "該当するオープンデータが見つかりませんでした。利用中の10データセットのキーワードには、質問文の語に当たるものがありませんでした。",
   );
 }
 
