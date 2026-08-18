@@ -136,3 +136,50 @@ export function resolveAreaFromName(name: string): string | null {
 
 /** テスト・検証用。分類済みの町字一覧 */
 export const KNOWN_TOWNS = Object.keys(TOWN_TO_AREA);
+
+/**
+ * エリア継承の根拠。住所つきデータセットで分類済みの施設1件を指す。
+ * `datasetTitle` と `sourceRow` で「どのデータセットのどの行から継承したか」を辿れる形にする
+ * （Issue #36 の AC。根拠がオープンデータ側にあることがこの継承の成立条件）。
+ */
+export interface FacilityAreaSource {
+  name: string;
+  area: string;
+  datasetTitle: string;
+  /** ヘッダを除いたデータ行の番号（catalog.ts の `describeQuery` と同じ数え方） */
+  sourceRow: number;
+}
+
+/**
+ * 町字を含まない停留所名に、住所つきデータセットで分類済みの施設名が**完全一致で**
+ * 含まれるなら、その施設のエリアを継承する（Issue #36）。
+ *
+ * めぐりん停留所は所在地列が全件空で、名称が施設名だけのもの（「東西(...)5寛永寺」）は
+ * `resolveAreaFromName` では判定できない。施設名を町字マッピングへ手で足すのは推測で
+ * 埋めることになるが（CLAUDE.md 絶対ルール #1）、住所を持つデータセットに同名の施設が
+ * 実在するなら、判断の根拠はオープンデータ側にある。
+ *
+ * - **完全一致の包含**のみ。部分一致にすると「上野駅」が「上野駅入谷口」に当たる類の
+ *   誤爆が起きる（Issue #36 の検討点）
+ * - 複数の施設名が当たったら**最長一致**を採る（「寛永寺」と「寛永寺霊園」が両方
+ *   当たるなら長いほうが停留所名の意図に近い）
+ * - 最長どうしでエリアが食い違ったら **null**（どちらか決められないものを推測で
+ *   選ばない）。同名施設が複数データセットにあってもエリアが同じなら採用してよい
+ *
+ * 適用は `resolveAreaFromName` が null を返した後段に限る。町字で判定できる停留所に
+ * まで施設照合を挟むと、判定の根拠が「町字か施設か」で行ごとに揺れる。
+ */
+export function inheritAreaFromFacility(
+  stopName: string,
+  facilities: readonly FacilityAreaSource[],
+): FacilityAreaSource | null {
+  if (!stopName) return null;
+  const stripped = stripParenthesized(stopName);
+  const matches = facilities.filter((f) => f.name && stripped.includes(f.name));
+  if (matches.length === 0) return null;
+  const longest = Math.max(...matches.map((m) => m.name.length));
+  const best = matches.filter((m) => m.name.length === longest);
+  const areas = new Set(best.map((m) => m.area));
+  if (areas.size > 1) return null;
+  return best[0];
+}

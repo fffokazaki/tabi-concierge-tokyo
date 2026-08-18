@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractTown, resolveArea, resolveAreaFromName } from "./area.ts";
+import { extractTown, inheritAreaFromFacility, resolveArea, resolveAreaFromName } from "./area.ts";
 
 describe("extractTown", () => {
   it("都県・区のプレフィックスと丁目以降を落として町字だけ返す", () => {
@@ -136,5 +136,53 @@ describe("resolveArea", () => {
 
   it("未知の町字は null を返す（推測で埋めない）", () => {
     expect(resolveArea("架空町1丁目")).toBeNull();
+  });
+});
+
+describe("inheritAreaFromFacility（Issue #36・施設名からのエリア継承）", () => {
+  const facilities = [
+    { name: "寛永寺", area: "上野", datasetTitle: "名所・史跡", sourceRow: 3 },
+    { name: "東京国立博物館", area: "上野", datasetTitle: "文化観光施設", sourceRow: 22 },
+  ];
+
+  it("分類済み施設名を完全一致で含む停留所名は、その施設のエリアと根拠を返す", () => {
+    const source = inheritAreaFromFacility("東西(上野公園経由・三崎坂往復ルート)5寛永寺", facilities);
+    expect(source).toEqual({ name: "寛永寺", area: "上野", datasetTitle: "名所・史跡", sourceRow: 3 });
+  });
+
+  it("分類済み施設名を含まない停留所名は null（判定不能のまま。推測で埋めない）", () => {
+    expect(inheritAreaFromFacility("東西(上野公園経由・三崎坂往復ルート)12谷中銀座・よみせ通り", facilities)).toBeNull();
+    expect(inheritAreaFromFacility("", facilities)).toBeNull();
+  });
+
+  it("括弧内の路線名は照合しない（経由地はその停留所の所在地ではない・Issue #30 と同じ判断）", () => {
+    // 施設名「寛永寺」が路線名側にだけ現れる停留所を、寛永寺の所在地と誤認しない
+    expect(inheritAreaFromFacility("東西(寛永寺経由ルート)12谷中銀座", facilities)).toBeNull();
+  });
+
+  it("複数の施設名が当たったら最長一致を採る", () => {
+    const withStation = [
+      ...facilities,
+      { name: "上野駅", area: "上野", datasetTitle: "名所・史跡", sourceRow: 40 },
+      { name: "上野駅入谷口", area: "上野", datasetTitle: "文化観光施設", sourceRow: 8 },
+    ];
+    const source = inheritAreaFromFacility("2上野駅入谷口", withStation);
+    expect(source?.name).toBe("上野駅入谷口");
+  });
+
+  it("最長一致どうしでエリアが食い違ったら null（どちらか決められないものを選ばない）", () => {
+    const conflicted = [
+      { name: "観音堂", area: "上野", datasetTitle: "名所・史跡", sourceRow: 10 },
+      { name: "観音堂", area: "浅草", datasetTitle: "文化観光施設", sourceRow: 11 },
+    ];
+    expect(inheritAreaFromFacility("3観音堂", conflicted)).toBeNull();
+  });
+
+  it("同名施設が複数データセットにあってもエリアが同じなら採用する", () => {
+    const duplicated = [
+      { name: "旧東京音楽学校奏楽堂", area: "上野", datasetTitle: "名所・史跡", sourceRow: 35 },
+      { name: "旧東京音楽学校奏楽堂", area: "上野", datasetTitle: "文化観光施設", sourceRow: 12 },
+    ];
+    expect(inheritAreaFromFacility("4旧東京音楽学校奏楽堂", duplicated)?.area).toBe("上野");
   });
 });
