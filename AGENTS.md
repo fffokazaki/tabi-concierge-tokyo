@@ -46,12 +46,17 @@ PoC 段階のため軽量な運用を採用している。判断の背景は [AD
 | Worker | Hono（`worker/`）。ローカルも本番も **workerd** で動く（Node ではない） |
 | ビルド | Vite 8 ＋ `@cloudflare/vite-plugin`。ツールチェーンは Node 24（`.nvmrc`） |
 | デプロイ先 | Cloudflare Workers（アカウント `opendata`）。<https://tabi-concierge-tokyo.opendata-002.workers.dev> |
-| 接続 | MCP は `createMcpHandler`（ステートレス。**Durable Objects は使わない**）※Step 5 |
+| 接続（`/api/*`） | **接続済み**。プラン画面が `search_datasets` → `aggregate_dataset` → `get_provenance` の3操作を呼ぶ（Issue #31・`buildPlan.ts`）。中身は `worker/core/` の固定データによるスタブ（Issue #22）で、D1 を引く本実装（Text-to-SQL）は Step 5 |
+| 接続（`/mcp`） | **未着手**（Step 5）。`createMcpHandler`（ステートレス。**Durable Objects は使わない**）を使う想定 |
 | データベース | Cloudflare D1 ※Step 2 で導入 |
 | 認証 | **実装しない**（POC 段階） |
 | コンテナ | 使用しない（サーバーレス） |
 
 > **workerd は Node ではない**。`worker/` のコードで `fs` / `net` を前提にしたライブラリは動かない。ローカル確認は必ず `npm run dev`（workerd 上で動く）で行い、`node` で直接実行しない。
+
+> **既知の制限（`search_datasets` の area フォールバック）**: `worker/core/operations.ts` の `computeSearchDatasets` は、キーワードが1件も当たらず `category` も指定されていないとき、代表エリアが分かっていればそのエリア収録データセットをそのまま「回答あり」として返す汎用フォールバック（`byArea`）を持つ。渋谷はカタログ上の該当データが「都市公園・都立公園一覧」（データセット#10）1件しかないため、`SHIBUYA_SIGHTSEEING_TERMS`（観光・文化施設系の語彙）に当たらない渋谷の問い（例:「渋谷でナイトライフ」）はすべてこのフォールバックを通り、無関係な公園データを返してしまう。**渋谷に限らない**——「ショッピング、上野」も同じフォールバックで無関係な名所・文化施設データを返す（実測確認済み）。この経路は `collectPartialGaps` を通らないため `gaps` に載らず、D1 の未回答記録（Issue #27）にも残らない。
+>
+> **この限界を「ナイトライフ」等のキーワード追加で直さないこと。** 実測で確かめてあるのは「渋谷のカタログには観光・文化施設データが1件も無い」という事実のみで、「ナイトライフ／ショッピングという切り口で検証済み」ではない。キーワードを足すと、検証していないことを検証済みであるかのように主張することになり、絶対ルール #1（推測で埋めない）に反する。根本原因は `byArea` フォールバックの汎用性側にあり、[Issue #50](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/50) で Futoshi が起票済み。修正は Step 5（Text-to-SQL 化）まで見送る。
 
 冒頭に「⚠️ テンプレート未具体化」の注記がある文書は本プロジェクト向けに書き換えられていない。そこに書かれた技術を本プロジェクトの決定と誤認しないこと。
 

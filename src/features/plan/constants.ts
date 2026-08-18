@@ -23,6 +23,13 @@ export const STOP_COUNT_BY_PACE: Record<Pace, number> = {
   packed: 4,
 };
 
+/**
+ * ペース別表示件数の最大値。`buildPlan.ts` の `ROUTE_STOP_LIMIT`（search_datasets へ渡す
+ * 候補件数の上限）はここから導く。別々に定数を持つと、ここを増やしても向こうの上限は
+ * 変わらず、増やしたはずの件数がエラーも無く黙って頭打ちになる。
+ */
+export const MAX_STOP_COUNT = Math.max(...Object.values(STOP_COUNT_BY_PACE));
+
 /** すべて未選択で始めると saveTrip のシナリオ選択が不安定になるため、プロトタイプと同じ初期値にする。 */
 export const DEFAULT_TRIP: Trip = {
   adults: 2,

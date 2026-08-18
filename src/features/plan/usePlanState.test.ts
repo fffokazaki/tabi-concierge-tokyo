@@ -4,10 +4,12 @@ import {
   AGGREGATE_PATH,
   jsonResponse,
   MEISHO_ID,
+  PLAN_FIXTURE_STOPS_4,
   provenanceSource,
   SEARCH_PATH,
   stubFetch,
   stubSuccessfulPlan,
+  stubSuccessfulPlanWithStops,
   PROVENANCE_PATH,
 } from "../../test/planFixtures";
 import { COUNTER_BOUNDS } from "./constants";
@@ -214,6 +216,19 @@ describe("ペースに応じた表示件数", () => {
     act(() => result.current.setTrip("pace", "packed"));
 
     expect(result.current.orderedStops).toHaveLength(3);
+  });
+
+  it("バランス型で応答が表示上限を超えるとき、伏せた件数を持つ（隠しバグの回帰）", async () => {
+    // stubSuccessfulPlan（3件）は STOP_COUNT_BY_PACE.balanced（3件）とちょうど一致してしまい、
+    // 表示上限を超えるケースを再現できない。4件返る応答が要る
+    const { fetchImpl } = stubSuccessfulPlanWithStops(PLAN_FIXTURE_STOPS_4);
+    const result = await renderReadyPlan(fetchImpl); // pace は既定の balanced のまま
+
+    // 表示は上限の3件どまりで水増しはしない。かつ、隠れた1件が黙って消えていないことを
+    // hiddenStopCount で確認する（以前はここが0のまま気づけなかった）
+    expect(result.current.orderedStops).toHaveLength(3);
+    expect(result.current.hiddenStopCount).toBe(1);
+    expect(result.current.hiddenStopNote).toContain("1件を伏せています");
   });
 
   it("非表示になった停留地の位置へはドラッグできない", async () => {

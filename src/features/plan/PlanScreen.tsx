@@ -14,6 +14,7 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
   const {
     request,
     orderedStops,
+    hiddenStopNote,
     selectedStopData,
     displayedEtiquette,
     etiquetteTitle,
@@ -115,6 +116,10 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
                 <ProvenanceChip source={source} />
               </div>
             ))}
+
+            {/* 「該当データなし」（DataGapCard）とは原因が別（表示上限で伏せているだけ）なので、
+                見た目も別要素にする。dashed の DataGapCard とは意図的にスタイルを変えている */}
+            {hiddenStopNote && <p className="route-hidden-note">{hiddenStopNote}</p>}
 
             <div className="route-divider" />
             <div className="route-panel__section-header">

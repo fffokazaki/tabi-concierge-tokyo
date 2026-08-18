@@ -159,6 +159,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .route-status { font-size: 12px; line-height: 1.6; color: var(--muted); margin: 0 0 14px; }
 .route-stop { margin-bottom: 10px; }
 
+/* 表示件数の都合で停留地を伏せていることの注記。「該当データなし」（.data-gap-card）とは
+   意味が違うので、dashed にせず .route-status と同系統の地味な文字だけの表現にする。 */
+.route-hidden-note { font-size: 12px; line-height: 1.6; color: var(--muted); margin: 8px 0 0; }
+
 .route-empty { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 14px; background: var(--surface); }
 .route-empty__title { font-size: 12.5px; font-weight: 700; color: var(--ink); margin: 0 0 6px; }
 .route-empty__message { font-size: 11.5px; line-height: 1.6; color: var(--muted); margin: 0 0 6px; }

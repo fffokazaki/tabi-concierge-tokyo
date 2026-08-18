@@ -4,11 +4,13 @@ import {
   AGGREGATE_PATH,
   jsonResponse,
   MEISHO_ID,
+  PLAN_FIXTURE_STOPS_4,
   provenanceSource,
   PROVENANCE_PATH,
   SEARCH_PATH,
   stubFetch,
   stubSuccessfulPlan,
+  stubSuccessfulPlanWithStops,
 } from "../../test/planFixtures";
 import { AppTabs } from "./AppTabs";
 import { COUNTER_BOUNDS } from "./constants";
@@ -119,6 +121,20 @@ describe("answered — 応答由来のルートと出典", () => {
     await waitFor(() => expect(screen.getByText("寛永寺")).toBeInTheDocument());
     expect(screen.getByText(/出典のあるマナー情報はまだありません/)).toBeInTheDocument();
     expect(screen.queryByText(/鳥居をくぐる前に一礼/)).not.toBeInTheDocument();
+  });
+
+  it("表示上限で伏せた停留地があるとき、DataGapCard とは別の注記を出す", async () => {
+    // 応答が4件でもバランス型の表示上限（3件）を超える分は伏せる。伏せた事実を
+    // 「データが無い」（DataGapCard）と混同させない見た目にする（レビュー指摘の回帰）
+    const { fetchImpl } = stubSuccessfulPlanWithStops(PLAN_FIXTURE_STOPS_4);
+    await createBriefing(fetchImpl);
+
+    await waitFor(() => expect(screen.getByText("寛永寺")).toBeInTheDocument());
+    expect(screen.getByText(/表示件数に合わせて.*1件を伏せています/)).toBeInTheDocument();
+    // gaps は無いので「該当データなし」を示す DataGapCard は出ない
+    expect(screen.queryByText("一部の興味には答えられませんでした")).not.toBeInTheDocument();
+    // 4件目（絹本著色元三大師画像）自体は伏せられて画面に出ない
+    expect(screen.queryByText("絹本著色元三大師画像")).not.toBeInTheDocument();
   });
 
   it("答えられなかった興味（#29 の gaps）を結果として表示する", async () => {
