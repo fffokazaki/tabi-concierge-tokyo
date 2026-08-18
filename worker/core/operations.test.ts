@@ -275,6 +275,44 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
   });
 });
 
+/**
+ * 分類指定の空振りの文言（Issue #59）。
+ *
+ * 実装が知っているのは「照合した集合でキーワード表に当たらなかった」ことだけなので、
+ * 「利用中の10データセットに無い」と断定しない。「上野の公園」で空振りしても、
+ * 渋谷区の都市公園・都立公園一覧は10件の中に実在する。
+ */
+describe("分類指定の空振りの文言", () => {
+  it("エリアで絞り込んでいた場合、絞り込んだ集合で当たらなかったことだけを述べる", async () => {
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "上野", category: "公園" }, recorder);
+
+    expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    expect(output.reason).toBe("other");
+    expect(output.message).toContain("「上野」で絞り込んだ候補");
+    expect(output.message).toContain("「公園」");
+    // 10件全体に無いという断定は、渋谷区の都市公園・都立公園一覧が実在するため事実に反する
+    expect(output.message).not.toContain("対応するものがありません");
+
+    // 分類指定を黙って捨てない挙動は変えない（従来どおり unanswered("other") として記録される）
+    expect(recorder.records).toEqual([
+      { question: "上野", area: "上野", category: "公園", reason: "other" },
+    ]);
+  });
+
+  it("エリア未指定なら、全10件のキーワードを照合して当たらなかったことを述べる", async () => {
+    const output = await searchDatasets({ query: "演劇", category: "劇場" }, capturingGapRecorder());
+
+    expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    expect(output.reason).toBe("other");
+    expect(output.message).toContain("利用中の10データセットのキーワード");
+    expect(output.message).toContain("「劇場」");
+    expect(output.message).not.toContain("対応するものがありません");
+  });
+});
+
 describe("aggregateDataset（直接呼び出し）", () => {
   it("エリアを指定されたら、そのエリアの行が無い限り answered を返さない", async () => {
     // 渋谷区の公園データに上野を求める
