@@ -284,8 +284,10 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
  * 完全一致で固定する（ACE-62-3）。
  */
 describe("マナー・作法の問い", () => {
+  // 「解説に相当するデータ」と限定した文言（DATABASE.md §2.1 の調査範囲）。ルールを場所として
+  // 公開したデータ（§2.2）はカタログに実在する（リンク切れ）ので「存在しない」と広げると嘘になる
   const ETIQUETTE_MESSAGE =
-    "該当するオープンデータがありません。訪日観光客向けのマナー・作法に相当するデータは、東京都オープンデータカタログに存在しないことを確認済みです（2026-08-17 調査）。この未回答は記録され、東京都へのデータ公開リクエストの題材になります。";
+    "該当するオープンデータがありません。訪日観光客向けのマナー・作法の解説に相当するデータは、東京都オープンデータカタログに存在しないことを確認済みです（2026-08-17 調査）。この未回答は記録され、東京都へのデータ公開リクエストの題材になります。";
 
   it("マナーだけを訊かれたら、調査済みの data_not_published を返して記録する", async () => {
     const recorder = capturingGapRecorder();
@@ -340,16 +342,105 @@ describe("マナー・作法の問い", () => {
     }
   });
 
-  it("「参拝」はマナー欠損にしない（行為の語。寺社の問いを奪わない）", async () => {
-    const output = await searchDatasets({ query: "上野で参拝したい" }, capturingGapRecorder());
+  it("調査していない語（礼儀・ピクトグラム）では発火しない（未調査の断定は推測）", async () => {
+    for (const query of ["礼儀を知りたい", "ピクトグラムを探したい"]) {
+      const recorder = capturingGapRecorder();
+      const output = await searchDatasets({ query }, recorder);
 
-    // answered（寺社データが当たる）でも unanswered でもよいが、マナーの調査済み欠損として
-    // 応答・gaps のどちらにも出ないこと
-    if (output.status === "answered") {
-      expect(output.gaps?.some((gap) => gap.message === ETIQUETTE_MESSAGE) ?? false).toBe(false);
-    } else {
+      expect(output.status).toBe("unanswered");
+      if (output.status !== "unanswered") continue;
+      // 最終フォールバック（other）に落ちる。調査済みの data_not_published にしない
+      expect(output.reason).toBe("other");
       expect(output.message).not.toBe(ETIQUETTE_MESSAGE);
+      expect(recorder.records.every((r) => r.reason !== "data_not_published")).toBe(true);
     }
+  });
+
+  it("複数の欠損が同時に成立したら、どちらも消えずに gaps と記録へ残る", async () => {
+    // ADR-010 の頻度集計は記録の完全性に依存する。some/toContainEqual では片方の消失を検出できない
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "上野の美術館とラーメンと作法", area: "上野" }, recorder);
+
+    expect(output.status).toBe("answered");
+    if (output.status !== "answered") return;
+    expect(output.gaps).toEqual([
+      {
+        status: "unanswered",
+        reason: "insufficient_granularity",
+        message:
+          "該当するオープンデータがありません。飲食店の店舗データは「東京都内の飲食店のバリアフリー情報」（210件・バリアフリー対応店に限定）のみで、ジャンルの列を持たないため「ラーメン」の粒度では答えられません。",
+      },
+      { status: "unanswered", reason: "data_not_published", message: ETIQUETTE_MESSAGE },
+    ]);
+    expect(recorder.records).toEqual([
+      { question: "上野の美術館とラーメンと作法", area: "上野", category: undefined, reason: "insufficient_granularity" },
+      { question: "上野の美術館とラーメンと作法", area: "上野", category: undefined, reason: "data_not_published" },
+    ]);
+  });
+
+  describe("判定の優先順（分岐の並べ替えで壊れたら気づけるよう固定する）", () => {
+    it("対象エリア外が先勝ちする（新宿のマナー）", async () => {
+      const output = await searchDatasets({ query: "新宿のマナー" }, capturingGapRecorder());
+
+      expect(output.status).toBe("unanswered");
+      if (output.status !== "unanswered") return;
+      expect(output.reason).toBe("out_of_area");
+    });
+
+    it("ジャンル指定の飲食が先勝ちし、マナーの記録は残らない（既知の取りこぼし）", async () => {
+      // unanswered は理由を1つしか運べない。ADR-010 の頻度集計にとって既知の穴として固定する
+      const recorder = capturingGapRecorder();
+      const output = await searchDatasets({ query: "ラーメンのマナー" }, recorder);
+
+      expect(output.status).toBe("unanswered");
+      if (output.status !== "unanswered") return;
+      expect(output.reason).toBe("insufficient_granularity");
+      expect(recorder.records).toHaveLength(1);
+    });
+
+    it("マナーは渋谷の観光データ欠損より先勝ちする（渋谷の神社のマナー）", async () => {
+      const output = await searchDatasets({ query: "渋谷の神社のマナー" }, capturingGapRecorder());
+
+      expect(output.status).toBe("unanswered");
+      if (output.status !== "unanswered") return;
+      expect(output.message).toBe(ETIQUETTE_MESSAGE);
+    });
+
+    it("category にマナーを書かれても、分類の空振りではなく調査済みの欠損として返す", async () => {
+      // haystack は query と category を連結するので、分類欄のマナーも語彙判定に入る。
+      // 「絞り込んだ候補に当たらなかった」より「カタログに無いことを調査済み」のほうが強い事実
+      const recorder = capturingGapRecorder();
+      const output = await searchDatasets({ query: "上野", category: "マナー" }, recorder);
+
+      expect(output.status).toBe("unanswered");
+      if (output.status !== "unanswered") return;
+      expect(output.reason).toBe("data_not_published");
+      expect(output.message).toBe(ETIQUETTE_MESSAGE);
+      expect(recorder.records).toEqual([
+        { question: "上野", area: "上野", category: "マナー", reason: "data_not_published" },
+      ]);
+    });
+  });
+
+  it("「参拝」はマナー欠損にしない（行為の語。寺社の問いを奪わない）", async () => {
+    // キーワードには当たらず（catalog の keywords に「参拝」は無い）、上野のエリア・フォールバックで
+    // 一覧が返る。マナーの調査済み欠損は応答にも記録にも出ない
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "上野で参拝したい" }, recorder);
+
+    expect(output.status).toBe("answered");
+    if (output.status !== "answered") return;
+    expect(output.gaps).toEqual([
+      {
+        status: "unanswered",
+        reason: "other",
+        message:
+          "該当するオープンデータがありません。質問文の語に当たるデータセットが無かったため、「上野」を収録するデータセットを、エリアの事実として提示しています。",
+      },
+    ]);
+    expect(recorder.records).toEqual([
+      { question: "上野で参拝したい", area: "上野", category: undefined, reason: "other" },
+    ]);
   });
 });
 
