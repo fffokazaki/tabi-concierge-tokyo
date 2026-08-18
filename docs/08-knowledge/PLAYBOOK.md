@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.18.0"
+version: "1.19.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-18"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 46
+ace_entry_count: 49
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -267,8 +267,23 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-62-1 | 応答の共通の書き出しも主張を運ぶ — 分岐で真偽が変わるなら使い分けて契約に書く | architecture | [playbook/architecture.md#ace-62-1](./playbook/architecture.md#ace-62-1) |
 | ACE-62-2 | 文言の嘘を直す判断をしたら、同じ言い回しを grep して姉妹分岐へ同時適用する | process | [playbook/process.md#ace-62-2](./playbook/process.md#ace-62-2) |
 | ACE-62-3 | 文言契約のテストは完全一致で固定し、到達性は副作用で確かめる | testing | [playbook/testing.md#ace-62-3](./playbook/testing.md#ace-62-3) |
+| ACE-64-1 | 名称に構造があるなら、照合は包含ではなく構造に合わせて狭める | data-processing | [playbook/data-processing.md#ace-64-1](./playbook/data-processing.md#ace-64-1) |
+| ACE-64-2 | 参照側に設定を再掲しない — 定義側のフラグ＋前提が崩れたら生成を止める | architecture | [playbook/architecture.md#ace-64-2](./playbook/architecture.md#ace-64-2) |
+| ACE-64-3 | 文書が断定した実測値は、その実測を再現するテストで固定する | documentation-quality | [playbook/documentation-quality.md#ace-64-3](./playbook/documentation-quality.md#ace-64-3) |
 
 ## Changelog
+
+### [1.19.0] - 2026-08-18
+
+#### 追加
+
+- ACE-64-1: 名称に構造があるなら、照合は包含ではなく構造に合わせて狭める（Issue #36 / PR #64）
+- ACE-64-2: 参照側に設定を再掲しない — 定義側のフラグ＋前提が崩れたら生成を止める（Issue #36 / PR #64）
+- ACE-64-3: 文書が断定した実測値は、その実測を再現するテストで固定する（Issue #36 / PR #64）
+
+#### カウンター更新
+
+- ACE-37-1: Helpful +1（継承の照合でも括弧内の路線名を先に落とす同じ判断を再利用し、テストで固定した）
 
 ### [1.18.0] - 2026-08-18
 
