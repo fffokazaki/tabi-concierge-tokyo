@@ -329,20 +329,31 @@ function uncoveredAreaGaps(
  * `area` に目的地の地名を入れるのは、この欠損が応答全体のエリアと必ず違うため（`Gap` の doc 参照。
  * 記録の `area` 列が応答全体の値に落ちると、どの地域のデータが求められたかの集計から消える）。
  *
- * 代表エリアが1つも無い場合はここへ来ない（`resolveArea` が `out_of_area` を返し、応答全体が
- * `unanswered` になる。2件目以降の地名は報告されない — `unanswered` は理由を1つしか運べない
- * 既知の制限と同じ）。
- *
- * **代表エリアがあっても、後段の分岐が `unanswered` を返す経路では同様に落ちる**
- * （ジャンル粒度・マナー・渋谷観光・分類空振りの早期 return。`{ interests: ["ラーメン"],
- * areas: ["上野", "新宿"] }` の新宿は応答にも記録にも残らない）。呼び出し側が明示した欠損の
- * 取りこぼしとして [Issue #70](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/70)
- * で扱う。
+ * 応答全体が `unanswered` になる経路でも、この欠損は**落とさず `gaps` として添える**
+ * （[Issue #70](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/70)）。`unanswered` の
+ * `reason` は1つしか運べないが、呼び出し側が構造化データで明示した目的地の欠損まで
+ * 畳むと、「ラーメンには答えられない」の応答から「新宿を訊かれた」事実が消える。
+ * 応答全体が `out_of_area` の場合は、理由が報告する地名（最初の1件）を除いた残りを添える。
  */
 const outOfAreaAskedGaps = (input: SearchDatasetsInput): Gap[] =>
   (input.areas ?? [])
     .filter((name) => !isRepresentativeArea(name))
     .map((name) => ({ ...outOfAreaUnanswered(name), area: name }));
+
+/**
+ * `unanswered` 応答で、目的地と明示された**代表エリア**のうち絞り込みに使わなかったもの
+ * （Issue #70）。絞り込みに使ったエリアは記録の `area` 列（解決結果）に残るが、2件目以降は
+ * これを添えないと応答・記録・`question` 列のどこにも残らない。
+ *
+ * `uncoveredAreaUnanswered`（「返した候補はいずれも〜」）は候補が存在しない文脈では嘘になる
+ * ため使えない。実際に言えること（この応答がそのエリアについて答えていない）だけを書く。
+ * `reason` は `other`（対象エリアなので `out_of_area` ではなく、データの不在を確かめた
+ * わけでもない — `uncoveredAreaUnanswered` と同じ判断）。
+ */
+const unansweredAskedAreaGap = (area: string): Gap => ({
+  ...unanswered("other", `「${area}」についても訊かれましたが、この応答では答えられていません。`),
+  area,
+});
 
 /**
  * 返した候補のキーワード表に、この興味の語が1つでも当たるか。判定は `scoreEntry` と同一
@@ -489,6 +500,18 @@ const toCandidate = (entry: CatalogEntry): DatasetCandidate => ({
 });
 
 type AnsweredSearch = Extract<SearchDatasetsOutput, { status: "answered" }>;
+type UnansweredSearch = Extract<SearchDatasetsOutput, { status: "unanswered" }>;
+
+/**
+ * 理由が覆っていない構造化欠損を、未回答応答に添える（Issue #70）。無ければキーごと省く。
+ *
+ * 載せるのは `areas` 由来の `out_of_area` だけ（shared/core.ts の doc 参照 — 興味ごとの
+ * 欠損 message は「返した候補」を前提にしており、候補が存在しない未回答の文脈では嘘になる）。
+ */
+function unansweredWith(base: Unanswered, gaps: readonly Gap[]): UnansweredSearch {
+  const [first, ...rest] = gaps;
+  return first ? { ...base, gaps: [first, ...rest] } : base;
+}
 
 /**
  * 候補が1件以上あるときだけ `answered` を作る。
@@ -573,11 +596,12 @@ type CoreOutput = SearchDatasetsOutput | AggregateDatasetOutput | GetProvenanceO
  * 応答全体の値を使う。
  */
 function toGapRecords(output: CoreOutput, context: GapContext): GapRecord[] {
-  if (output.status === "unanswered") return [{ ...context, reason: output.reason }];
-
-  // `answered` に部分欠損が載るのは search_datasets だけ
-  const gaps = "gaps" in output ? output.gaps : undefined;
-  return gaps ? gaps.map((gap) => ({ ...context, area: gap.area ?? context.area, reason: gap.reason })) : [];
+  // `gaps` を持つのは search_datasets だけ。`answered` の部分欠損（Issue #29）に加え、
+  // `unanswered` にも構造化入力由来の欠損が載る（Issue #70）ので、両方の status で行にする
+  const gaps = "gaps" in output ? (output.gaps ?? []) : [];
+  const gapRows = gaps.map((gap) => ({ ...context, area: gap.area ?? context.area, reason: gap.reason }));
+  if (output.status === "unanswered") return [{ ...context, reason: output.reason }, ...gapRows];
+  return gapRows;
 }
 
 /**
@@ -683,7 +707,16 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   const haystack = [input.query ?? "", ...(input.interests ?? []), input.area ?? "", input.category ?? ""].join(" ");
 
   const area = resolveArea(input);
-  if (area.kind === "out_of_area") return outOfAreaUnanswered(area.label);
+
+  // `areas` で目的地と明示された対象エリア外（Issue #58）。応答が `unanswered` になる経路でも
+  // 落とさず添える（Issue #70）。応答全体が `out_of_area` の場合は、理由が報告する地名を除く
+  const outOfAreaAsked = outOfAreaAskedGaps(input);
+  if (area.kind === "out_of_area") {
+    return unansweredWith(
+      outOfAreaUnanswered(area.label),
+      outOfAreaAsked.filter((gap) => gap.area !== area.label),
+    );
+  }
 
   // 訊かれたエリアのうち、実際に返す候補が収録していないものを欠損にする（Issue #52）。
   // 候補が決まらないと判定できないので、`answered` を作る各地点で呼ぶ
@@ -691,10 +724,16 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   const uncovered = (entries: readonly CatalogEntry[]): Gap[] =>
     area.kind === "representative" ? uncoveredAreaGaps(asked, area.area, entries) : [];
 
-  // `areas` で目的地と明示された対象エリア外（Issue #58）。代表エリアが1つも無い場合は
-  // 上の早期 return で応答全体が `out_of_area` になっているので、ここに残るのは
-  // 「代表エリアと混ざって訊かれた」ものだけ
-  const outOfAreaAsked = outOfAreaAskedGaps(input);
+  // `unanswered` を返す経路に添える構造化欠損（Issue #70）: 明示された対象エリア外に加え、
+  // 目的地と明示された代表エリアの2件目以降も落とさない。質問文からの推測（過検知の側に
+  // 倒してある）まで載せると query だけの未回答の記録が過検知ぶん膨らむので、
+  // `areas`（構造化入力）で明示された場合に限る
+  const unansweredExtras: Gap[] = [
+    ...outOfAreaAsked,
+    ...(input.areas && area.kind === "representative"
+      ? asked.filter((name) => name !== area.area).map(unansweredAskedAreaGap)
+      : []),
+  ];
 
   const inArea = area.kind === "unspecified" ? CATALOG : CATALOG.filter((entry) => entry.areas.includes(area.area));
   const matched = inArea
@@ -703,15 +742,19 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
     .sort((a, b) => b.score - a.score || a.entry.no - b.entry.no)
     .map((scored) => scored.entry);
 
-  // ジャンル指定の飲食は、飲食店データで答えたことにしない（ジャンルの列が無いため）
+  // ジャンル指定の飲食は、飲食店データで答えたことにしない（ジャンルの列が無いため）。
+  // 以降の unanswered 早期 return はいずれも `outOfAreaAsked` を添える（Issue #70） —
+  // 添えないと、目的地と明示された対象エリア外の欠損が応答からも記録からも消える
   const genre = findFirstTerm(haystack, CUISINE_GENRE_TERMS);
   const usable = genre ? matched.filter((entry) => entry.datasetId !== RESTAURANT_DATASET_ID) : matched;
-  if (genre && usable.length === 0) return cuisineGenreUnanswered(genre);
+  if (genre && usable.length === 0) return unansweredWith(cuisineGenreUnanswered(genre), unansweredExtras);
 
   // マナー・作法の問いにキーワードが1件も当たらなければ、調査済みの欠損として返す
   // （Issue #43・ADR-010）。エリア・フォールバックより手前に置くのはジャンル判定と同じ理由 —
   // 後ろに回すと「浅草のマナー」に浅草の一覧を返して欠損が消える
-  if (usable.length === 0 && findFirstTerm(haystack, ETIQUETTE_TERMS)) return etiquetteUnanswered();
+  if (usable.length === 0 && findFirstTerm(haystack, ETIQUETTE_TERMS)) {
+    return unansweredWith(etiquetteUnanswered(), unansweredExtras);
+  }
 
   const gaps = collectPartialGaps(area, genre, haystack);
 
@@ -727,7 +770,7 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   }
 
   if (area.kind === "representative" && area.area === "渋谷" && findFirstTerm(haystack, SHIBUYA_SIGHTSEEING_TERMS)) {
-    return shibuyaSightseeingUnanswered();
+    return unansweredWith(shibuyaSightseeingUnanswered(), unansweredExtras);
   }
 
   // 分類を明示されたのに1件も当たらなかったときは、エリアだけの一覧へ落とさない。
@@ -737,7 +780,7 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   // プラン画面は興味も要望も `query` に畳み込むため（`buildPlan.ts` の `buildQuery`）ここを通らず、
   // 下のエリア・フォールバックへ落ちる。そちら側の手当ては Issue #50 で入れた
   if (input.category?.trim()) {
-    return categoryMissUnanswered(area, input.category.trim());
+    return unansweredWith(categoryMissUnanswered(area, input.category.trim()), unansweredExtras);
   }
 
   // キーワードが当たらなくても、エリアが分かっていればそのエリアを収録したデータセットは
@@ -782,9 +825,12 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   // 興味だけの呼び出し（query 省略）に「質問文の語」と書くと、存在しないものを照合したと
   // 読めてしまうので、照合に使った入力に合わせて言い分ける（実際に行ったことだけを書く）
   const askedLabel = input.interests?.length ? "質問文・興味の語" : "質問文の語";
-  return unanswered(
-    "other",
-    `該当するオープンデータが見つかりませんでした。利用中の10データセットのキーワードには、${askedLabel}に当たるものがありませんでした。`,
+  return unansweredWith(
+    unanswered(
+      "other",
+      `該当するオープンデータが見つかりませんでした。利用中の10データセットのキーワードには、${askedLabel}に当たるものがありませんでした。`,
+    ),
+    unansweredExtras,
   );
 }
 
