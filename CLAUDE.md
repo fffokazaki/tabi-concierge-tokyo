@@ -73,9 +73,9 @@ Issue があれば件名に含める: feat: #12 ...
 
 > **workerd は Node ではない**。`worker/` のコードで `fs` / `net` を前提にしたライブラリは動かない。ローカル確認は必ず `npm run dev`（workerd 上で動く）で行い、`node` で直接実行しない。テストは `@cloudflare/vitest-pool-workers` を使う。
 
-> **既知の制限（`search_datasets` の area フォールバック）**: `worker/core/operations.ts` の `computeSearchDatasets` は、キーワードが1件も当たらず `category` も指定されていないとき、代表エリアが分かっていればそのエリア収録データセットをそのまま「回答あり」として返す汎用フォールバック（`byArea`）を持つ。渋谷はカタログ上の該当データが「都市公園・都立公園一覧」（データセット#10）1件しかないため、`SHIBUYA_SIGHTSEEING_TERMS`（観光・文化施設系の語彙）に当たらない渋谷の問い（例:「渋谷でナイトライフ」）はすべてこのフォールバックを通り、無関係な公園データを返してしまう。**渋谷に限らない**——「ショッピング、上野」も同じフォールバックで無関係な名所・文化施設データを返す（実測確認済み）。この経路は `collectPartialGaps` を通らないため `gaps` に載らず、D1 の未回答記録（Issue #27）にも残らない。
+> **`search_datasets` の area フォールバック**: キーワードが1件も当たらないとき代表エリア収録データセットをそのまま返す経路が、答えられていないことを見落としていた欠陥（[Issue #50](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/50)）は [PR #51](https://github.com/fffokazaki/tabi-concierge-tokyo/pull/51) で修正・デプロイ済み。挙動の詳細は [API.md](docs/02-design/API.md) §3.1 を参照（実装が変わるたびにここへ転記すると陳腐化するため、詳細はそちらに一本化する）。
 >
-> **この限界を「ナイトライフ」等のキーワード追加で直さないこと。** 実測で確かめてあるのは「渋谷のカタログには観光・文化施設データが1件も無い」という事実のみで、「ナイトライフ／ショッピングという切り口で検証済み」ではない。キーワードを足すと、検証していないことを検証済みであるかのように主張することになり、絶対ルール #1（推測で埋めない）に反する。根本原因は `byArea` フォールバックの汎用性側にあり、[Issue #50](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/50) で Futoshi が起票済み。修正は Step 5（Text-to-SQL 化）まで見送る。
+> **`SHIBUYA_SIGHTSEEING_TERMS` に「ナイトライフ」等のキーワードを足す直し方は取らないこと。** 実測で確かめてあるのは「渋谷のカタログには観光・文化施設データが1件も無い」という事実のみで、「ナイトライフ／ショッピングという切り口で検証済み」ではない。キーワードを足すと、検証していないことを検証済みであるかのように主張することになり、絶対ルール #1（推測で埋めない）に反する。PR #51 の回帰テストでこの前提が固定されている。
 
 バージョンが「未確認」の項目は実装着手時に確認して [ARCHITECTURE.md](docs/02-design/ARCHITECTURE.md) §8 と [MASTER.md](docs/MASTER.md) を更新する。推測で書かない。
 
