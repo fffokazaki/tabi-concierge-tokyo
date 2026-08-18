@@ -343,6 +343,8 @@ describe("構造化入力: areas（訊かれた目的地）", () => {
     if (output.status !== "unanswered") return;
     expect(output.reason).toBe("out_of_area");
     expect(output.message).toContain("新宿");
+    // 理由が唯一の目的地を報告しているので、空の gaps はキーごと省く
+    expect(Object.hasOwn(output, "gaps")).toBe(false);
     expect(recorder.records).toEqual([
       { question: "美術館を回りたい", area: "新宿", category: undefined, reason: "out_of_area" },
     ]);
@@ -607,6 +609,56 @@ describe("構造化入力: interests（訊かれた興味）", () => {
     expect(output.reason).toBe("other");
     expect(output.gaps).toHaveLength(1);
     expect(output.gaps?.[0].area).toBe("新宿");
+    expect(recorder.records).toEqual([
+      { question: "動物園に行きたい", area: "上野", category: "動物園", reason: "other" },
+      { question: "動物園に行きたい", area: "新宿", category: "動物園", reason: "out_of_area" },
+    ]);
+  });
+
+  it("マナー・渋谷観光の unanswered でも、areas で明示された対象エリア外は gaps に残る", async () => {
+    // どちらも unansweredWith を通る同型の経路だが、分岐の並べ替えで片方だけ添え忘れても
+    // 気づけるよう個別に固定する
+    const etiquette = capturingGapRecorder();
+    const etiquetteOutput = await searchDatasets({ query: "マナーを知りたい", areas: ["浅草", "新宿"] }, etiquette);
+    expect(etiquetteOutput.status).toBe("unanswered");
+    if (etiquetteOutput.status !== "unanswered") return;
+    expect(etiquetteOutput.reason).toBe("data_not_published");
+    expect(etiquetteOutput.gaps?.[0].area).toBe("新宿");
+    expect(etiquette.records).toEqual([
+      { question: "マナーを知りたい", area: "浅草", category: undefined, reason: "data_not_published" },
+      { question: "マナーを知りたい", area: "新宿", category: undefined, reason: "out_of_area" },
+    ]);
+
+    const shibuya = capturingGapRecorder();
+    const shibuyaOutput = await searchDatasets({ query: "美術館を見たい", areas: ["渋谷", "新宿"] }, shibuya);
+    expect(shibuyaOutput.status).toBe("unanswered");
+    if (shibuyaOutput.status !== "unanswered") return;
+    expect(shibuyaOutput.reason).toBe("data_not_published");
+    expect(shibuyaOutput.gaps?.[0].area).toBe("新宿");
+    expect(shibuya.records).toEqual([
+      { question: "美術館を見たい", area: "渋谷", category: undefined, reason: "data_not_published" },
+      { question: "美術館を見たい", area: "新宿", category: undefined, reason: "out_of_area" },
+    ]);
+  });
+
+  it("unanswered でも、目的地と明示された代表エリアの2件目以降が gaps と記録に残る", async () => {
+    // 絞り込みに使った上野は記録の area 列（解決結果）に残るが、渋谷はこの欠損が無いと
+    // 応答・記録・question 列のどこにも残らない。「返した候補が〜」の文言は候補の無い
+    // 文脈では嘘になるため、この応答が答えていない事実だけを書いた専用の文言を使う
+    const recorder = capturingGapRecorder();
+    const output = await searchDatasets({ query: "", interests: ["ラーメン"], areas: ["上野", "渋谷"] }, recorder);
+
+    expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    expect(output.reason).toBe("insufficient_granularity");
+    expect(output.gaps).toHaveLength(1);
+    expect(output.gaps?.[0].reason).toBe("other");
+    expect(output.gaps?.[0].area).toBe("渋谷");
+    expect(output.gaps?.[0].message).toContain("答えられていません");
+    expect(recorder.records).toEqual([
+      { question: "ラーメン", area: "上野", category: undefined, reason: "insufficient_granularity" },
+      { question: "ラーメン", area: "渋谷", category: undefined, reason: "other" },
+    ]);
   });
 
   it("unanswered に興味ごとの欠損は載せない（未回答が全体を覆っている）", async () => {

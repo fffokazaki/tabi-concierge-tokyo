@@ -613,6 +613,18 @@ describe("未回答の gaps 記録", () => {
     expect(await readGapRows()).toEqual([]);
   });
 
+  it("unanswered の gaps も D1 へ1行ずつ入る（主理由と合わせて複数行・Issue #70）", async () => {
+    // コアの偽レコーダーで通っても、本番相当の D1 バッチ書き込みで追加欠損だけ落ちる
+    // リグレッションはここでしか検出できない
+    const body = expectUnanswered(await search({ query: "ラーメンが食べたい", areas: ["上野", "新宿"] }));
+    expect(body.gaps).toHaveLength(1);
+
+    expect(await readGapRows()).toEqual([
+      { question: "ラーメンが食べたい", area: "上野", category: undefined, reason: "insufficient_granularity" },
+      { question: "ラーメンが食べたい", area: "新宿", category: undefined, reason: "out_of_area" },
+    ]);
+  });
+
   it("部分欠損つきの answered では gaps が増える（Issue #29 の gaps を記録に落とす）", async () => {
     // AC の「answered → gaps は増えない」は #29 より前に書かれたもの。
     // 部分欠損を持つ answered まで増えないことにすると、#29 で可視化したばかりの

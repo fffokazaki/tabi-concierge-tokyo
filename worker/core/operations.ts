@@ -341,6 +341,21 @@ const outOfAreaAskedGaps = (input: SearchDatasetsInput): Gap[] =>
     .map((name) => ({ ...outOfAreaUnanswered(name), area: name }));
 
 /**
+ * `unanswered` 応答で、目的地と明示された**代表エリア**のうち絞り込みに使わなかったもの
+ * （Issue #70）。絞り込みに使ったエリアは記録の `area` 列（解決結果）に残るが、2件目以降は
+ * これを添えないと応答・記録・`question` 列のどこにも残らない。
+ *
+ * `uncoveredAreaUnanswered`（「返した候補はいずれも〜」）は候補が存在しない文脈では嘘になる
+ * ため使えない。実際に言えること（この応答がそのエリアについて答えていない）だけを書く。
+ * `reason` は `other`（対象エリアなので `out_of_area` ではなく、データの不在を確かめた
+ * わけでもない — `uncoveredAreaUnanswered` と同じ判断）。
+ */
+const unansweredAskedAreaGap = (area: string): Gap => ({
+  ...unanswered("other", `「${area}」についても訊かれましたが、この応答では答えられていません。`),
+  area,
+});
+
+/**
  * 返した候補のキーワード表に、この興味の語が1つでも当たるか。判定は `scoreEntry` と同一
  * （キーワード表との部分一致だけで、興味の語を分解しない）。
  *
@@ -709,6 +724,17 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   const uncovered = (entries: readonly CatalogEntry[]): Gap[] =>
     area.kind === "representative" ? uncoveredAreaGaps(asked, area.area, entries) : [];
 
+  // `unanswered` を返す経路に添える構造化欠損（Issue #70）: 明示された対象エリア外に加え、
+  // 目的地と明示された代表エリアの2件目以降も落とさない。質問文からの推測（過検知の側に
+  // 倒してある）まで載せると query だけの未回答の記録が過検知ぶん膨らむので、
+  // `areas`（構造化入力）で明示された場合に限る
+  const unansweredExtras: Gap[] = [
+    ...outOfAreaAsked,
+    ...(input.areas && area.kind === "representative"
+      ? asked.filter((name) => name !== area.area).map(unansweredAskedAreaGap)
+      : []),
+  ];
+
   const inArea = area.kind === "unspecified" ? CATALOG : CATALOG.filter((entry) => entry.areas.includes(area.area));
   const matched = inArea
     .map((entry) => ({ entry, score: scoreEntry(entry, haystack) }))
@@ -721,13 +747,13 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   // 添えないと、目的地と明示された対象エリア外の欠損が応答からも記録からも消える
   const genre = findFirstTerm(haystack, CUISINE_GENRE_TERMS);
   const usable = genre ? matched.filter((entry) => entry.datasetId !== RESTAURANT_DATASET_ID) : matched;
-  if (genre && usable.length === 0) return unansweredWith(cuisineGenreUnanswered(genre), outOfAreaAsked);
+  if (genre && usable.length === 0) return unansweredWith(cuisineGenreUnanswered(genre), unansweredExtras);
 
   // マナー・作法の問いにキーワードが1件も当たらなければ、調査済みの欠損として返す
   // （Issue #43・ADR-010）。エリア・フォールバックより手前に置くのはジャンル判定と同じ理由 —
   // 後ろに回すと「浅草のマナー」に浅草の一覧を返して欠損が消える
   if (usable.length === 0 && findFirstTerm(haystack, ETIQUETTE_TERMS)) {
-    return unansweredWith(etiquetteUnanswered(), outOfAreaAsked);
+    return unansweredWith(etiquetteUnanswered(), unansweredExtras);
   }
 
   const gaps = collectPartialGaps(area, genre, haystack);
@@ -744,7 +770,7 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   }
 
   if (area.kind === "representative" && area.area === "渋谷" && findFirstTerm(haystack, SHIBUYA_SIGHTSEEING_TERMS)) {
-    return unansweredWith(shibuyaSightseeingUnanswered(), outOfAreaAsked);
+    return unansweredWith(shibuyaSightseeingUnanswered(), unansweredExtras);
   }
 
   // 分類を明示されたのに1件も当たらなかったときは、エリアだけの一覧へ落とさない。
@@ -754,7 +780,7 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   // プラン画面は興味も要望も `query` に畳み込むため（`buildPlan.ts` の `buildQuery`）ここを通らず、
   // 下のエリア・フォールバックへ落ちる。そちら側の手当ては Issue #50 で入れた
   if (input.category?.trim()) {
-    return unansweredWith(categoryMissUnanswered(area, input.category.trim()), outOfAreaAsked);
+    return unansweredWith(categoryMissUnanswered(area, input.category.trim()), unansweredExtras);
   }
 
   // キーワードが当たらなくても、エリアが分かっていればそのエリアを収録したデータセットは
@@ -804,7 +830,7 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
       "other",
       `該当するオープンデータが見つかりませんでした。利用中の10データセットのキーワードには、${askedLabel}に当たるものがありませんでした。`,
     ),
-    outOfAreaAsked,
+    unansweredExtras,
   );
 }
 
