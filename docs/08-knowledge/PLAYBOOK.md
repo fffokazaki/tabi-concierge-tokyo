@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.23.0"
+version: "1.24.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-18"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 64
+ace_entry_count: 66
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -285,8 +285,17 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-49-3 | 二重管理文書の同期照合は、その PR が触った領域ではなく文書全体で行う | documentation-quality | [playbook/documentation-quality.md#ace-49-3](./playbook/documentation-quality.md#ace-49-3) |
 | ACE-49-4 | 文書の版番号はマージでは解決されない — 長命ブランチでは採番そのものが衝突する | documentation-quality | [playbook/documentation-quality.md#ace-49-4](./playbook/documentation-quality.md#ace-49-4) |
 | ACE-49-5 | 「〜を描画しない」型の否定アサーションは、本番データの実物を確認してから書く | testing | [playbook/testing.md#ace-49-5](./playbook/testing.md#ace-49-5) |
+| ACE-79-1 | 非網羅の語彙表による否定判定を「無い」と書かない — 書けるのは「見つからなかった」まで | documentation-quality | [playbook/documentation-quality.md#ace-79-1](./playbook/documentation-quality.md#ace-79-1) |
+| ACE-79-2 | 全経路に共通する不変条件の注記は、経路ごとに書かず生成関数へ一元化する | architecture | [playbook/architecture.md#ace-79-2](./playbook/architecture.md#ace-79-2) |
 
 ## Changelog
+
+### [1.24.0] - 2026-08-18
+
+#### 追加
+
+- ACE-79-1: 非網羅の語彙表による否定判定を「無い」と書かない — 書けるのは「見つからなかった」まで（Issue #78 / PR #79）
+- ACE-79-2: 全経路に共通する不変条件の注記は、経路ごとに書かず生成関数へ一元化する（Issue #78 / PR #79）
 
 ### [1.23.0] - 2026-08-18
 
