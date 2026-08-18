@@ -1,6 +1,6 @@
 ---
 title: "DEPLOYMENT"
-version: "1.4.7"
+version: "1.4.8"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -205,6 +205,8 @@ npm run deploy  # vite build → wrangler deploy
 
 | 日時 | Version ID | 内容 | 確認 |
 | --- | --- | --- | --- |
+| 2026-08-18 | `5b6f5f35-428f-4670-a81b-29d442fc58a4` | `operations.ts` を `search-gaps.ts` と分割（#71 / PR #74・挙動変更なしの移動のみ）。`worker/` の変更のためデプロイ。`migrations/` 未変更のためマイグレーション・シードは実行していない | `/api/health` OK。#70 の代表入力（`{"interests":["ラーメン"],"areas":["上野","新宿"]}`）が分割前と同一応答（`insufficient_granularity` + gaps 新宿）であることを確認 |
+| 2026-08-18 | `d6afba6e-1451-4499-b00f-db06bf82d02c` | `unanswered` 応答に `gaps` を追加（#70 / PR #73）。`worker/` と `shared/core.ts` の変更のためデプロイ。`migrations/` 未変更のためマイグレーション・シードは実行していない | `/api/health` OK。`{"query":"","interests":["ラーメン"],"areas":["上野","新宿"]}` が `unanswered(insufficient_granularity)` + `gaps` に新宿（`out_of_area`・`area` 付き）で返ることを確認（本番 D1 への記録経路は同一実装のためテストで担保） |
 | 2026-08-18 | `aceb02d5-4dc2-4227-8831-884933dc54ca` | `search_datasets` に構造化入力 `interests` / `areas` を追加（#58・#53 / PR #69 / ADR-011）。`worker/` と `shared/core.ts` の変更で、`migrations/` は未変更のためマイグレーション・シードは実行していない | 下記チェックリスト全項目 OK。加えて `POST /api/search-datasets` に `{"query":"渋谷から上野の美術館へ行きたい","areas":["上野"]}`（gaps なし＝出発地の過検知が消える）と `{"query":"上野で夜遊びしたい","interests":["ナイトライフ"]}`（銭湯＋興味の取り落ち gap）を投げて確認、`area`＋`areas` 同時指定の 400 も確認。**本番 D1 の `gaps` に `ナイトライフ、上野で夜遊びしたい / 上野 / other` の行が入ること**を確認。伝播直後の1回目は旧版が応答した（旧仕様どおり query から渋谷を過検知した行が1行残っている） |
 | 2026-08-18 | `f4a09425-4bb5-4988-856a-ee4ed554af3a` | マナー・作法の問いを調査済み欠損（`data_not_published`）としてデータ公開リクエストへ還元（#43 / PR #66 / ADR-010）。`worker/core/operations.ts` のみの変更で、`migrations/` は未変更のためマイグレーション・シードは実行していない | 下記チェックリスト全項目 OK。加えて `POST /api/search-datasets` にマナー単独（`{"query":"日本のマナーを知りたい"}`）と混在（`{"query":"上野の美術館と作法"}`）を投げ、前者が `data_not_published` の全体応答・後者が `answered` ＋ `gaps` 添付で返ること、**本番 D1 の `gaps` に両方の `data_not_published` 行が入ること**を確認。伝播直後の1回目は旧版が応答した（`other` の記録が1行残っており、旧版でも記録自体は動いていた） |
 | 2026-08-18 | （Worker 未変更・`npm run db:seed` のみ） | めぐりん停留所の施設名からのエリア継承（#36 / PR #64）。`scripts/` の変更で spots 3 件の `area` が変わるためリモート D1 へ再シード。`migrations/` 未変更のため migrate は実行せず、`worker/` 未変更のため deploy も実行していない | リモート D1 を実測: めぐりんのエリア別件数が 上野 18・浅草 14・判定不能 40（継承前は 上野 15・判定不能 43）、総 `spots` 1,645 件・`gaps` 17 行が保持されていることを確認 |
@@ -400,6 +402,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.4.8] - 2026-08-18
+
+#### 追加
+
+- デプロイ記録に PR #73（#70: unanswered の gaps）と PR #74（#71: operations.ts 分割）の反映を追記
 
 ### [1.4.7] - 2026-08-18
 
