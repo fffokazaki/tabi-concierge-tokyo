@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.20.0"
+version: "1.21.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-18"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 51
+ace_entry_count: 55
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -272,8 +272,21 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-64-3 | 文書が断定した実測値は、その実測を再現するテストで固定する | documentation-quality | [playbook/documentation-quality.md#ace-64-3](./playbook/documentation-quality.md#ace-64-3) |
 | ACE-66-1 | 埋められない看板機能は、欠損の記録頻度を還元の根拠に変える（エスカレーション） | architecture | [playbook/architecture.md#ace-66-1](./playbook/architecture.md#ace-66-1) |
 | ACE-66-2 | 調査済みの断定は、調査の範囲・粒度に文言を一致させる | documentation-quality | [playbook/documentation-quality.md#ace-66-2](./playbook/documentation-quality.md#ace-66-2) |
+| ACE-69-1 | 呼び出し側が構造で持つ情報は、畳み込む前に受ける — 推測での復元はフォールバック | architecture | [playbook/architecture.md#ace-69-1](./playbook/architecture.md#ace-69-1) |
+| ACE-69-2 | 部分一致の haystack に絞り込みキーを混ぜない — 「新宿」は「宿」に当たる | data-processing | [playbook/data-processing.md#ace-69-2](./playbook/data-processing.md#ace-69-2) |
+| ACE-69-3 | 既知欠損との重複排除は、語のクラスではなく「報告された1件」との対応で畳む | architecture | [playbook/architecture.md#ace-69-3](./playbook/architecture.md#ace-69-3) |
+| ACE-69-4 | 頻度が根拠になる記録は、1リクエスト内の入力重複を正規化してから積む | data-processing | [playbook/data-processing.md#ace-69-4](./playbook/data-processing.md#ace-69-4) |
 
 ## Changelog
+
+### [1.21.0] - 2026-08-18
+
+#### 追加
+
+- ACE-69-1: 呼び出し側が構造で持つ情報は、畳み込む前に受ける — 推測での復元はフォールバック（Issue #53 #58 / PR #69 / ADR-011）
+- ACE-69-2: 部分一致の haystack に絞り込みキーを混ぜない — 「新宿」は「宿」に当たる（PR #69）
+- ACE-69-3: 既知欠損との重複排除は、語のクラスではなく「報告された1件」との対応で畳む（PR #69）
+- ACE-69-4: 頻度が根拠になる記録は、1リクエスト内の入力重複を正規化してから積む（PR #69）
 
 ### [1.20.0] - 2026-08-18
 
