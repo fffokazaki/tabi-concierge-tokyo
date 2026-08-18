@@ -4,10 +4,12 @@ import {
   AGGREGATE_PATH,
   jsonResponse,
   MEISHO_ID,
+  PLAN_FIXTURE_STOPS_4,
   provenanceSource,
   SEARCH_PATH,
   stubFetch,
   stubSuccessfulPlan,
+  stubSuccessfulPlanWithStops,
   PROVENANCE_PATH,
 } from "../../test/planFixtures";
 import { COUNTER_BOUNDS } from "./constants";
@@ -191,6 +193,56 @@ describe("停留地の並べ替えと選択", () => {
 
     expect(result.current.orderedStops.map((s) => s.stop.place)).toEqual(["寛永寺", "国立西洋美術館", "燕湯"]);
     expect(result.current.selectedStopData).toBeNull();
+  });
+});
+
+describe("ペースに応じた表示件数", () => {
+  it("ゆったりは応答の一部だけを表示する", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    const { result } = renderHook(() => usePlanState({ fetchImpl }));
+    act(() => result.current.setTrip("pace", "relaxed"));
+
+    act(() => result.current.saveTrip());
+    await waitFor(() => expect(result.current.request.status).toBe("ready"));
+
+    expect(result.current.orderedStops).toHaveLength(2);
+  });
+
+  it("しっかりでも、応答の件数を超えて水増しはしない", async () => {
+    // stubSuccessfulPlan は3件しか返さない。STOP_COUNT_BY_PACE.packed は4件だが、
+    // 実際に取れた件数（3件）で頭打ちになるべきで、存在しない4件目を捏造しない
+    const { fetchImpl } = stubSuccessfulPlan();
+    const result = await renderReadyPlan(fetchImpl);
+    act(() => result.current.setTrip("pace", "packed"));
+
+    expect(result.current.orderedStops).toHaveLength(3);
+  });
+
+  it("バランス型で応答が表示上限を超えるとき、伏せた件数を持つ（隠しバグの回帰）", async () => {
+    // stubSuccessfulPlan（3件）は STOP_COUNT_BY_PACE.balanced（3件）とちょうど一致してしまい、
+    // 表示上限を超えるケースを再現できない。4件返る応答が要る
+    const { fetchImpl } = stubSuccessfulPlanWithStops(PLAN_FIXTURE_STOPS_4);
+    const result = await renderReadyPlan(fetchImpl); // pace は既定の balanced のまま
+
+    // 表示は上限の3件どまりで水増しはしない。かつ、隠れた1件が黙って消えていないことを
+    // hiddenStopCount で確認する（以前はここが0のまま気づけなかった）
+    expect(result.current.orderedStops).toHaveLength(3);
+    expect(result.current.hiddenStopCount).toBe(1);
+    expect(result.current.hiddenStopNote).toContain("1件を伏せています");
+  });
+
+  it("非表示になった停留地の位置へはドラッグできない", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    const result = await renderReadyPlan(fetchImpl);
+    act(() => result.current.setTrip("pace", "relaxed")); // 2件だけ表示
+    const originalPlaces = result.current.orderedStops.map((s) => s.stop.place);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    act(() => result.current.reorderStop(0, 2)); // 2 は非表示（3番目）の位置
+
+    expect(result.current.orderedStops.map((s) => s.stop.place)).toEqual(originalPlaces);
+    expect(warnSpy).toHaveBeenCalledOnce();
+    warnSpy.mockRestore();
   });
 });
 

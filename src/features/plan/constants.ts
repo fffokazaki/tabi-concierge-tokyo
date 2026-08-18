@@ -1,4 +1,4 @@
-import { BUDGETS, INTEREST_TAGS, PACES, SETTINGS, type Trip } from "./types";
+import { BUDGETS, INTEREST_TAGS, PACES, SETTINGS, type Pace, type Trip } from "./types";
 
 /** 同行者カウンター（大人・子ども・滞在日数）の上下限をひとまとめにしたもの。 */
 export const COUNTER_BOUNDS = {
@@ -15,6 +15,20 @@ export const INTEREST_OPTIONS = INTEREST_TAGS;
 export const SETTING_OPTIONS = SETTINGS;
 export const PACE_OPTIONS = PACES;
 export const BUDGET_OPTIONS = BUDGETS;
+
+/** ペースに応じて表示する停留地数。応答の停留地数がこれより少ない場合はある分だけ表示する。 */
+export const STOP_COUNT_BY_PACE: Record<Pace, number> = {
+  relaxed: 2,
+  balanced: 3,
+  packed: 4,
+};
+
+/**
+ * ペース別表示件数の最大値。`buildPlan.ts` の `ROUTE_STOP_LIMIT`（search_datasets へ渡す
+ * 候補件数の上限）はここから導く。別々に定数を持つと、ここを増やしても向こうの上限は
+ * 変わらず、増やしたはずの件数がエラーも無く黙って頭打ちになる。
+ */
+export const MAX_STOP_COUNT = Math.max(...Object.values(STOP_COUNT_BY_PACE));
 
 /** すべて未選択で始めると saveTrip のシナリオ選択が不安定になるため、プロトタイプと同じ初期値にする。 */
 export const DEFAULT_TRIP: Trip = {

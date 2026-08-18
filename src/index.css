@@ -159,15 +159,14 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .route-status { font-size: 12px; line-height: 1.6; color: var(--muted); margin: 0 0 14px; }
 .route-stop { margin-bottom: 10px; }
 
+/* 表示件数の都合で停留地を伏せていることの注記。「該当データなし」（.data-gap-card）とは
+   意味が違うので、dashed にせず .route-status と同系統の地味な文字だけの表現にする。 */
+.route-hidden-note { font-size: 12px; line-height: 1.6; color: var(--muted); margin: 8px 0 0; }
+
 .route-empty { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 14px; background: var(--surface); }
 .route-empty__title { font-size: 12.5px; font-weight: 700; color: var(--ink); margin: 0 0 6px; }
 .route-empty__message { font-size: 11.5px; line-height: 1.6; color: var(--muted); margin: 0 0 6px; }
 .route-empty__reason { font-size: 10.5px; color: var(--muted); margin: 0; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
-
-/* 答えられなかった興味（#29 の gaps）。データが無いことは正常な出力なのでエラー色にしない */
-.route-gaps { font-size: 11px; line-height: 1.6; color: oklch(45% 0.14 60); background: oklch(94% 0.05 60); border: 1px solid oklch(80% 0.08 60); border-radius: 8px; padding: 8px 10px; margin: 0 0 14px; }
-.route-gaps__title { font-weight: 700; margin: 0 0 4px; }
-.route-gaps__list { margin: 0; padding-left: 1.1em; }
 
 .route-failure { border: 1px solid oklch(75% 0.14 25); background: oklch(96% 0.03 25); border-radius: 10px; padding: 12px; margin-bottom: 14px; }
 .route-failure__title { font-size: 12.5px; font-weight: 700; color: oklch(45% 0.18 25); margin: 0 0 6px; }
@@ -185,6 +184,14 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .stop-card__time { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.3px; }
 .stop-card__place { font-family: "Lora", Georgia, "Yu Mincho", serif; font-size: 15px; font-weight: 600; color: var(--ink); margin: 2px 0 0; }
 .stop-card__note { font-size: 12.5px; color: oklch(40% 0.02 75); line-height: 1.5; margin: 3px 0 0; }
+
+/* 答えられなかった興味（Issue #29 の gaps）。データが無いことは正常な出力なのでエラー色にしない。
+   承認済みデザインカンプの角丸破線カードを踏襲（詳細は DataGapCard.tsx のコメント参照）。 */
+.data-gap-card { border: 1.5px dashed var(--border); border-radius: 12px; padding: 14px; margin: 4px 0 16px; background: var(--bg); }
+.data-gap-card__title { font-family: "Lora", Georgia, "Yu Mincho", serif; font-size: 15px; font-weight: 600; color: var(--ink); margin: 0 0 8px; }
+.data-gap-card__list { margin: 0; padding-left: 1.1em; font-size: 12.5px; line-height: 1.6; color: oklch(40% 0.02 75); }
+.data-gap-card__list li { margin-bottom: 4px; }
+.data-gap-card__list li:last-child { margin-bottom: 0; }
 
 .route-divider { border-top: 1px solid var(--border); margin: 6px 0 14px; }
 .route-panel__section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }

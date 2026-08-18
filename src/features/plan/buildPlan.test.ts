@@ -9,8 +9,8 @@ import {
   SEARCH_PATH as SEARCH,
   stubFetch,
 } from "../../test/planFixtures";
-import { buildPlan, buildQuery, type PlanOutcome } from "./buildPlan";
-import { DEFAULT_TRIP } from "./constants";
+import { buildPlan, buildQuery, ROUTE_STOP_LIMIT, type PlanOutcome } from "./buildPlan";
+import { DEFAULT_TRIP, MAX_STOP_COUNT } from "./constants";
 import type { Trip } from "./types";
 
 /**
@@ -69,6 +69,15 @@ describe("buildPlan", () => {
     await buildPlan(DEFAULT_TRIP, { fetchImpl });
 
     expect(calls.map((call) => call.path)).toEqual([SEARCH, AGGREGATE, AGGREGATE, PROVENANCE]);
+  });
+
+  it("search_datasets へ渡す limit は STOP_COUNT_BY_PACE の最大値と揃っている（別々にハードコードして乖離させない）", async () => {
+    const { fetchImpl, calls } = happyPath();
+    await buildPlan(DEFAULT_TRIP, { fetchImpl });
+
+    const searchCall = calls.find((call) => call.path === SEARCH);
+    expect((searchCall?.body as { limit: number }).limit).toBe(MAX_STOP_COUNT);
+    expect(ROUTE_STOP_LIMIT).toBe(MAX_STOP_COUNT);
   });
 
   it("name / summary を Stop.place / Stop.note に写し、出典を対で持つ", async () => {

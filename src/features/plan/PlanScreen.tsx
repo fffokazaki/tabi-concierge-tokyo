@@ -1,5 +1,5 @@
 import type { DragEvent } from "react";
-import type { Unanswered } from "../../../shared/core";
+import { DataGapCard } from "./components/DataGapCard";
 import { EtiquetteList } from "./components/EtiquetteList";
 import { ProvenanceChip } from "./components/ProvenanceChip";
 import { RouteStopCard } from "./components/RouteStopCard";
@@ -14,6 +14,7 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
   const {
     request,
     orderedStops,
+    hiddenStopNote,
     selectedStopData,
     displayedEtiquette,
     etiquetteTitle,
@@ -96,7 +97,7 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
 
         {request.status === "ready" && (
           <>
-            {request.gaps.length > 0 && <GapNotice gaps={request.gaps} />}
+            {request.gaps.length > 0 && <DataGapCard gaps={request.gaps} />}
 
             {orderedStops.map(({ origIdx, pos, stop, source, positionLabel, selected, isDragOver }) => (
               <div key={origIdx} className="route-stop">
@@ -115,6 +116,10 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
                 <ProvenanceChip source={source} />
               </div>
             ))}
+
+            {/* 「該当データなし」（DataGapCard）とは原因が別（表示上限で伏せているだけ）なので、
+                見た目も別要素にする。dashed の DataGapCard とは意図的にスタイルを変えている */}
+            {hiddenStopNote && <p className="route-hidden-note">{hiddenStopNote}</p>}
 
             <div className="route-divider" />
             <div className="route-panel__section-header">
@@ -137,25 +142,6 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
           </>
         )}
       </div>
-    </div>
-  );
-}
-
-/**
- * 答えられなかった興味の表示（Issue #29 の `gaps`）。
- *
- * エラー扱いにしない。データが無いことは正常な出力で、「どのデータが公開されていないか」を
- * 見せること自体が企画の芯にあたる（DOMAIN.md §7）。
- */
-function GapNotice({ gaps }: { gaps: Unanswered[] }) {
-  return (
-    <div className="route-gaps" role="status">
-      <p className="route-gaps__title">一部の興味には答えられませんでした</p>
-      <ul className="route-gaps__list">
-        {gaps.map((gap) => (
-          <li key={`${gap.reason}:${gap.message}`}>{gap.message}</li>
-        ))}
-      </ul>
     </div>
   );
 }

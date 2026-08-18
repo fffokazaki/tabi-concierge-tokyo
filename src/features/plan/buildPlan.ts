@@ -7,6 +7,7 @@ import type {
 } from "../../../shared/core";
 import { UNANSWERED_REASONS } from "../../../shared/core";
 import { callCoreOperation, type CoreOperation } from "../../api/coreOperations";
+import { MAX_STOP_COUNT } from "./constants";
 import { INTEREST_LABELS } from "./labels";
 import type { Stop, Trip } from "./types";
 
@@ -29,10 +30,12 @@ import type { Stop, Trip } from "./types";
  */
 
 /**
- * 1ルートに載せる停留地の上限。`search_datasets` の既定値（4）と揃えてある
- * （API.md §3.1。フロントエンドが1ルートに3〜4停留地を想定しているため）。
+ * 1ルートに載せる停留地の上限。`STOP_COUNT_BY_PACE`（constants.ts）の最大値から導く。
+ * ハードコードで別々に持つと、ペースの表示件数（例: packed）を増やしても
+ * `search_datasets` の上限は変わらず、増やしたはずの件数がエラーも無く頭打ちになる。
+ * 現状は4（API.md §3.1 の既定値と一致。フロントエンドが1ルートに3〜4停留地を想定しているため）。
  */
-export const ROUTE_STOP_LIMIT = 4;
+export const ROUTE_STOP_LIMIT = MAX_STOP_COUNT;
 
 /** 停留地とその出典。出典なしの停留地を作れないよう、対で持つ。 */
 export type SourcedStop = { stop: Stop; source: ProvenanceSource };

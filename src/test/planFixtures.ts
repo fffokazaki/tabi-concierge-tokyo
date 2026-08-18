@@ -13,6 +13,7 @@ import type { ProvenanceSource } from "../../shared/core";
 
 export const MEISHO_ID = "t131067d0000000251";
 export const BUNKA_ID = "t131067d0000000236";
+export const BUNKAZAI_ID = "t131067d0000000393";
 
 export const SEARCH_PATH = "/api/search-datasets";
 export const AGGREGATE_PATH = "/api/aggregate-dataset";
@@ -56,12 +57,15 @@ export const PLAN_FIXTURE_STOPS = [
   { id: "t131067d0000000256", title: "銭湯", name: "燕湯", summary: "住所は東京都台東区上野3-14-5。" },
 ] as const;
 
-export function stubSuccessfulPlan() {
+type FixtureStop = { id: string; title: string; name: string; summary: string };
+
+/** `stubSuccessfulPlan` 系の共通実装。渡した停留地の集合で3操作すべてに一貫して答える。 */
+export function stubSuccessfulPlanWithStops(planStops: readonly FixtureStop[]) {
   return stubFetch({
     [SEARCH_PATH]: () =>
       jsonResponse({
         status: "answered",
-        candidates: PLAN_FIXTURE_STOPS.map((stop) => ({
+        candidates: planStops.map((stop) => ({
           datasetId: stop.id,
           title: stop.title,
           provider: "台東区",
@@ -72,14 +76,27 @@ export function stubSuccessfulPlan() {
     // 実際の aggregate_dataset と同じく datasetId で引く。呼ばれた回数では分岐しない
     [AGGREGATE_PATH]: (body) => {
       const datasetId = (body as { datasetId: string }).datasetId;
-      const stop = PLAN_FIXTURE_STOPS.find((candidate) => candidate.id === datasetId);
+      const stop = planStops.find((candidate) => candidate.id === datasetId);
       if (!stop) return jsonResponse({ status: "unanswered", reason: "other", message: "未知のID" });
       return jsonResponse({ status: "answered", result: { name: stop.name, summary: stop.summary }, query: "q" });
     },
     [PROVENANCE_PATH]: () =>
       jsonResponse({
         status: "answered",
-        sources: PLAN_FIXTURE_STOPS.map((stop) => provenanceSource(stop.id, stop.title)),
+        sources: planStops.map((stop) => provenanceSource(stop.id, stop.title)),
       }),
   });
 }
+
+export function stubSuccessfulPlan() {
+  return stubSuccessfulPlanWithStops(PLAN_FIXTURE_STOPS);
+}
+
+/**
+ * 4件の停留地が出典つきで返る組み合わせ（バランス型の表示上限＝3件を超えるケースの回帰用）。
+ * `PLAN_FIXTURE_STOPS`（3件）は他テストがその件数そのものに依存しているため変更しない。
+ */
+export const PLAN_FIXTURE_STOPS_4 = [
+  ...PLAN_FIXTURE_STOPS,
+  { id: BUNKAZAI_ID, title: "文化財一覧", name: "絹本著色元三大師画像", summary: "台東区指定文化財の一つ。" },
+] as const;

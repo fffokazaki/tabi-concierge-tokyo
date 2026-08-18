@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { Unanswered, UnansweredReason } from "../../../shared/core";
 import { buildPlan, type BuildPlanOptions, type PlanFailure, type SourcedStop } from "./buildPlan";
-import { DEFAULT_TRIP } from "./constants";
+import { DEFAULT_TRIP, STOP_COUNT_BY_PACE } from "./constants";
 import { INTEREST_LABELS, PACE_LABELS } from "./labels";
 import type { InterestTag, Screen, Trip } from "./types";
 
@@ -57,8 +57,25 @@ export function usePlanState(options: BuildPlanOptions = {}) {
   const latestRequest = useRef(0);
 
   const stops = request.status === "ready" ? request.stops : [];
-  const effectiveOrder = order ?? stops.map((_, i) => i);
-  const selectedStopData = selectedIdx != null ? (stops[selectedIdx]?.stop ?? null) : null;
+  // 並べ替えは応答全件分保持するが、表示するのはペースに応じた件数だけ（隠れた分の並び順は失わない）。
+  // effectiveOrder は常に「並べ替え後の順序の先頭からの連続区間」になる（一部を間引いた
+  // 部分集合にはしない）。reorderStop の範囲判定・splice はどちらも「表示中の件数」だけを
+  // 見ているが、それで壊れないのはこの前提（プレフィックスであること）があるため。
+  // 将来ここを .filter() 系に変えると、この前提が崩れて位置と添字の対応が静かにずれる。
+  const visibleCount = Math.min(STOP_COUNT_BY_PACE[trip.pace], stops.length);
+  const effectiveOrder = (order ?? stops.map((_, i) => i)).slice(0, visibleCount);
+  /**
+   * 表示件数の都合で伏せている停留地の数。「該当データなし」（gaps）とは原因が別物
+   * （こちらは出典の取れた停留地が実在するが、ペース別の表示上限で削られているだけ）なので、
+   * 画面でも DataGapCard とは別要素として出す（PlanScreen 参照）。
+   */
+  const hiddenStopCount = stops.length - effectiveOrder.length;
+  const hiddenStopNote =
+    hiddenStopCount > 0
+      ? `${PACE_LABELS[trip.pace]}の表示件数に合わせて、出典の取れた停留地のうち${hiddenStopCount}件を伏せています。`
+      : null;
+  const selectedStopData =
+    selectedIdx != null && effectiveOrder.includes(selectedIdx) ? stops[selectedIdx].stop : null;
 
   const orderedStops: OrderedStop[] = effectiveOrder.map((origIdx, pos) => ({
     origIdx,
@@ -155,6 +172,8 @@ export function usePlanState(options: BuildPlanOptions = {}) {
     trip,
     request,
     orderedStops,
+    hiddenStopCount,
+    hiddenStopNote,
     selectedStopData,
     displayedEtiquette,
     etiquetteTitle,
@@ -184,6 +203,7 @@ export type PlanScreenState = Pick<
   PlanState,
   | "request"
   | "orderedStops"
+  | "hiddenStopNote"
   | "selectedStopData"
   | "displayedEtiquette"
   | "etiquetteTitle"
