@@ -11,7 +11,7 @@ describe("InterestFilterChips", () => {
     expect(screen.getByRole("button", { name: "ラーメン" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "文化" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "家族向け" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "ナイトライフ" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "自然" })).toBeInTheDocument();
   });
 
   it("常に1つだけアクティブになる（単一選択）", () => {

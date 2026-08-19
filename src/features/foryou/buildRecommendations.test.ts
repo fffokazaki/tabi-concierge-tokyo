@@ -98,7 +98,7 @@ describe("「すべて」", () => {
       "ラーメン",
       "文化",
       "家族向け",
-      "ナイトライフ",
+      "自然",
     ]);
   });
 
@@ -117,7 +117,7 @@ describe("「すべて」", () => {
           candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
           gaps: [
             { status: "unanswered", reason: "insufficient_granularity", message: "「ラーメン」の粒度では…" },
-            { status: "unanswered", reason: "other", message: "「ナイトライフ」に当たるものがありませんでした。" },
+            { status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" },
           ],
         }),
       [AGGREGATE]: () => json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" }),
