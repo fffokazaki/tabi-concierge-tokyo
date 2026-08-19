@@ -30,11 +30,13 @@ import type { ActiveInterest, Recommendation } from "./types";
  * 候補を集計できないと、検索側は「覆えた」と判定して欠損を出さず、集計側で黙って落ちる
  * ―― その興味が答えられも報告もされない状態になる。
  *
- * **出典が取れずに落ちる候補（`get_provenance` 側）はまだ黙って消える**（[Issue #92]）。
- * 集計側と違って持ち上げられる文面がサーバー応答に無く、何を出すかを決める必要があるため
- * 分けてある。
+ * 直しきっていないものが2つある。**出典が取れずに落ちる候補（`get_provenance` 側）は
+ * まだ黙って消える**（[Issue #92]。集計側と違って持ち上げられる文面がサーバー応答に無い）。
+ * **候補が全滅したときは個々の理由が汎用の `other` に丸められる**（[Issue #94]。可視性は
+ * 残るが内訳が落ちる）。どちらも分類・表示の設計判断を要するため分けてある。
  *
  * [Issue #92]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/92
+ * [Issue #94]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/94
  */
 
 export type RecommendationOutcome =
@@ -94,17 +96,11 @@ export async function buildRecommendations(
   }
 
   if (extracted.length === 0) {
-    // 理由が1つに定まるときはそれをそのまま返す。汎用の other へ丸めると、
-    // 粒度不足（insufficient_granularity）が「その他」として集計され、
-    // 未回答の分類そのものが実態とずれる（DOMAIN.md §7・§8）。
-    //
-    // 検索側の gap も勘定に入れる。集計側だけを見ると、検索が別の理由で覆えなかった
-    // 興味があるのに集計側の理由を画面全体の理由として名乗ってしまう
-    const remaining = dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps]);
-    if (remaining.length === 1) {
-      return { kind: "unanswered", reason: remaining[0].reason, message: remaining[0].message };
-    }
-
+    // 候補が全滅したときは分類を汎用の other に置く。個々の未回答理由（`aggregateGaps`）を
+    // ここで画面全体の分類へ引き上げると、1件のデータセットについての判定を全体の判定として
+    // 名乗ることになる ―― `data_not_published` は「カタログに該当データが存在しないことを
+    // 確かめられた場合」（shared/core.ts）だが、実際に確かめたのは候補1件の不足でしかない。
+    // どの分類なら引き上げてよいかは設計判断なので Issue #94 で決める
     return {
       kind: "unanswered",
       reason: "other",
@@ -146,9 +142,13 @@ export async function buildRecommendations(
 /**
  * 同じ分類・同じ文面の未回答を1件にまとめる。
  *
- * 集計側の未回答は「どのデータセットで起きたか」を含まない文面なので、複数の候補が
- * 同じ理由で落ちると同一の行が並ぶ。畳み込む単位は `DataGapCard` が行の区別に使う組
- * （`reason` と `message`）と同じで、そこを揃えないと React の key が重複する。
+ * 畳み込む単位は `DataGapCard` が行の区別に使う組（`reason` と `message`）と同じ。
+ * そこを揃えないと React の key が重複する。
+ *
+ * **どれだけ実際に畳み込まれるかは当てにしない。** `computeAggregateDataset`
+ * （worker/core/operations.ts）が返す未回答は6分岐のうち5つがデータセット名を文面へ
+ * 埋め込むため、同じ分類でも文面は候補ごとに異なる。ここは重複を防ぐ不変条件であって、
+ * 件数を減らす仕組みではない。
  */
 function dedupeGaps(gaps: Unanswered[]): Unanswered[] {
   const seen = new Set<string>();
