@@ -81,7 +81,7 @@ Issue があれば件名に含める: feat: #12 ...
 >
 > **あなたへ画面（`src/features/foryou/`）の興味チップはラーメンだけ意図的に候補ゼロのまま残してある。** 実データ検証済みの `insufficient_granularity`（粒度不足）を具体的な理由つきで返す、正直な「答えられない」実演として価値がある（DATABASE.md「既知のデータ欠損」・DOMAIN.md §7）。バグではないので、キーワード表を拡張して「直そう」としないこと（絶対ルール #1）。
 >
-> ナイトライフはカタログ全10件にキーワードが1件も当たらず常に候補ゼロだったため `nature`（自然）へ差し替え済み（2026-08-19・Futoshi が本番データで確認。渋谷区都市公園一覧で実在候補1件、search_datasets → aggregate_dataset → get_provenance の一連が実際に動くことまで確認済み）。差し替え候補として `shopping`（ショッピング）も検討したが、こちらは候補ゼロ（nightlife より悪い）で採用していない。チップ構成は `FORYOU_INTEREST_TAGS`（`src/features/foryou/constants.ts`）の配列を編集するだけで変えられる。自然の唯一の一致先（都市公園・都立公園一覧）は `no` が最大で上記の同点タイに毎回負けていたため、`RECOMMENDATION_LIMIT` を4→6へ上げて対応した。
+> ナイトライフはカタログ全10件にキーワードが1件も当たらず常に候補ゼロだったため `nature`（自然）へ差し替え済み（2026-08-19・Futoshi が本番データで確認。渋谷区都市公園一覧で実在候補1件、search_datasets → aggregate_dataset → get_provenance の一連が実際に動くことまで確認済み）。差し替え候補として `shopping`（ショッピング）も検討したが、こちらも候補ゼロで（`nightlife` と同じ `unanswered`/`other` 応答・メッセージも同文。2026-08-19 実測）、改善にならないため採用していない。チップ構成は `FORYOU_INTEREST_TAGS`（`src/features/foryou/constants.ts`）の配列を編集するだけで変えられる。自然の唯一の一致先（都市公園・都立公園一覧）は `no` が最大で上記の同点タイに毎回負けていたため、`RECOMMENDATION_LIMIT` を4→6へ上げて対応した。
 
 バージョンが「未確認」の項目は実装着手時に確認して [ARCHITECTURE.md](docs/02-design/ARCHITECTURE.md) §8 と [MASTER.md](docs/MASTER.md) を更新する。推測で書かない。
 

@@ -9,7 +9,8 @@ import type { InterestTag } from "../plan/types";
  *
  * `nightlife` は `nature` へ差し替え済み（2026-08-19・Futoshi が本番データで確認）。
  * nightlife はカタログ全10件にキーワードが1件も当たらず常に候補ゼロだった。
- * 差し替え候補として `shopping` も検討したが、こちらも候補ゼロ（nightlife より悪い）。
+ * 差し替え候補として `shopping` も検討したが、こちらも候補ゼロで、差し替える意味がない
+ * （`nightlife` と同じ `unanswered`/`other` 応答・メッセージも同文。2026-08-19 実測）。
  * `nature` は実データで実在候補1件（渋谷区都市公園一覧）を確認済みで、
  * search_datasets → aggregate_dataset → get_provenance の一連が実際に動くことを
  * Futoshi が本番データで確認している。
