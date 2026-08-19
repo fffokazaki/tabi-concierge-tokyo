@@ -29,8 +29,10 @@ import {
   normalizedList,
   outOfAreaAskedGaps,
   outOfAreaUnanswered,
+  reportableInterests,
   resolveArea,
   scoreEntry,
+  selectWithInterestCoverage,
   SHIBUYA_SIGHTSEEING_TERMS,
   shibuyaSightseeingUnanswered,
   unanswered,
@@ -305,7 +307,9 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
 
   const gaps = collectPartialGaps(area, genre, haystack);
 
-  const selected = usable.slice(0, limit);
+  // 興味カバレッジ優先（Issue #84）。切り捨てで消える候補と、覆えていない興味の判定が
+  // 同じ述語を見るようにして、「枠に入らなかっただけ」を欠損として見せない
+  const selected = selectWithInterestCoverage(usable, limit, reportableInterests(input, area, genre));
   const answered = answeredCandidates(selected);
   if (answered) {
     return withGaps(answered, [

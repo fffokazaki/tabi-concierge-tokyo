@@ -39,6 +39,55 @@ describe("searchDatasets（直接呼び出し）", () => {
 });
 
 /**
+ * 同点の解決（Issue #84）。
+ *
+ * `scoreEntry` が同点のとき、順位は `.sort(... || a.entry.no - b.entry.no)` の
+ * **カタログ登録順**（`no` 昇順）で決まる。関連度と無関係な基準なので、あとから足した
+ * データセットほど切り捨てられる側に回る。
+ *
+ * ここで固定するのは**カタログの中身に依存する事実**で、テストを緑に保つための表明ではない。
+ * 11件目を足したり既存のキーワード表をいじったりすると落ちる — それが狙い。落ちたら
+ * 「同点の並びが変わった」であって、期待値を書き換える前に、切り捨てで消える候補が
+ * どの興味の一致先だったかを確かめること（Issue #84 の症状の再来かもしれない）。
+ *
+ * 構造化入力 `interests` を送る呼び出しには、覆えていない興味に先に1枠充てる手当てが入っている
+ * （`operations.structured.test.ts` の「同点で切り捨てられる興味の一致先を先に確保する」）。
+ * ここで見るのは**手当てが効かない自然文の経路**。
+ */
+describe("同点の解決はカタログ登録順（no 昇順）", () => {
+  // 「文化」「家族」「自然」に1件ずつ当たる、実測（2026-08-19）で6件が同点になる問い合わせ。
+  // あなたへ画面の「すべて」を自然文へ畳み込んだ形にあたる
+  const TIED_QUERY = "文化、家族向け、自然";
+
+  it("同点の候補は、関連度ではなく登録順に並ぶ", async () => {
+    const output = await searchDatasets({ query: TIED_QUERY, limit: MAX_SEARCH_LIMIT }, capturingGapRecorder());
+
+    expect(expectAnswered(output).candidates.map((candidate) => candidate.title)).toEqual([
+      "名所・史跡",
+      "文化観光施設",
+      "文化財一覧",
+      "トイレ情報",
+      "銭湯",
+      "都市公園・都立公園一覧",
+    ]);
+  });
+
+  it("興味を自然文へ畳み込んだ呼び出しでは、切り捨ても登録順のまま（Issue #84 の手当ては構造化入力にだけ効く）", async () => {
+    // 「自然」の唯一の一致先（no:10・渋谷区分として最後に足したデータセット）が落ちる。
+    // 畳み込まれた自然文からは、どれがどの興味の一致先かを判定できない（分解は Step 5 の
+    // LLM 側の仕事。Issue #53 と同じ理由でスタブに形態素解析を持ち込まない）
+    const output = await searchDatasets({ query: TIED_QUERY, limit: 4 }, capturingGapRecorder());
+
+    expect(expectAnswered(output).candidates.map((candidate) => candidate.title)).toEqual([
+      "名所・史跡",
+      "文化観光施設",
+      "文化財一覧",
+      "トイレ情報",
+    ]);
+  });
+});
+
+/**
  * エリア・フォールバックの部分欠損（Issue #50）。
  *
  * キーワードが1件も当たらなくても、エリアを収録したデータセットは事実として提示できる。

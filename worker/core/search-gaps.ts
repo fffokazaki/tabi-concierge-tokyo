@@ -353,10 +353,8 @@ const interestMissUnanswered = (interest: string): Unanswered =>
   );
 
 /**
- * `interests`（構造化入力）のうち、返した候補が覆っていないものを欠損にする（Issue #53／ADR-011）。
- *
- * 判定は「返した候補」に対して行う（Issue #52 の取り落ちと同じ理由 — 利用者が見るのは
- * 返した候補であって、照合の途中結果ではない）。
+ * `interests`（構造化入力）のうち、**取り落ちとして報告しうる**もの。返した候補との照合の
+ * 前に、より強い分類ですでに報告済みの興味を落とす。
  *
  * **既知の欠損として実際に報告される興味だけを外す。** `collectPartialGaps` がより強い分類
  * （`insufficient_granularity` / `data_not_published`）で同じ欠損を報告済みの場合、ここで
@@ -368,6 +366,33 @@ const interestMissUnanswered = (interest: string): Unanswered =>
  *   `other` の取り落ちとして載せる。粒度不足と分類しきれないが、沈黙よりよい）
  * - マナー・渋谷の観光: 報告される欠損は特定の語に紐づかない総括（マナー全般・渋谷の
  *   観光データ全般）なので、該当する語を含む興味はすべてその1件が覆っている
+ *
+ * 抽出を関数として切り出してあるのは、`uncoveredInterestGaps`（報告）と
+ * `selectWithInterestCoverage`（選定）が**同じ列**を見る必要があるため（Issue #84）。
+ * 選定側だけがこの絞り込みを持たないと、報告されない興味のために枠を1つ使ってしまう
+ * （「浅草寺のマナー」は no:1 のキーワード「浅草寺」に当たるので枠を取れてしまうが、
+ * 欠損としては報告されない）。
+ */
+export function reportableInterests(
+  input: SearchDatasetsInput,
+  area: ResolvedArea,
+  genre: string | undefined,
+): readonly string[] {
+  return (input.interests ?? [])
+    .filter((interest) => !(genre && interest.includes(genre)))
+    .filter((interest) => !findFirstTerm(interest, ETIQUETTE_TERMS))
+    .filter(
+      (interest) =>
+        !(area.kind === "representative" && area.area === "渋谷" && findFirstTerm(interest, SHIBUYA_SIGHTSEEING_TERMS)),
+    );
+}
+
+/**
+ * `interests`（構造化入力）のうち、返した候補が覆っていないものを欠損にする（Issue #53／ADR-011）。
+ *
+ * 判定は「返した候補」に対して行う（Issue #52 の取り落ちと同じ理由 — 利用者が見るのは
+ * 返した候補であって、照合の途中結果ではない）。どの興味を報告対象とするかは
+ * `reportableInterests` を参照。
  */
 export function uncoveredInterestGaps(
   input: SearchDatasetsInput,
@@ -375,15 +400,58 @@ export function uncoveredInterestGaps(
   genre: string | undefined,
   entries: readonly CatalogEntry[],
 ): Gap[] {
-  return (input.interests ?? [])
+  return reportableInterests(input, area, genre)
     .filter((interest) => !interestCovered(interest, entries))
-    .filter((interest) => !(genre && interest.includes(genre)))
-    .filter((interest) => !findFirstTerm(interest, ETIQUETTE_TERMS))
-    .filter(
-      (interest) =>
-        !(area.kind === "representative" && area.area === "渋谷" && findFirstTerm(interest, SHIBUYA_SIGHTSEEING_TERMS)),
-    )
     .map(interestMissUnanswered);
+}
+
+/**
+ * 候補を `limit` 件に絞る。**まだ覆えていない興味に1枠ずつ先に充てる**（Issue #84）。
+ *
+ * スコア順に上から切ると、同点のときの順位は `no` 昇順（カタログ登録順）で決まる。
+ * 関連度と無関係な基準なので、**あとから足したデータセットほど構造的に切り捨てられる**。
+ * 実測（2026-08-19）では、あなたへ画面の「すべて」（`["ラーメン","文化","家族向け","自然"]`）で
+ * 6件が score=1 の同点になり、`limit: 4` だと「自然」の唯一の一致先
+ * （no:10 都市公園・都立公園一覧）が毎回落ちて、**カタログに実在する答えを
+ * 「答えられなかった」と見せていた**（DOMAIN.md §7 の実演としては誤った見せ方）。
+ *
+ * そこで、まだ1件も候補が当たっていない興味に一致するデータセットを先に1枠ずつ確保し、
+ * 残り枠をスコア順で埋める。使う述語は `uncoveredInterestGaps` と同じ `interestCovered` で、
+ * 選定と報告の基準が揃うため「枠に入らなかっただけなのに欠損に見える」が構造的に起きない。
+ *
+ * **`no` 昇順は消えていない。** 枠を埋める段の同点解決は引き続きカタログ登録順で、
+ * 変わったのは「構造化入力の興味がある呼び出しでは、先に枠を確保する」ことだけ。
+ *
+ * **効くのは `interests` を送った呼び出しだけ。** 自然文に畳み込まれた興味（プラン画面の
+ * `buildQuery`）は分解できないため従来どおりスコア順の切り捨てになる（Issue #53 と同じ理由 —
+ * 分解は Step 5 の LLM 側の仕事で、スタブに形態素解析を持ち込まない）。
+ *
+ * エリア・フォールバック（キーワードが1件も当たらない経路）で呼ぶ必要はない。そこへ落ちる
+ * 時点でどのデータセットも haystack に当たっておらず、**各興味は haystack の部分文字列**
+ * なので、どの興味にも当たるものが無いことが構造的に決まっている（枠は必ず0件）。
+ *
+ * 返す順序は常に `usable` の部分列（スコア降順→`no` 昇順）。確保した枠は「入れるかどうか」
+ * にだけ効かせ、表示の並びは関連度のまま保つ。
+ */
+export function selectWithInterestCoverage(
+  usable: readonly CatalogEntry[],
+  limit: number,
+  interests: readonly string[],
+): CatalogEntry[] {
+  // 切り捨てが起きないなら選定の余地が無い（`interests` を送らない呼び出しも同様）
+  if (usable.length <= limit || interests.length === 0) return usable.slice(0, limit);
+
+  const reserved = new Set<CatalogEntry>();
+  for (const interest of interests) {
+    if (reserved.size >= limit) break;
+    // すでに確保した候補が覆っている興味に、重ねて枠を使わない
+    if (interestCovered(interest, [...reserved])) continue;
+    const hit = usable.find((entry) => !reserved.has(entry) && scoreEntry(entry, interest) > 0);
+    if (hit) reserved.add(hit);
+  }
+
+  const chosen = new Set([...reserved, ...usable.filter((entry) => !reserved.has(entry))].slice(0, limit));
+  return usable.filter((entry) => chosen.has(entry));
 }
 
 type ResolvedArea =
