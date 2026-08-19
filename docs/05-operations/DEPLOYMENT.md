@@ -1,10 +1,10 @@
 ---
 title: "DEPLOYMENT"
-version: "1.4.12"
+version: "1.4.13"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-19"
+updated: "2026-08-20"
 changeImpact: "low"
 ---
 
@@ -205,6 +205,7 @@ npm run deploy  # vite build → wrangler deploy
 
 | 日時 | Version ID | 内容 | 確認 |
 | --- | --- | --- | --- |
+| 2026-08-20 | `9d4ee8c8-728c-4cad-a06a-c7538ae724ff` | あなたへ画面で `aggregate_dataset` の `unanswered` を握りつぶさず `gaps` へ合流させる修正（#89 / PR #93）。**`src/` のみの変更**だが、フロントエンドはデプロイしないと画面に出ないためデプロイ（§3「いつデプロイするか」）。`worker/` `shared/` `migrations/` `data/` `scripts/` は未変更のため、マイグレーション・シードは実行していない | チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。`index.html` のバンドル（`assets/index-D7Z439oZ.js`）はローカルビルドとハッシュ一致。コア3操作も実測（`上野の寺社をめぐりたい` が `answered`、対象エリア外が HTTP 200 の `unanswered(out_of_area)`）。**本修正は現行のチップ構成では画面の見え方を変えない。それを実測で確かめた** — あなたへ画面の現行呼び出し（`interests` 4件・`limit: 6`）が返す候補6件すべてを `aggregate_dataset` に通し、6件とも `answered`（集計側の欠損が1件も出ない）ことを確認。Issue #89 の「現行の `FORYOU_INTEREST_TAGS` では到達しない」が本番でも成立している。**到達したときに修正が効く条件も本番で確認した** — 興味「統計」を送ると `samples: []` の`t000012d0000000081`（R6国・地域別外国人旅行者行動特性調査）が候補に入り、それを集計すると `insufficient_granularity` の `unanswered` が返る。修正前はこの応答でカードが黙って消えていた。**本番 D1 への書き込みが発生している** — 上記の実測で `gaps` に4行（`統計` の `insufficient_granularity` / `other`、`ラーメン、文化、家族向け、自然` の `insufficient_granularity` ×2、`新宿の美術館に行きたい` の `out_of_area`）が記録されたことを確認（ADR-010 の想定どおりの通常挙動） |
 | 2026-08-19 | `b7680bf0-b47e-4a4d-81f8-f2b10b5ee315` | `search_datasets` の候補選定を興味カバレッジ優先にする修正（#84 / PR #86）。`worker/core/search-gaps.ts` と `worker/core/operations.ts` の変更のためデプロイ（§3「いつデプロイするか」）。`migrations/` `data/` `scripts/` は未変更のため、マイグレーション・シードは実行していない | デプロイ後の確認チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。`index.html` のバンドル（`assets/index-C-fp05dy.js`）はローカルビルドとハッシュ一致で、**フロントエンドは PR #82 から変わっていない**（本 PR の `src/` 変更はコメントのみ）。コア3操作をすべて実測 — `search_datasets`（`上野の寺社をめぐりたい`）が `answered`、対象エリア外（`新宿の美術館`）が HTTP 200 の `unanswered(out_of_area)`、`aggregate_dataset` が `answered`、`get_provenance`（`/api/provenance`）が CC BY 4.0 の出典1件を返すこと。本修正の要点も本番で確認した — `{"interests":["ラーメン","文化","家族向け","自然"],"limit":4}` が［名所・史跡／文化観光施設／トイレ情報／**都市公園・都立公園一覧**］を返し「自然」の `other` 欠損が出ないこと、`limit: 6`（あなたへ画面の現行値）では同点6件がそのまま返り**従来と同一**であること、`{"interests":["観光","家族向け","自然"],"limit":2}` では枠が尽きて「自然」が `other` の欠損として残ること（既知の限界・仕様どおり）。**本番 D1 への書き込みが発生している** — 上記のうち欠損を伴う応答は `toGapRecords` の経路で `gaps` 行が記録される（ADR-010 の想定どおりの通常挙動） |
 | 2026-08-19 | `fa934ef5-e942-4e17-8ed1-1ae3871e70b5` | あなたへ画面（興味チップ・レコメンドカード・出典つき / PR #82）。**`src/` と文書のみの変更**だが、フロントエンドはデプロイしないと画面に出ないためデプロイ（§3「いつデプロイするか」）。`worker/` `shared/` `migrations/` は未変更のため、マイグレーション・シードは実行していない | `/api/health` の `runtime` が `Cloudflare-Workers`、SPA `/` が 200 で `index.html` が新バンドル（`assets/index-C-fp05dy.js`）を指し、ローカルビルドとハッシュ一致。`/api/unknown` は 404。`/showcase` は 307 →（`/showcase/`）200（Workers Assets のディレクトリ・リダイレクト。本デプロイでの変更ではない）。加えて**実ブラウザで本番の「あなたへ」タブを操作**し、「すべて」で6件（寛永寺・国立西洋美術館・絹本著色元三大師画像・上野公園大黒天横・銭湯・**恵比寿東公園**）が出典チップつきで並ぶこと、欠損表示がラーメンの `insufficient_granularity` 1件だけになること、ラーメンのチップ単独では正常な「該当するオープンデータがありません」になることを確認。**本番 D1 への書き込みが発生している** — 「すべて」の応答は `answered` だがラーメンの gap を1件伴うため、`toGapRecords` の経路で gaps 行が1行記録される（ADR-010 の想定どおりの通常挙動） |
 | 2026-08-18 | `bc0c7593-5bd5-4c40-84e1-0d13157d257f` | `aggregate_dataset` の `query` に行の選定根拠と「intent の内容との照合はしていない」を明記（#78 / PR #79）。`worker/core/operations.ts` のみの変更で、`migrations/` は未変更のためマイグレーション・シードは実行していない | チェックリスト4項目 OK（health の runtime / SPA 200 / showcase 200 / api 404）。加えて `POST /api/aggregate-dataset` に無エリア（`寺社を1件`）と浅草指定（`浅草の寺社を1件`）を投げ、両経路の `query` に新しい選定根拠と未照合の明記が載ること、浅草側の行番号（27行目）と選定根拠が同じ sample から出ていることを確認。`search_datasets` の疎通も確認。伝播直後の1回目は旧版が応答し、約20秒後の再実行で新版を確認した。**本番 D1 の実測は行っていない** — `gaps` の記録経路は本変更で触れておらず（`answered` は記録対象外のまま）、テストで担保 |
@@ -406,6 +407,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.4.13] - 2026-08-20
+
+#### 追加
+
+- §3「デプロイ記録」に 2026-08-20 の反映（Version ID `9d4ee8c8-728c-4cad-a06a-c7538ae724ff`）を追記。PR #93（#89・あなたへ画面で `aggregate_dataset` の `unanswered` を `gaps` へ合流させる）の `src/` 変更を §3「いつデプロイするか」の注記（`src/` だけの変更も画面に出ない）に従って反映した。確認欄には、本修正が**現行のチップ構成では画面の見え方を変えない**ことを実測で確かめた記録（候補6件すべてが `aggregate_dataset` で `answered`）と、**到達したときに修正が効く条件**（興味「統計」で `samples: []` のデータセットが候補に入り `insufficient_granularity` を返す）を明記した
 
 ### [1.4.12] - 2026-08-19
 
