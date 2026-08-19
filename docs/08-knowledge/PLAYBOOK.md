@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.24.0"
+version: "1.25.0"
 status: "approved"
 created: "2026-08-15"
-updated: "2026-08-18"
+updated: "2026-08-19"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 66
+ace_entry_count: 70
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -287,8 +287,21 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-49-5 | 「〜を描画しない」型の否定アサーションは、本番データの実物を確認してから書く | testing | [playbook/testing.md#ace-49-5](./playbook/testing.md#ace-49-5) |
 | ACE-79-1 | 非網羅の語彙表による否定判定を「無い」と書かない — 書けるのは「見つからなかった」まで | documentation-quality | [playbook/documentation-quality.md#ace-79-1](./playbook/documentation-quality.md#ace-79-1) |
 | ACE-79-2 | 全経路に共通する不変条件の注記は、経路ごとに書かず生成関数へ一元化する | architecture | [playbook/architecture.md#ace-79-2](./playbook/architecture.md#ace-79-2) |
+| ACE-82-1 | 同点の解決に「登録順」を使うと、あとから足した候補が構造的に負け続ける | architecture | [playbook/architecture.md#ace-82-1](./playbook/architecture.md#ace-82-1) |
+| ACE-82-2 | 表示上限で溢れただけの候補が「データが無い」に化ける — 選定と欠損判定は同じ基準を見る | architecture | [playbook/architecture.md#ace-82-2](./playbook/architecture.md#ace-82-2) |
+| ACE-82-3 | 棄却した代替案に「より悪い」と序列を付けない — 実測が支えるのは「同じだった」まで | documentation-quality | [playbook/documentation-quality.md#ace-82-3](./playbook/documentation-quality.md#ace-82-3) |
+| ACE-82-4 | コメントに書いた実測事実は、テストで固定しないと次の変更で静かに嘘になる | testing | [playbook/testing.md#ace-82-4](./playbook/testing.md#ace-82-4) |
 
 ## Changelog
+
+### [1.25.0] - 2026-08-19
+
+#### 追加
+
+- ACE-82-1: 同点の解決に「登録順」を使うと、あとから足した候補が構造的に負け続ける（PR #82 / Issue #84）
+- ACE-82-2: 表示上限で溢れただけの候補が「データが無い」に化ける — 選定と欠損判定は同じ基準を見る（PR #82 / Issue #84）
+- ACE-82-3: 棄却した代替案に「より悪い」と序列を付けない — 実測が支えるのは「同じだった」まで（PR #82）
+- ACE-82-4: コメントに書いた実測事実は、テストで固定しないと次の変更で静かに嘘になる（PR #82 / Issue #84）
 
 ### [1.24.0] - 2026-08-18
 
