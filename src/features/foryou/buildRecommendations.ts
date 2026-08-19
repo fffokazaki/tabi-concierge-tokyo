@@ -96,9 +96,14 @@ export async function buildRecommendations(
   if (extracted.length === 0) {
     // 理由が1つに定まるときはそれをそのまま返す。汎用の other へ丸めると、
     // 粒度不足（insufficient_granularity）が「その他」として集計され、
-    // 未回答の分類そのものが実態とずれる（DOMAIN.md §7・§8）
-    const only = dedupeGaps(aggregateGaps);
-    if (only.length === 1) return { kind: "unanswered", reason: only[0].reason, message: only[0].message };
+    // 未回答の分類そのものが実態とずれる（DOMAIN.md §7・§8）。
+    //
+    // 検索側の gap も勘定に入れる。集計側だけを見ると、検索が別の理由で覆えなかった
+    // 興味があるのに集計側の理由を画面全体の理由として名乗ってしまう
+    const remaining = dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps]);
+    if (remaining.length === 1) {
+      return { kind: "unanswered", reason: remaining[0].reason, message: remaining[0].message };
+    }
 
     return {
       kind: "unanswered",
