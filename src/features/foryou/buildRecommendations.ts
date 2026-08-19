@@ -23,6 +23,20 @@ import type { ActiveInterest, Recommendation } from "./types";
  * `interests: string[]` をそのまま使う。あなたへはチップで1興味ずつ（または「すべて」で
  * 複数まとめて）問い合わせる UI なので、畳み込みが引き起こす「キーワードが1件当たると
  * 他の興味の欠損が沈黙する」問題（Issue #53）を最初から踏まない。
+ *
+ * `gaps` は `search_datasets` が返したものだけではない。`aggregate_dataset` が候補ごとに
+ * 返した未回答も同じ配列へ合流させる（Issue #89）。Issue #84 でバックエンドが「その興味の
+ * 唯一の一致先だから」という理由で候補を能動的に枠へ押し込むようになったため、押し込んだ
+ * 候補を集計できないと、検索側は「覆えた」と判定して欠損を出さず、集計側で黙って落ちる
+ * ―― その興味が答えられも報告もされない状態になる。
+ *
+ * 直しきっていないものが2つある。**出典が取れずに落ちる候補（`get_provenance` 側）は
+ * まだ黙って消える**（[Issue #92]。集計側と違って持ち上げられる文面がサーバー応答に無い）。
+ * **候補が全滅したときは個々の理由が汎用の `other` に丸められる**（[Issue #94]。可視性は
+ * 残るが内訳が落ちる）。どちらも分類・表示の設計判断を要するため分けてある。
+ *
+ * [Issue #92]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/92
+ * [Issue #94]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/94
  */
 
 export type RecommendationOutcome =
@@ -63,6 +77,9 @@ export async function buildRecommendations(
   const reason = activeInterest === "all" ? null : RECOMMENDATION_REASON_LABELS[activeInterest];
 
   const extracted: { datasetId: string; result: AggregateResult }[] = [];
+  // 集計できなかった候補の理由。黙って落とすと「最初から候補が無かった」ように見える
+  // （Issue #89）ため、search_datasets の gaps と同じ経路で画面に出す
+  const aggregateGaps: Unanswered[] = [];
   for (const candidate of searched.value.candidates) {
     const aggregated = await callAndRead(
       "aggregate_dataset",
@@ -71,11 +88,19 @@ export async function buildRecommendations(
       options,
     );
     if (aggregated.kind === "failure") return aggregated.outcome;
-    if (aggregated.kind === "unanswered") continue;
+    if (aggregated.kind === "unanswered") {
+      aggregateGaps.push(aggregated.unanswered);
+      continue;
+    }
     extracted.push({ datasetId: candidate.datasetId, result: aggregated.value });
   }
 
   if (extracted.length === 0) {
+    // 候補が全滅したときは分類を汎用の other に置く。個々の未回答理由（`aggregateGaps`）を
+    // ここで画面全体の分類へ引き上げると、1件のデータセットについての判定を全体の判定として
+    // 名乗ることになる ―― `data_not_published` は「カタログに該当データが存在しないことを
+    // 確かめられた場合」（shared/core.ts）だが、実際に確かめたのは候補1件の不足でしかない。
+    // どの分類なら引き上げてよいかは設計判断なので Issue #94 で決める
     return {
       kind: "unanswered",
       reason: "other",
@@ -107,7 +132,32 @@ export async function buildRecommendations(
     };
   }
 
-  return { kind: "recommendations", recommendations, gaps: searched.value.gaps ?? [] };
+  return {
+    kind: "recommendations",
+    recommendations,
+    gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps]),
+  };
+}
+
+/**
+ * 同じ分類・同じ文面の未回答を1件にまとめる。
+ *
+ * 畳み込む単位は `DataGapCard` が行の区別に使う組（`reason` と `message`）と同じ。
+ * そこを揃えないと React の key が重複する。
+ *
+ * **どれだけ実際に畳み込まれるかは当てにしない。** `computeAggregateDataset`
+ * （worker/core/operations.ts）が返す未回答は6分岐のうち5つがデータセット名を文面へ
+ * 埋め込むため、同じ分類でも文面は候補ごとに異なる。ここは重複を防ぐ不変条件であって、
+ * 件数を減らす仕組みではない。
+ */
+function dedupeGaps(gaps: Unanswered[]): Unanswered[] {
+  const seen = new Set<string>();
+  return gaps.filter((gap) => {
+    const key = `${gap.reason}:${gap.message}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +166,9 @@ export async function buildRecommendations(
 
 type ReadOutcome<T> =
   | { kind: "answered"; value: T }
-  | { kind: "unanswered"; outcome: RecommendationOutcome }
+  // `outcome`（そのまま画面へ返す形）と `unanswered`（gaps へ積む形）の両方を持つ。
+  // 呼び出し側が「打ち切る」か「記録して続ける」かを選べるようにするため（Issue #89）
+  | { kind: "unanswered"; outcome: RecommendationOutcome; unanswered: Unanswered }
   | { kind: "failure"; outcome: RecommendationOutcome };
 
 async function callAndRead<T>(
@@ -146,7 +198,11 @@ async function callAndRead<T>(
 
   const unanswered = readUnanswered(result.body);
   if (unanswered) {
-    return { kind: "unanswered", outcome: { kind: "unanswered", reason: unanswered.reason, message: unanswered.message } };
+    return {
+      kind: "unanswered",
+      outcome: { kind: "unanswered", reason: unanswered.reason, message: unanswered.message },
+      unanswered,
+    };
   }
 
   if (result.body.status !== "answered") {
