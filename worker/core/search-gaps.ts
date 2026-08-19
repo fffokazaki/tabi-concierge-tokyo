@@ -335,6 +335,12 @@ export const unansweredAskedAreaGap = (area: string): Gap => ({
  * 「夜」を含むため covered 扱いになり、取り落ちは報告されない — Issue #53 の症状と同じ形が
  * チップの文言次第で再発する。興味チップの語彙を決める側（フロントエンド）は、キーワード表の
  * 語（catalog.ts）を**含まない**ラベルほど判定が正確になることに留意。
+ *
+ * **この述語には消費者が2つある**（Issue #84）。欠損の判定（`uncoveredInterestGaps`）と、
+ * 枠の確保（`selectWithInterestCoverage`）。したがって誤マッチの帰結は「欠損が出ない」だけで
+ * 済まなくなった — **誤マッチした候補を探しに行って枠に座らせ、スコアの高い候補を押し出す**。
+ * 「上野の観光」＋興味「夜遊び」（`limit: 2`）は、旧実装の［名所・史跡／文化観光施設］から
+ * ［名所・史跡／銭湯］へ変わる。基準が揃うことは正しさを意味しない（盲点も揃う）。
  */
 const interestCovered = (interest: string, entries: readonly CatalogEntry[]): boolean =>
   entries.some((entry) => scoreEntry(entry, interest) > 0);
@@ -371,7 +377,8 @@ const interestMissUnanswered = (interest: string): Unanswered =>
  * `selectWithInterestCoverage`（選定）が**同じ列**を見る必要があるため（Issue #84）。
  * 選定側だけがこの絞り込みを持たないと、報告されない興味のために枠を1つ使ってしまう
  * （「浅草寺のマナー」は no:1 のキーワード「浅草寺」に当たるので枠を取れてしまうが、
- * 欠損としては報告されない）。
+ * **「取り落ち」としては報告されない** — マナーの欠損は `collectPartialGaps` が
+ * `data_not_published` として総括で報告済み）。
  */
 export function reportableInterests(
   input: SearchDatasetsInput,
@@ -406,7 +413,7 @@ export function uncoveredInterestGaps(
 }
 
 /**
- * 候補を `limit` 件に絞る。**まだ覆えていない興味に1枠ずつ先に充てる**（Issue #84）。
+ * 候補を `limit` 件に絞る。**まだ覆えていない興味に枠を先に充てる**（Issue #84）。
  *
  * スコア順に上から切ると、同点のときの順位は `no` 昇順（カタログ登録順）で決まる。
  * 関連度と無関係な基準なので、**あとから足したデータセットほど構造的に切り捨てられる**。
@@ -415,9 +422,24 @@ export function uncoveredInterestGaps(
  * （no:10 都市公園・都立公園一覧）が毎回落ちて、**カタログに実在する答えを
  * 「答えられなかった」と見せていた**（DOMAIN.md §7 の実演としては誤った見せ方）。
  *
- * そこで、まだ1件も候補が当たっていない興味に一致するデータセットを先に1枠ずつ確保し、
- * 残り枠をスコア順で埋める。使う述語は `uncoveredInterestGaps` と同じ `interestCovered` で、
- * 選定と報告の基準が揃うため「枠に入らなかっただけなのに欠損に見える」が構造的に起きない。
+ * そこで、まだ覆えていない興味を**最も多く覆う候補**から順に枠を確保し、残り枠をスコア順で
+ * 埋める。1件で複数の興味を覆える候補を先に取るので、同じ枠数で覆える興味が増える
+ * （`["寺社の歴史と文化", "美術館"]` は文化財一覧1件で両方覆えるが、興味ごとに最初の
+ * 一致先を取る素朴な貪欲法では名所・史跡を取って「美術館」を取り落とす）。使う述語は
+ * `uncoveredInterestGaps` と同じ `interestCovered` で、選定と報告の基準が揃う。
+ *
+ * **ただし「枠に入らなかっただけなのに欠損に見える」を消し切るわけではない。** 消えるのは
+ * 枠が足りる範囲だけで、次の3つは残る（いずれもテストで固定してある）:
+ * 1. **報告対象の興味が `limit` を超えた分**は枠を取れず、一致先が `usable` に居ても
+ *    従来どおり欠損として報告される。`interests` は最大20件・`limit` は上限10（API.md §3.1）
+ *    なので、これは仕様上ふつうに起きる入力
+ * 2. **`interestCovered` の偽陽性を能動的に拾う。** この述語は部分一致でしかなく
+ *    （`interestCovered` の doc 参照）、興味「緑茶」は都市公園のキーワード「緑」に当たる。
+ *    旧実装ではこの誤マッチが効くのは「たまたま枠内に居たとき」だけだったが、いまは
+ *    **探しに行って枠に座らせる** — スコアの高い候補を押し出し、欠損も消える。
+ *    **枠を確保できた＝その興味に本当に答えた、ではない**（選定と報告が同じ盲点を共有する）
+ * 3. 貪欲法なので**最小の枠数になるとは限らない**。各段で最多を取るだけで、全体最適
+ *    （集合被覆）は解かない。同数のときは `usable` の順（＝スコア降順→`no` 昇順）で決める
  *
  * **`no` 昇順は消えていない。** 枠を埋める段の同点解決は引き続きカタログ登録順で、
  * 変わったのは「構造化入力の興味がある呼び出しでは、先に枠を確保する」ことだけ。
@@ -430,24 +452,40 @@ export function uncoveredInterestGaps(
  * 時点でどのデータセットも haystack に当たっておらず、**各興味は haystack の部分文字列**
  * なので、どの興味にも当たるものが無いことが構造的に決まっている（枠は必ず0件）。
  *
- * 返す順序は常に `usable` の部分列（スコア降順→`no` 昇順）。確保した枠は「入れるかどうか」
- * にだけ効かせ、表示の並びは関連度のまま保つ。
+ * **事前条件**: `usable` は**スコア降順→`no` 昇順にソート済み**で渡すこと。返す順序が
+ * 「スコア順のまま」になるのは呼び出し側のこの並びに依存しており、この関数は並べ替えない。
+ * 確保した枠は「入れるかどうか」にだけ効かせ、返すのは常に `usable` の部分列。
  */
 export function selectWithInterestCoverage(
   usable: readonly CatalogEntry[],
   limit: number,
   interests: readonly string[],
 ): CatalogEntry[] {
-  // 切り捨てが起きないなら選定の余地が無い（`interests` を送らない呼び出しも同様）
+  // 切り捨てが起きないなら選定の余地が無い。`interests` が空になるのは、送らない呼び出しと
+  // `reportableInterests` が全部落とした呼び出し（マナーだけ・渋谷の観光語だけ等）の両方
   if (usable.length <= limit || interests.length === 0) return usable.slice(0, limit);
 
   const reserved = new Set<CatalogEntry>();
-  for (const interest of interests) {
-    if (reserved.size >= limit) break;
-    // すでに確保した候補が覆っている興味に、重ねて枠を使わない
-    if (interestCovered(interest, [...reserved])) continue;
-    const hit = usable.find((entry) => !reserved.has(entry) && scoreEntry(entry, interest) > 0);
-    if (hit) reserved.add(hit);
+  let uncovered = interests;
+  while (reserved.size < limit && uncovered.length > 0) {
+    // まだ覆えていない興味を最も多く覆う候補を選ぶ。同数なら `usable` の順（スコア降順→no 昇順）
+    let best: CatalogEntry | undefined;
+    let bestCount = 0;
+    for (const entry of usable) {
+      // 確保済みの候補は、覆う興味を `uncovered` から外してあるので必ず0件になる（防御的）
+      if (reserved.has(entry)) continue;
+      const count = uncovered.filter((interest) => scoreEntry(entry, interest) > 0).length;
+      if (count > bestCount) {
+        best = entry;
+        bestCount = count;
+      }
+    }
+    // 残りの興味に一致する候補が1件も無い（＝カタログにも絞り込み後にも答えが無い）。
+    // 枠を使いようがないので確保は打ち切り、残りは `uncoveredInterestGaps` が欠損として報告する
+    if (!best) break;
+    const picked = best;
+    reserved.add(picked);
+    uncovered = uncovered.filter((interest) => scoreEntry(picked, interest) === 0);
   }
 
   const chosen = new Set([...reserved, ...usable.filter((entry) => !reserved.has(entry))].slice(0, limit));
