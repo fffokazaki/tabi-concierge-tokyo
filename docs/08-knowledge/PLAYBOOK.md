@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.28.0"
+version: "1.29.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-20"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 79
+ace_entry_count: 81
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -309,8 +309,17 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-93-2 | 個別の判定を全体の分類へ引き上げると主張の範囲が広がる — 強い分類ほど引き上げない | architecture | [playbook/architecture.md#ace-93-2](./playbook/architecture.md#ace-93-2) |
 | ACE-93-3 | 握りつぶしを1件直すときは、同じ関数の下流と対になる画面を棚卸しする | process | [playbook/process.md#ace-93-3](./playbook/process.md#ace-93-3) |
 | ACE-93-4 | レビューで解決策が割れたら、まず両者が依拠している事実をソースで確認する | process | [playbook/process.md#ace-93-4](./playbook/process.md#ace-93-4) |
+| ACE-97-1 | vendored なツールの欠陥は直さず、開示して上流へ送る | tooling | [playbook/tooling.md#ace-97-1](./playbook/tooling.md#ace-97-1) |
+| ACE-97-2 | 再同期で消える場所に、再同期の警告を書かない | tooling | [playbook/tooling.md#ace-97-2](./playbook/tooling.md#ace-97-2) |
 
 ## Changelog
+
+### [1.29.0] - 2026-08-20
+
+#### 追加
+
+- ACE-97-1: vendored なツールの欠陥は直さず、開示して上流へ送る（PR #97）
+- ACE-97-2: 再同期で消える場所に、再同期の警告を書かない（PR #97）
 
 ### [1.28.0] - 2026-08-20
 
