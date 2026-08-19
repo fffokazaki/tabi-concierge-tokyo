@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.26.0"
+version: "1.27.0"
 status: "approved"
 created: "2026-08-15"
-updated: "2026-08-19"
+updated: "2026-08-20"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 75
+ace_entry_count: 79
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -296,8 +296,25 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-86-3 | テストの有効性は「修正前に落ちるか」ではなく「守りたい変異で落ちるか」で測る | testing | [playbook/testing.md#ace-86-3](./playbook/testing.md#ace-86-3) |
 | ACE-86-4 | ハード上限が残っている限り「構造的に起きない」とは書けない | documentation-quality | [playbook/documentation-quality.md#ace-86-4](./playbook/documentation-quality.md#ace-86-4) |
 | ACE-86-5 | 直した経路が本番設定で1行も動かないなら、それは「修正済み」ではない | process | [playbook/process.md#ace-86-5](./playbook/process.md#ace-86-5) |
+| ACE-93-1 | 他レイヤの出力の性質を推測で前提にすると、誤るのはコメントではなく判定ロジックのほう | architecture | [playbook/architecture.md#ace-93-1](./playbook/architecture.md#ace-93-1) |
+| ACE-93-2 | 個別の判定を全体の分類へ引き上げると主張の範囲が広がる — 強い分類ほど引き上げない | architecture | [playbook/architecture.md#ace-93-2](./playbook/architecture.md#ace-93-2) |
+| ACE-93-3 | 握りつぶしを1件直すときは、同じ関数の下流と対になる画面を棚卸しする | process | [playbook/process.md#ace-93-3](./playbook/process.md#ace-93-3) |
+| ACE-93-4 | レビューで解決策が割れたら、まず両者が依拠している事実をソースで確認する | process | [playbook/process.md#ace-93-4](./playbook/process.md#ace-93-4) |
 
 ## Changelog
+
+### [1.27.0] - 2026-08-20
+
+#### 追加
+
+- ACE-93-1: 他レイヤの出力の性質を推測で前提にすると、誤るのはコメントではなく判定ロジックのほう（Issue #89 / PR #93）
+- ACE-93-2: 個別の判定を全体の分類へ引き上げると主張の範囲が広がる — 強い分類ほど引き上げない（Issue #89 / PR #93）
+- ACE-93-3: 握りつぶしを1件直すときは、同じ関数の下流と対になる画面を棚卸しする（Issue #89 / PR #93）
+- ACE-93-4: レビューで解決策が割れたら、まず両者が依拠している事実をソースで確認する（Issue #89 / PR #93）
+
+#### カウンター更新
+
+- ACE-73-1: Helpful +1（サーバー側で確立した「未回答を optional の gaps で併走させる」設計を、フロントエンド側の集計未回答にもそのまま適用できた）
 
 ### [1.26.0] - 2026-08-19
 
