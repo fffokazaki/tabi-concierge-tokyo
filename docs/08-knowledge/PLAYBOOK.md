@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.25.0"
+version: "1.26.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-19"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 70
+ace_entry_count: 75
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -291,8 +291,30 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-82-2 | 表示上限で溢れただけの候補が「データが無い」に化ける — 選定と欠損判定は同じ基準を見る | architecture | [playbook/architecture.md#ace-82-2](./playbook/architecture.md#ace-82-2) |
 | ACE-82-3 | 棄却した代替案に「より悪い」と序列を付けない — 実測が支えるのは「同じだった」まで | documentation-quality | [playbook/documentation-quality.md#ace-82-3](./playbook/documentation-quality.md#ace-82-3) |
 | ACE-82-4 | コメントに書いた実測事実は、テストで固定しないと次の変更で静かに嘘になる | testing | [playbook/testing.md#ace-82-4](./playbook/testing.md#ace-82-4) |
+| ACE-86-1 | 選定と判定で述語を共有すると、一貫性と一緒に盲点も共有される | architecture | [playbook/architecture.md#ace-86-1](./playbook/architecture.md#ace-86-1) |
+| ACE-86-2 | カバレッジ確保の貪欲法は「興味ごとに最初の一致」ではなく「最多被覆から」 | architecture | [playbook/architecture.md#ace-86-2](./playbook/architecture.md#ace-86-2) |
+| ACE-86-3 | テストの有効性は「修正前に落ちるか」ではなく「守りたい変異で落ちるか」で測る | testing | [playbook/testing.md#ace-86-3](./playbook/testing.md#ace-86-3) |
+| ACE-86-4 | ハード上限が残っている限り「構造的に起きない」とは書けない | documentation-quality | [playbook/documentation-quality.md#ace-86-4](./playbook/documentation-quality.md#ace-86-4) |
+| ACE-86-5 | 直した経路が本番設定で1行も動かないなら、それは「修正済み」ではない | process | [playbook/process.md#ace-86-5](./playbook/process.md#ace-86-5) |
 
 ## Changelog
+
+### [1.26.0] - 2026-08-19
+
+#### 追加
+
+- ACE-86-1: 選定と判定で述語を共有すると、一貫性と一緒に盲点も共有される（PR #86 / Issue #84）
+- ACE-86-2: カバレッジ確保の貪欲法は「興味ごとに最初の一致」ではなく「最多被覆から」（PR #86 / Issue #84）
+- ACE-86-3: テストの有効性は「修正前に落ちるか」ではなく「守りたい変異で落ちるか」で測る（PR #86 / Issue #84）
+- ACE-86-4: ハード上限が残っている限り「構造的に起きない」とは書けない（PR #86 / Issue #84）
+- ACE-86-5: 直した経路が本番設定で1行も動かないなら、それは「修正済み」ではない（PR #86 / Issue #84）
+
+#### カウンター更新
+
+- ACE-82-1: Helpful +1（同点解決の第2キーを「関連度と相関するか」で選ぶ指針が、そのまま PR #86 の設計方針になった）
+- ACE-82-2: Helpful +1（「選定側にカバレッジ優先を入れて両者の基準を揃える」という Action を実装した PR）
+- ACE-82-3: Helpful +1（レビューが「構造的に起きない」の過剰断定を指摘する際の判断基準として参照された）
+- ACE-82-4: Helpful +1（実測コメントをテストで固定する指針が、同点タイの回帰テスト追加の根拠になった）
 
 ### [1.25.0] - 2026-08-19
 
