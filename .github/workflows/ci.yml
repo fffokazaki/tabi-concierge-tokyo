@@ -39,3 +39,9 @@ jobs:
       # 型もテストも通るのにビルドで落ちる構成ミスを、デプロイ前に捕まえる。
       - name: ビルド
         run: npm run build
+
+      # ACE Playbook の frontmatter（ace_entry_count / version ↔ Changelog / changeImpact）が
+      # 実態からドリフトしていないかを検証する。/ace-curate は develop へ直 push するため、
+      # PR だけを見張っても捕まらない — 上の on: に push が含まれているのがこのゲートの前提。
+      - name: ACE Playbook の frontmatter 検証
+        run: npm run ace:check-playbook-frontmatter
