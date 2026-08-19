@@ -1,11 +1,11 @@
 ---
 title: "ace-cycle"
-version: "1.2.1"
+version: "1.3.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-17"
-changeImpact: "low"
+updated: "2026-08-20"
+changeImpact: "medium"
 ---
 
 # ACE サイクル運用手順（Generate → Reflect → Curate ＋ 定期 Refine）
@@ -16,7 +16,9 @@ changeImpact: "low"
 ## 概要
 
 > ⚠️ **本リポジトリでの位置づけ（2026-08-15 時点）**
-> 本ファイルは ff-dev-toolkit の運用手順をコピーし、**本リポジトリ向けに 2 箇所だけ手を入れたもの**（末尾の Changelog は上流の改訂履歴であり、本リポジトリの変更履歴ではない）。
+> 本ファイルは ff-dev-toolkit の運用手順をコピーし、**本リポジトリ向けに 2 箇所だけ手を入れたもの**。
+>
+> 末尾の Changelog は 1.2.1 までが上流の改訂履歴で、**1.3.0 以降が本リポジトリでの変更**（frontmatter は上流に無く、コピー時にこちらで付けたもの）。
 >
 > **上流との差分**（`/ace-setup` 再実行・上流再同期の際は巻き戻るため、都度この 2 点を再適用すること）:
 >
@@ -25,9 +27,25 @@ changeImpact: "low"
 >
 > 次は**本リポジトリに未導入**のため、記載どおりには実行できない:
 >
-> - `scripts/ace/*.ts`（`check-entry-format` / `ace-refine-report` / `ace-reuse-report` 等）と対応する `npm run ace:*` — 未導入。**エントリが 0 件の段階では必須ゲートとして扱わない**。件数・行数が増えて自動検証が必要になった時点で、ff-dev-toolkit の `docs-template/scripts/ace/` から導入する
+> - `scripts/ace/*.ts` のうち `check-entry-format` / `ace-refine-report` / `ace-reuse-report` / `check-archive-links` — 未導入。必要になった時点で ff-dev-toolkit の `docs-template/scripts/ace/` から導入する
 > - `knowledge-management.md` / `git-workflow.md` / `ace-autonomous.md` — 未導入（必要時に ff-dev-toolkit の `docs-template/05-operations/deployment/` から同一相対パスでコピー）
 > - 本文中の例示（Prisma の `findMany`・N+1 対策など）は上流テンプレートのサンプルであり、本プロジェクトの実態ではない（本プロジェクトは DB を使わない → [DATABASE.md](../../02-design/DATABASE.md)）
+>
+> 次は**導入済み**（2026-08-20・[PR #97](https://github.com/fffokazaki/tabi-concierge-tokyo/pull/97)）:
+>
+> - `sync-playbook-frontmatter` — `npm run ace:check-playbook-frontmatter`（検証・CI の `verify` でも実行）/ `npm run ace:sync-playbook-frontmatter`（`--write`）。**Phase 3 の frontmatter 更新後・コミット前に検証すること**
+> - `check-category-size` — 上記が集計ロジックを import するためだけに置いている。**CLI としては使っていない**（`npm run ace:*` を生やしておらず、CI も呼ばない）。本文の以降に出てくる「`check-category-size` の件数ゲートがブロックする」という記述は、**この入口を足したあとで有効になる規約**として読むこと
+> - ゲートが見るのは `ace_entry_count` の実数一致・`version` ↔ `## Changelog` 最新版の一致・`changeImpact` の値域の3点。**`## Changelog` ごと消した場合と、`version` / `ace_entry_count` を `metadata:` 配下へネストした場合は検出できない**（上流の fail-open。[feel-flow/ff-dev-toolkit#19](https://github.com/feel-flow/ff-dev-toolkit/issues/19)）
+>
+> **再同期の手引き（`scripts/ace/`）**: 3ファイルとも **ff-dev-toolkit 0.28.0** の `docs-template/scripts/ace/` 由来。
+>
+> | ファイル | 上流との関係 |
+> | --- | --- |
+> | `sync-playbook-frontmatter.ts` | **挙動に関わる改変は1行**。`import ... from "./check-category-size"` の拡張子を `.js` → `.ts`（このリポジトリは tsx を使わず Node の型ストリップで実行するため）。加えてその理由を説明するコメント5行を import 文の直前に足しているので、上流との `diff` は7行になる。再同期のたびに再適用すること |
+> | `check-category-size.ts` | 上流とバイト一致。**ローカルで編集しない**（編集すると上流のテストが担保している範囲から外れ、こちらにはその検証手段が無い） |
+> | `sync-playbook-frontmatter.test.ts` | 上流とバイト一致。同上 |
+>
+> この表をファイル内コメントではなくここに置いているのは、**丸ごと上書きする再同期ではファイルごとコメントが消える**ため。
 >
 > 本リポジトリで実際に使うのは `/ace-curate <PR番号>`（ff-dev-toolkit プラグインが提供）と、その追記先である [PLAYBOOK.md](../../08-knowledge/PLAYBOOK.md)。
 
@@ -409,6 +427,14 @@ ACE_REUSE_STALE_DAYS=120 npm run ace:reuse-report
 ---
 
 ## Changelog
+
+### [1.3.0] - 2026-08-20
+
+#### 変更
+
+- 冒頭 callout の「未導入」リストを実態に合わせて更新（PR #97）。`sync-playbook-frontmatter` と `check-category-size` を導入したため、導入済み・未導入をスクリプト単位で書き分けた。あわせて導入済みゲートが検証しない範囲（`## Changelog` 削除・frontmatter のネスト。上流 feel-flow/ff-dev-toolkit#19 の fail-open）と、Phase 3 の frontmatter 更新後にゲートを回す旨を明記した
+- 末尾 Changelog の位置づけを訂正。1.2.1 までは上流の改訂履歴だが、frontmatter 自体が上流に無くコピー時にこちらで付けたものなので、1.3.0 以降は本リポジトリでの変更履歴として扱う
+- 冒頭 callout に `scripts/ace/` の**再同期の手引き**を追加（PR #97）。取り込み元が ff-dev-toolkit 0.28.0 であること、`sync-playbook-frontmatter.ts` の import 拡張子1行だけが改変でありローカルで再適用が要ること、他2ファイルは上流とバイト一致で編集しないことを表にした。ファイル内コメントは丸ごと上書きの再同期で消えるため、記録の置き場を文書側にしている
 
 ### [1.2.1] - 2026-08-17
 
