@@ -64,7 +64,7 @@ Issue があれば件名に含める: feat: #12 ...
 | ビルド | Vite 8 ＋ `@cloudflare/vite-plugin`。ツールチェーンは Node 24（`.nvmrc`） |
 | デプロイ先 | Cloudflare Workers（アカウント `opendata`）。<https://tabi-concierge-tokyo.opendata-002.workers.dev> |
 | デプロイ方法 | **手動**。`npm run deploy`（= `wrangler deploy`）をローカルから実行する。`.github/workflows/ci.yml` は検証（typecheck / test / build）だけを行い、**デプロイはしない**。**いつ実行するかは [DEPLOYMENT.md](docs/05-operations/DEPLOYMENT.md) §3 で契機を定めた**（`worker/` `shared/` を変更したらデプロイ、`migrations/` なら先に `db:migrate`）。契機を決めていなかったため本番が43コミット遅れる事故があった（Issue #46） |
-| 接続（`/api/*`） | **接続済み**。プラン画面が `search_datasets` → `aggregate_dataset` → `get_provenance` の3操作を呼ぶ（Issue #31・`buildPlan.ts`）。中身は `worker/core/` の固定データによるスタブ（Issue #22）で、D1 を引く本実装（Text-to-SQL）は Step 5 |
+| 接続（`/api/*`） | **接続済み**。プラン画面（Issue #31・`src/features/plan/buildPlan.ts`）とあなたへ画面（`src/features/foryou/buildRecommendations.ts`）が、それぞれ独立に `search_datasets` → `aggregate_dataset` → `get_provenance` の3操作を呼ぶ。中身は `worker/core/` の固定データによるスタブ（Issue #22）で、D1 を引く本実装（Text-to-SQL）は Step 5 |
 | 接続（`/mcp`） | **未着手**（Step 5）。`createMcpHandler`（ステートレス。**Durable Objects は使わない**）を使う想定 |
 | データベース | Cloudflare D1（`tabi-concierge-tokyo`・導入済み）。スキーマは `migrations/`、取り込みは `scripts/`。開発は `npm run db:reset:local` |
 | Python 実行環境 | **未確認**。「現状の構成では Cloudflare 上で Python が使えない」という報告があるが、本リポジトリ内に検証記録はなく未確認（実装で Python を前提にする前に要確認） |
@@ -76,6 +76,12 @@ Issue があれば件名に含める: feat: #12 ...
 > **`search_datasets` の area フォールバック**: キーワードが1件も当たらないとき代表エリア収録データセットをそのまま返す経路が、答えられていないことを見落としていた欠陥（[Issue #50](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/50)）は [PR #51](https://github.com/fffokazaki/tabi-concierge-tokyo/pull/51) で修正・デプロイ済み。挙動の詳細は [API.md](docs/02-design/API.md) §3.1 を参照（実装が変わるたびにここへ転記すると陳腐化するため、詳細はそちらに一本化する）。
 >
 > **`SHIBUYA_SIGHTSEEING_TERMS` に「ナイトライフ」等のキーワードを足す直し方は取らないこと。** 実測で確かめてあるのは「渋谷のカタログには観光・文化施設データが1件も無い」という事実のみで、「ナイトライフ／ショッピングという切り口で検証済み」ではない。キーワードを足すと、検証していないことを検証済みであるかのように主張することになり、絶対ルール #1（推測で埋めない）に反する。PR #51 の回帰テストでこの前提が固定されている。
+
+> **`search_datasets` の同点解決は関連度と無関係。** `scoreEntry`（`worker/core/search-gaps.ts`）の点数が同点のとき、`worker/core/operations.ts` の `.sort((a, b) => b.score - a.score || a.entry.no - b.entry.no)` がカタログ登録順（`no` 昇順）で解決する。多くの語を一度に送る呼び出し（あなたへの「すべて」など）ほど同点が起きやすく、`no` が大きい（＝あとから足した）データセットほど不利に切り捨てられる — 関連度に基づく順位付けではない。実測で6件同点になるケースを確認済み（2026-08-19。詳細は `src/features/foryou/constants.ts` の `RECOMMENDATION_LIMIT` コメント）。スタブの既知の限界で、Step 5（Text-to-SQL 化）で見直す対象。
+>
+> **あなたへ画面（`src/features/foryou/`）の興味チップはラーメンだけ意図的に候補ゼロのまま残してある。** 実データ検証済みの `insufficient_granularity`（粒度不足）を具体的な理由つきで返す、正直な「答えられない」実演として価値がある（DATABASE.md「既知のデータ欠損」・DOMAIN.md §7）。バグではないので、キーワード表を拡張して「直そう」としないこと（絶対ルール #1）。
+>
+> ナイトライフはカタログ全10件にキーワードが1件も当たらず常に候補ゼロだったため `nature`（自然）へ差し替え済み（2026-08-19・Futoshi が本番データで確認。渋谷区都市公園一覧で実在候補1件、search_datasets → aggregate_dataset → get_provenance の一連が実際に動くことまで確認済み）。差し替え候補として `shopping`（ショッピング）も検討したが、こちらも候補ゼロで（`nightlife` と同じ `unanswered`/`other` 応答・メッセージも同文。2026-08-19 実測）、改善にならないため採用していない。チップ構成は `FORYOU_INTEREST_TAGS`（`src/features/foryou/constants.ts`）の配列を編集するだけで変えられる。自然の唯一の一致先（都市公園・都立公園一覧）は `no` が最大で上記の同点タイに毎回負けていたため、`RECOMMENDATION_LIMIT` を4→6へ上げて対応した。
 
 バージョンが「未確認」の項目は実装着手時に確認して [ARCHITECTURE.md](docs/02-design/ARCHITECTURE.md) §8 と [MASTER.md](docs/MASTER.md) を更新する。推測で書かない。
 

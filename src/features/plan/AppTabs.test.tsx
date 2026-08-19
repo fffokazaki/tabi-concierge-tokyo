@@ -61,13 +61,42 @@ describe("AppTabs", () => {
     expect(adultsValue()).toBe(String(COUNTER_BOUNDS.adults.max));
   });
 
-  it("renders the other tabs as disabled placeholders", async () => {
+  it("renders the still-unimplemented tabs as disabled placeholders", async () => {
     const { fetchImpl } = stubSuccessfulPlan();
     await createBriefing(fetchImpl);
 
     expect(screen.getByRole("button", { name: "スキャン" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "周辺" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "あなたへ" })).toBeDisabled();
+    // あなたへは実装済みなので disabled ではない（下の describe で個別に確認する）
+    expect(screen.getByRole("button", { name: "あなたへ" })).not.toBeDisabled();
+  });
+});
+
+describe("あなたへタブへの切り替え", () => {
+  it("あなたへタブを押すとプラン画面から切り替わり、戻れる", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    await createBriefing(fetchImpl);
+    await waitFor(() => expect(screen.getByText("寛永寺")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "あなたへ" }));
+    expect(screen.getByText("興味に基づくおすすめ")).toBeInTheDocument();
+    // プラン側の内容には戻らない限り出ない
+    expect(screen.queryByText("あなたのルート")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "プラン" }));
+    expect(screen.getByText("あなたのルート")).toBeInTheDocument();
+  });
+
+  it("あなたへタブへ入ると自動で読み込みが始まり、レコメンドが出る", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    await createBriefing(fetchImpl);
+    await waitFor(() => expect(screen.getByText("寛永寺")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "あなたへ" }));
+    // stubSuccessfulPlan は search-datasets に一律で応答するので、あなたへ側の
+    // 初回読み込み（既定「すべて」）でも同じ寛永寺・国立西洋美術館が出典つきで出る
+    await waitFor(() => expect(screen.getAllByText("寛永寺").length).toBeGreaterThan(0));
+    expect(screen.getAllByRole("link", { name: "CC BY 4.0" }).length).toBeGreaterThan(0);
   });
 });
 
