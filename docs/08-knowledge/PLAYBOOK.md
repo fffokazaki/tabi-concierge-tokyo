@@ -1,6 +1,6 @@
 ---
 title: "PLAYBOOK"
-version: "1.27.0"
+version: "1.28.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-20"
@@ -27,8 +27,17 @@ GitHub Discussions が「人間が読むためのナラティブ（物語的記�
 
 > **本リポジトリでの ACE 実行は任意（2026-08-15 時点・[ADR-006](../06-reference/DECISIONS.md)）**: PoC 段階のため、PR ごとの ACE 実行を必須ゲートにしていない。メンテナ環境では必須運用とし、それ以外の作業者は任意とする。
 >
-> **本リポジトリでの前提（2026-08-15 時点）**: `scripts/ace/*.ts`（`check-entry-format` / `check-category-size` / `ace-reuse-report` 等）と対応する `npm run ace:*` は**未導入**。
-> 以降に登場する「機械ゲートが強制する / exit 1 でブロックする」という記述は、**導入後に有効になる規約**として読むこと。エントリが増えて自動検証が必要になった時点で、ff-dev-toolkit の `docs-template/scripts/ace/` から導入する。
+> **本リポジトリでの前提（2026-08-20 更新）**: `scripts/ace/*.ts` は**一部だけ導入済み**。
+>
+> | スクリプト | 状態 |
+> | --- | --- |
+> | `sync-playbook-frontmatter` | **導入済み**。`npm run ace:check-playbook-frontmatter`（検証）/ `ace:sync-playbook-frontmatter`（`--write`）。CI の `verify` ジョブでも実行する |
+> | `check-category-size` | **導入済み（ライブラリとしてのみ）**。上記が集計ロジックを import する。単体の CLI としては使っておらず、`npm run ace:*` も生やしていない |
+> | `check-entry-format` / `ace-reuse-report` / `ace-refine-report` / `check-archive-links` | **未導入**。必要になった時点で ff-dev-toolkit の `docs-template/scripts/ace/` から導入する |
+>
+> 導入済みのゲートが見るのは `ace_entry_count` の実数一致・`version` ↔ `## Changelog` 最新版の一致・`changeImpact` の値域の3点。**次の2つは検出できない**（上流 ff-dev-toolkit 側の fail-open。[feel-flow/ff-dev-toolkit#19](https://github.com/feel-flow/ff-dev-toolkit/issues/19)）— (1) `## Changelog` セクションごと消すと version の検証はスキップされて通る (2) `version` / `ace_entry_count` を `metadata:` 配下にネストしてもトップレベルとして受理される。どちらも `/ace-curate` が起こすドリフトではないため、導入を待たずに使っている。
+>
+> 未導入のスクリプトに関して以降に登場する「機械ゲートが強制する / exit 1 でブロックする」という記述は、**導入後に有効になる規約**として読むこと。
 
 ### 運用ルール
 
@@ -302,6 +311,12 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-93-4 | レビューで解決策が割れたら、まず両者が依拠している事実をソースで確認する | process | [playbook/process.md#ace-93-4](./playbook/process.md#ace-93-4) |
 
 ## Changelog
+
+### [1.28.0] - 2026-08-20
+
+#### 変更
+
+- §概要の「本リポジトリでの前提」を実態に合わせて更新（PR #97）。`scripts/ace/*.ts` を一律「未導入」としていたが、`sync-playbook-frontmatter` と `check-category-size` を導入したため、スクリプトごとの導入状態を表にした。あわせて導入済みゲートが**検証しない範囲**（`## Changelog` 削除・frontmatter のネスト。上流 feel-flow/ff-dev-toolkit#19 の fail-open）を明記した
 
 ### [1.27.0] - 2026-08-20
 
