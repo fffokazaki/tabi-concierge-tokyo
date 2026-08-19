@@ -406,4 +406,219 @@ describe("構造化入力: interests（訊かれた興味）", () => {
       { question: "ナイトライフ、ラーメン", area: undefined, category: undefined, reason: "insufficient_granularity" },
     ]);
   });
+
+  /**
+   * 興味カバレッジ優先の選定（Issue #84）。
+   *
+   * 同点の解決は `no` 昇順（カタログ登録順）で、関連度と無関係な基準。上から `limit` 件で
+   * 切ると、あとから足したデータセットほど構造的に落ちる。落ちた結果その興味が
+   * 「返した候補のキーワードに当たらない」となり、**カタログに実在する答えを
+   * 「答えられなかった」と見せていた**（Issue #84 の実測）。
+   *
+   * ここで固定するのは「まだ覆えていない興味に1枠ずつ先に充てる」挙動と、それが
+   * **欠損を消す方向には効かない**こと（一致先がそもそも無い興味は従来どおり報告する）。
+   */
+  describe("同点で切り捨てられる興味の一致先を先に確保する", () => {
+    it("「すべて」（4興味・limit 4）で、自然の唯一の一致先が落ちない", async () => {
+      // あなたへ画面の「すべて」。実測（2026-08-19）では6件が score=1 の同点になり、
+      // 旧実装は no 昇順の上位4件（名所・史跡／文化観光施設／文化財一覧／トイレ情報）を返して
+      // no:10 都市公園・都立公園一覧（自然の唯一の一致先）を毎回落としていた
+      const recorder = capturingGapRecorder();
+      // `query` は送らない。あなたへ画面（`src/features/foryou/buildRecommendations.ts`）は
+      // 興味チップだけを送り、自由文を持たない
+      const output = await searchDatasets({ interests: ["ラーメン", "文化", "家族向け", "自然"], limit: 4 }, recorder);
+
+      const body = expectAnswered(output);
+      expect(body.candidates.map((candidate) => candidate.title)).toEqual([
+        "名所・史跡",
+        "文化観光施設",
+        "トイレ情報",
+        "都市公園・都立公園一覧",
+      ]);
+      // 「自然」の other 欠損は出ない。残るのはラーメンの粒度不足だけ（実在しないデータの欠損）
+      expect(body.gaps).toHaveLength(1);
+      expect(body.gaps?.[0].reason).toBe("insufficient_granularity");
+      expect(recorder.records).toEqual([
+        { question: "ラーメン、文化、家族向け、自然", area: undefined, category: undefined, reason: "insufficient_granularity" },
+      ]);
+    });
+
+    it("確保した枠は「入れるかどうか」にだけ効かせ、並びはスコア順のまま", async () => {
+      // 「美術館」で文化観光施設・文化財一覧が score 2、候補に残る他の3件（名所・史跡／
+      // 銭湯／都市公園）が score 1。limit 2 では自然のために score 1 の都市公園を確保するが、
+      // 返す順序は score 降順のまま
+      const output = await searchDatasets(
+        { query: "美術館", interests: ["文化", "自然"], limit: 2 },
+        capturingGapRecorder(),
+      );
+
+      expect(expectAnswered(output).candidates.map((candidate) => candidate.title)).toEqual([
+        "文化観光施設",
+        "都市公園・都立公園一覧",
+      ]);
+    });
+
+    it("一致先がカタログに無い興味は、従来どおり欠損として報告する（枠を作って隠さない）", async () => {
+      const recorder = capturingGapRecorder();
+      const output = await searchDatasets(
+        { query: "", interests: ["文化", "家族向け", "自然", "ショッピング"], limit: 4 },
+        recorder,
+      );
+
+      const body = expectAnswered(output);
+      expect(body.gaps).toHaveLength(1);
+      expect(body.gaps?.[0].reason).toBe("other");
+      expect(body.gaps?.[0].message).toContain("ショッピング");
+      expect(recorder.records).toEqual([
+        { question: "文化、家族向け、自然、ショッピング", area: undefined, category: undefined, reason: "other" },
+      ]);
+    });
+
+    it("エリアで絞り込んだ外にしか一致先が無い興味も、従来どおり欠損として報告する", async () => {
+      // 都市公園は渋谷収録なので、上野で絞ると枠を確保しようがない。
+      // カバレッジ優先はエリアの絞り込みを迂回しない
+      const recorder = capturingGapRecorder();
+      const output = await searchDatasets(
+        { query: "上野の美術館", interests: ["文化", "自然"], limit: 2 },
+        recorder,
+      );
+
+      const body = expectAnswered(output);
+      expect(body.candidates.map((candidate) => candidate.title)).toEqual(["文化観光施設", "文化財一覧"]);
+      expect(body.gaps).toHaveLength(1);
+      expect(body.gaps?.[0].message).toContain("自然");
+      expect(recorder.records).toHaveLength(1);
+    });
+
+    it("より強い分類で報告済みの興味には枠を使わない（マナーはキーワードに当たっても確保しない）", async () => {
+      // 「公園でのマナー」は no:10 都市公園のキーワード「公園」に当たるが、欠損としては
+      // マナーの data_not_published が総括して報告する。ここで枠を使うと、報告の
+      // 役に立たないまま関連度の高い候補を1件押し出すことになる。
+      //
+      // **押し出しが起きるケースを選ぶこと。** `reportableInterests` を選定側に通さない変異は
+      // ［文化観光施設／都市公園］を返すので、候補リストの assert だけが判別の手段になる
+      // （gaps はどちらの実装でも data_not_published 1件で区別がつかない）
+      const output = await searchDatasets(
+        { query: "美術館", interests: ["公園でのマナー"], limit: 2 },
+        capturingGapRecorder(),
+      );
+
+      const body = expectAnswered(output);
+      // 枠を使わないので、候補はスコア順の上位2件そのまま
+      expect(body.candidates.map((candidate) => candidate.title)).toEqual(["文化観光施設", "文化財一覧"]);
+      expect(body.gaps).toHaveLength(1);
+      expect(body.gaps?.[0].reason).toBe("data_not_published");
+    });
+
+    it("1件で複数の興味を覆える候補には、枠を1つしか使わない", async () => {
+      // 名所・史跡は「観光」と「文化」の両方のキーワードを持つ。興味ごとに1枠ずつ取ると
+      // 2枠を消費して「自然」が押し出されるが、覆えた興味を差し引けば1枠で済む。
+      // この判定を落とすと limit の小さい呼び出しで Issue #84 と同型の症状が戻る
+      const recorder = capturingGapRecorder();
+      const output = await searchDatasets({ interests: ["観光", "文化", "自然"], limit: 2 }, recorder);
+
+      const body = expectAnswered(output);
+      expect(body.candidates.map((candidate) => candidate.title)).toEqual([
+        "名所・史跡",
+        "都市公園・都立公園一覧",
+      ]);
+      expect(body.gaps).toBeUndefined();
+      expect(recorder.records).toEqual([]);
+    });
+
+    it("枠が足りなければ、一致先があっても従来どおり欠損として報告する（カバレッジ優先は欠損隠しに転じない）", async () => {
+      // 独立した一致先を持つ興味が3件・枠は2つ。「自然」の一致先（no:10 都市公園）は
+      // 候補集合の中に居るが、枠が尽きるので入らない — **その事実は欠損として必ず残る**。
+      // `limit` は上限10・`interests` は最大20件（API.md §3.1）なので、
+      // 「報告対象の興味 > limit」は仕様上ふつうに起きる入力
+      const recorder = capturingGapRecorder();
+      const output = await searchDatasets({ interests: ["観光", "家族向け", "自然"], limit: 2 }, recorder);
+
+      const body = expectAnswered(output);
+      expect(body.candidates.map((candidate) => candidate.title)).toEqual(["名所・史跡", "トイレ情報"]);
+      expect(body.gaps).toHaveLength(1);
+      expect(body.gaps?.[0].message).toContain("自然");
+      expect(recorder.records).toEqual([
+        { question: "観光、家族向け、自然", area: undefined, category: undefined, reason: "other" },
+      ]);
+    });
+
+    it("interests を送っても、切り捨てが枠の確保と衝突しなければ候補は従来どおり", async () => {
+      // 切り捨ては起きる（usable 4件 > limit 2）が、「文化」の一致先はスコア最上位なので
+      // 確保しても並びも中身も変わらない。カバレッジ優先が「切り捨てが起きたら必ず結果を
+      // 変える」ものではないことを固定する
+      const output = await searchDatasets(
+        { query: "上野の美術館", interests: ["文化"], limit: 2 },
+        capturingGapRecorder(),
+      );
+
+      expect(expectAnswered(output).candidates.map((candidate) => candidate.title)).toEqual([
+        "文化観光施設",
+        "文化財一覧",
+      ]);
+    });
+
+    it("出荷設定（あなたへ画面の「すべて」・limit 6）では切り捨てが起きず、6件すべて返る", async () => {
+      // `RECOMMENDATION_LIMIT`（`src/features/foryou/constants.ts`）は 6。同点6件が枠に収まる
+      // ため `selectWithInterestCoverage` は早期 return で返り、**枠の確保は動かない**。
+      // 現行の出荷設定を支えているのは PR #82 の 4→6 であって本 PR の選定ではない、という
+      // 事実をここで固定する（4 に戻したときの挙動は上の limit 4 のテストが持つ）
+      const recorder = capturingGapRecorder();
+      const output = await searchDatasets({ interests: ["ラーメン", "文化", "家族向け", "自然"], limit: 6 }, recorder);
+
+      const body = expectAnswered(output);
+      expect(body.candidates.map((candidate) => candidate.title)).toEqual([
+        "名所・史跡",
+        "文化観光施設",
+        "文化財一覧",
+        "トイレ情報",
+        "銭湯",
+        "都市公園・都立公園一覧",
+      ]);
+      expect(body.gaps).toHaveLength(1);
+      expect(body.gaps?.[0].reason).toBe("insufficient_granularity");
+    });
+
+    it("枠の確保はエリアの取り落ち（Issue #52）を消さない", async () => {
+      // 枠の確保で `selected` が変わると、返した候補が収録するエリアも変わりうる。
+      // 上野で絞った候補はどれも渋谷を収録していないので、渋谷の取り落ちは枠の確保に
+      // 関係なく残る。**いまのカタログでは上野・浅草の8件が同じ areas を持つため
+      // 偶然そうなっている**面もあり、11件目（上野と渋谷の両方を収録するもの）が
+      // 入ったときに気づけるようここで固定する
+      const recorder = capturingGapRecorder();
+      const output = await searchDatasets({ areas: ["上野", "渋谷"], interests: ["観光", "家族向け"], limit: 2 }, recorder);
+
+      const body = expectAnswered(output);
+      expect(body.candidates.map((candidate) => candidate.title)).toEqual(["名所・史跡", "トイレ情報"]);
+      expect(body.gaps).toHaveLength(1);
+      expect(body.gaps?.[0].area).toBe("渋谷");
+      expect(recorder.records).toEqual([
+        { question: "観光、家族向け", area: "渋谷", category: undefined, reason: "other" },
+      ]);
+    });
+
+    it("【既知の限界】部分一致の偽陽性を能動的に拾い、スコアの高い候補を押し出して欠損まで消す", async () => {
+      // `interestCovered` は部分一致でしかないので、興味「緑茶」は都市公園のキーワード
+      // 「緑」に当たる。旧実装ではこの誤マッチが効くのは「たまたま枠内に居たとき」だけ
+      // だったが、いまは探しに行って枠に座らせる —
+      //   旧: [文化観光施設(score 2), 文化財一覧(score 2)] ＋「緑茶」の取り落ち
+      //   新: [文化観光施設(2), 都市公園(1)]              ＋ 欠損なし
+      // score 2 が score 1 に押し出され、報告されていた欠損が消える。
+      //
+      // **バグではなく、述語を共有したことの帰結**（選定と報告が同じ盲点を持つ）。
+      // 直すには興味の語を分解する必要があり、それは Step 5 の LLM 側の仕事で、
+      // スタブに形態素解析を持ち込まない（絶対ルール #1）。ここで固定するのは
+      // 「気づかないうちに挙動が変わらないようにする」ため
+      const recorder = capturingGapRecorder();
+      const output = await searchDatasets({ query: "美術館", interests: ["文化", "緑茶"], limit: 2 }, recorder);
+
+      const body = expectAnswered(output);
+      expect(body.candidates.map((candidate) => candidate.title)).toEqual([
+        "文化観光施設",
+        "都市公園・都立公園一覧",
+      ]);
+      expect(body.gaps).toBeUndefined();
+      expect(recorder.records).toEqual([]);
+    });
+  });
 });
