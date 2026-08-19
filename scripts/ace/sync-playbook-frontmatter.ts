@@ -37,14 +37,16 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+// 【本リポジトリでの唯一の改変】末尾の拡張子を上流の `.js` から `.ts` へ変えている。
+// 上流テンプレート（ff-dev-toolkit）は tsx 前提だが、このリポジトリは Node の型ストリップで
+// `.ts` を直接実行する（`scripts/seed.ts` と同じ流儀）ため、`.js` のままでは
+// ERR_MODULE_NOT_FOUND で落ちる。テンプレートを再同期したら、この1行を再適用すること
+// （再同期の手引きは docs/05-operations/deployment/ace-cycle.md の冒頭 callout）。
 import {
   analyzePlaybookMarkdown,
   discoverPlaybookSubfiles,
   mergeAnalyses,
   type AnalyzeSuccess,
-// 拡張子は `.ts`。上流テンプレート（ff-dev-toolkit）は tsx 前提で `.js` を書いているが、
-// このリポジトリは Node の型ストリップで `.ts` を直接実行する（`scripts/seed.ts` と同じ流儀）ため、
-// `.js` のままだと ERR_MODULE_NOT_FOUND で落ちる。テンプレートを再同期するとき戻さないこと
 } from "./check-category-size.ts";
 
 const EXIT_OK = 0;
