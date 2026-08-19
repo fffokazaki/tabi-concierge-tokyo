@@ -23,6 +23,18 @@ import type { ActiveInterest, Recommendation } from "./types";
  * `interests: string[]` をそのまま使う。あなたへはチップで1興味ずつ（または「すべて」で
  * 複数まとめて）問い合わせる UI なので、畳み込みが引き起こす「キーワードが1件当たると
  * 他の興味の欠損が沈黙する」問題（Issue #53）を最初から踏まない。
+ *
+ * `gaps` は `search_datasets` が返したものだけではない。`aggregate_dataset` が候補ごとに
+ * 返した未回答も同じ配列へ合流させる（Issue #89）。Issue #84 でバックエンドが「その興味の
+ * 唯一の一致先だから」という理由で候補を能動的に枠へ押し込むようになったため、押し込んだ
+ * 候補を集計できないと、検索側は「覆えた」と判定して欠損を出さず、集計側で黙って落ちる
+ * ―― その興味が答えられも報告もされない状態になる。
+ *
+ * **出典が取れずに落ちる候補（`get_provenance` 側）はまだ黙って消える**（[Issue #92]）。
+ * 集計側と違って持ち上げられる文面がサーバー応答に無く、何を出すかを決める必要があるため
+ * 分けてある。
+ *
+ * [Issue #92]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/92
  */
 
 export type RecommendationOutcome =
@@ -63,6 +75,9 @@ export async function buildRecommendations(
   const reason = activeInterest === "all" ? null : RECOMMENDATION_REASON_LABELS[activeInterest];
 
   const extracted: { datasetId: string; result: AggregateResult }[] = [];
+  // 集計できなかった候補の理由。黙って落とすと「最初から候補が無かった」ように見える
+  // （Issue #89）ため、search_datasets の gaps と同じ経路で画面に出す
+  const aggregateGaps: Unanswered[] = [];
   for (const candidate of searched.value.candidates) {
     const aggregated = await callAndRead(
       "aggregate_dataset",
@@ -71,11 +86,20 @@ export async function buildRecommendations(
       options,
     );
     if (aggregated.kind === "failure") return aggregated.outcome;
-    if (aggregated.kind === "unanswered") continue;
+    if (aggregated.kind === "unanswered") {
+      aggregateGaps.push(aggregated.unanswered);
+      continue;
+    }
     extracted.push({ datasetId: candidate.datasetId, result: aggregated.value });
   }
 
   if (extracted.length === 0) {
+    // 理由が1つに定まるときはそれをそのまま返す。汎用の other へ丸めると、
+    // 粒度不足（insufficient_granularity）が「その他」として集計され、
+    // 未回答の分類そのものが実態とずれる（DOMAIN.md §7・§8）
+    const only = dedupeGaps(aggregateGaps);
+    if (only.length === 1) return { kind: "unanswered", reason: only[0].reason, message: only[0].message };
+
     return {
       kind: "unanswered",
       reason: "other",
@@ -107,7 +131,28 @@ export async function buildRecommendations(
     };
   }
 
-  return { kind: "recommendations", recommendations, gaps: searched.value.gaps ?? [] };
+  return {
+    kind: "recommendations",
+    recommendations,
+    gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps]),
+  };
+}
+
+/**
+ * 同じ分類・同じ文面の未回答を1件にまとめる。
+ *
+ * 集計側の未回答は「どのデータセットで起きたか」を含まない文面なので、複数の候補が
+ * 同じ理由で落ちると同一の行が並ぶ。畳み込む単位は `DataGapCard` が行の区別に使う組
+ * （`reason` と `message`）と同じで、そこを揃えないと React の key が重複する。
+ */
+function dedupeGaps(gaps: Unanswered[]): Unanswered[] {
+  const seen = new Set<string>();
+  return gaps.filter((gap) => {
+    const key = `${gap.reason}:${gap.message}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +161,9 @@ export async function buildRecommendations(
 
 type ReadOutcome<T> =
   | { kind: "answered"; value: T }
-  | { kind: "unanswered"; outcome: RecommendationOutcome }
+  // `outcome`（そのまま画面へ返す形）と `unanswered`（gaps へ積む形）の両方を持つ。
+  // 呼び出し側が「打ち切る」か「記録して続ける」かを選べるようにするため（Issue #89）
+  | { kind: "unanswered"; outcome: RecommendationOutcome; unanswered: Unanswered }
   | { kind: "failure"; outcome: RecommendationOutcome };
 
 async function callAndRead<T>(
@@ -146,7 +193,11 @@ async function callAndRead<T>(
 
   const unanswered = readUnanswered(result.body);
   if (unanswered) {
-    return { kind: "unanswered", outcome: { kind: "unanswered", reason: unanswered.reason, message: unanswered.message } };
+    return {
+      kind: "unanswered",
+      outcome: { kind: "unanswered", reason: unanswered.reason, message: unanswered.message },
+      unanswered,
+    };
   }
 
   if (result.body.status !== "answered") {

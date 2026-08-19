@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { BUNKA_ID, jsonResponse as json, MEISHO_ID, provenanceSource as source, stubFetch } from "../../test/planFixtures";
+import {
+  BUNKA_ID,
+  BUNKAZAI_ID,
+  jsonResponse as json,
+  MEISHO_ID,
+  provenanceSource as source,
+  stubFetch,
+} from "../../test/planFixtures";
 import {
   AGGREGATE_PATH as AGGREGATE,
   PROVENANCE_PATH as PROVENANCE,
@@ -131,6 +138,86 @@ describe("「すべて」", () => {
 });
 
 describe("抽出・出典の欠落", () => {
+  it("集計で unanswered になった候補は黙って消さず、理由つきで gaps へ合流させる（Issue #89）", async () => {
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [
+            { datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" },
+            { datasetId: BUNKA_ID, title: "文化観光施設", provider: "台東区", url: "u", matchReason: "r" },
+          ],
+        }),
+      [AGGREGATE]: (body) =>
+        (body as { datasetId: string }).datasetId === MEISHO_ID
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          : json({
+              status: "unanswered",
+              reason: "insufficient_granularity",
+              message: "サンプル行が無いため内容を取り出せません。",
+            }),
+      [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
+    });
+
+    const outcome = expectRecs(await buildRecommendations("culture", { fetchImpl }));
+    expect(outcome.recommendations.map((r) => r.name)).toEqual(["寛永寺"]);
+    expect(outcome.gaps).toEqual([
+      {
+        status: "unanswered",
+        reason: "insufficient_granularity",
+        message: "サンプル行が無いため内容を取り出せません。",
+      },
+    ]);
+  });
+
+  it("search_datasets の gaps と集計の unanswered を両方持ち上げる（前者が先）", async () => {
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [
+            { datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" },
+            { datasetId: BUNKA_ID, title: "文化観光施設", provider: "台東区", url: "u", matchReason: "r" },
+          ],
+          gaps: [{ status: "unanswered", reason: "insufficient_granularity", message: "「ラーメン」の粒度では…" }],
+        }),
+      [AGGREGATE]: (body) =>
+        (body as { datasetId: string }).datasetId === MEISHO_ID
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          : json({ status: "unanswered", reason: "other", message: "固定データにその行がありません。" }),
+      [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
+    });
+
+    const outcome = expectRecs(await buildRecommendations("all", { fetchImpl }));
+    expect(outcome.gaps.map((gap) => gap.message)).toEqual([
+      "「ラーメン」の粒度では…",
+      "固定データにその行がありません。",
+    ]);
+  });
+
+  it("同じ理由・同じ文面の gap は1件にまとめる（DataGapCard がこの組で行を区別するため）", async () => {
+    const failure = { status: "unanswered", reason: "other", message: "固定データにその行がありません。" };
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [
+            { datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" },
+            { datasetId: BUNKA_ID, title: "文化観光施設", provider: "台東区", url: "u", matchReason: "r" },
+            { datasetId: BUNKAZAI_ID, title: "文化財", provider: "台東区", url: "u", matchReason: "r" },
+          ],
+        }),
+      [AGGREGATE]: (body) =>
+        (body as { datasetId: string }).datasetId === MEISHO_ID
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          : json(failure),
+      [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
+    });
+
+    const outcome = expectRecs(await buildRecommendations("culture", { fetchImpl }));
+    expect(outcome.gaps).toHaveLength(1);
+  });
+
   it("抽出できなかった候補は落とすが、全滅したら空のレコメンドを返さない", async () => {
     const { fetchImpl, calls } = stubFetch({
       [SEARCH]: () =>
@@ -144,6 +231,29 @@ describe("抽出・出典の欠落", () => {
     const outcome = await buildRecommendations("culture", { fetchImpl });
     expect(outcome.kind).toBe("unanswered");
     expect(calls.map((c) => c.path)).not.toContain(PROVENANCE);
+  });
+
+  it("全滅の理由が1つに定まるなら、汎用の other ではなくその分類・文面で返す", async () => {
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
+        }),
+      [AGGREGATE]: () =>
+        json({
+          status: "unanswered",
+          reason: "insufficient_granularity",
+          message: "この一覧はサンプル行を持たないため、おすすめに出せる粒度で取り出せません。",
+        }),
+    });
+
+    const outcome = await buildRecommendations("culture", { fetchImpl });
+    expect(outcome).toEqual({
+      kind: "unanswered",
+      reason: "insufficient_granularity",
+      message: "この一覧はサンプル行を持たないため、おすすめに出せる粒度で取り出せません。",
+    });
   });
 
   it("出典が取れなければ、出典なしのままレコメンドを返さない", async () => {
