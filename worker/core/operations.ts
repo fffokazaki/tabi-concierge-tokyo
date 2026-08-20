@@ -455,7 +455,7 @@ function computeAggregateDataset(input: AggregateDatasetInput): AggregateDataset
   if (nonTarget) {
     return unanswered(
       "out_of_area",
-      `「${nonTarget}」は POC の対象エリア（${REPRESENTATIVE_AREAS.join("・")}）の外です。`,
+      `「${nonTarget}」はこのアプリの対象エリア（${REPRESENTATIVE_AREAS.join("・")}）の外です。`,
     );
   }
 
@@ -482,7 +482,7 @@ function computeAggregateDataset(input: AggregateDatasetInput): AggregateDataset
     ? // `areas` にあるのに固定データが無い ＝ スタブ側の欠落。データそのものの欠損と混ぜない
       unanswered(
         "other",
-        `「${entry.title}」は「${intendedArea}」を収録していますが、スタブの固定データにその行がありません。`,
+        `「${entry.title}」は「${intendedArea}」を収録していますが、このアプリではまだその内容を取り出せません。`,
       )
     : unanswered("data_not_published", `「${entry.title}」は「${intendedArea}」の地物を収録していません。`);
 }

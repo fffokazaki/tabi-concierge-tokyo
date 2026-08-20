@@ -444,6 +444,10 @@ describe("マナー・作法の問い", () => {
       expect(output.status).toBe("unanswered");
       if (output.status !== "unanswered") return;
       expect(output.reason).toBe("out_of_area");
+      // 文面は利用者に見える。実装用語（POC）を出さない（Issue #99）
+      expect(output.message).toBe(
+        "該当するオープンデータがありません。「新宿」はこのアプリの対象エリア（上野・浅草・渋谷）の外です。",
+      );
     });
 
     it("ジャンル指定の飲食が先勝ちし、マナーの記録は残らない（既知の取りこぼし）", async () => {
@@ -573,6 +577,20 @@ describe("aggregateDataset（直接呼び出し）", () => {
     );
 
     expect(output.status).toBe("unanswered");
+  });
+
+  it("対象エリア外の文面に実装用語（POC）を出さない（Issue #99）", async () => {
+    // unanswered の message は DataGapCard 経由で利用者に見える。開発者向けの語が
+    // 混ざる退行をここで止める（「スタブ」の分岐は現行カタログでは到達不能のため未固定）
+    const output = await aggregateDataset(
+      { datasetId: MEISHO_ID, intent: "新宿の寺を1件" },
+      capturingGapRecorder(),
+    );
+
+    expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    expect(output.reason).toBe("out_of_area");
+    expect(output.message).toBe("「新宿」はこのアプリの対象エリア（上野・浅草・渋谷）の外です。");
   });
 
   it("既知のエリア名が無い answered は、固定サンプル先頭という選定根拠を query に明記する（Issue #78）", async () => {

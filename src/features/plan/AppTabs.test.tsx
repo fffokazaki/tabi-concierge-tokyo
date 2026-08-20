@@ -203,13 +203,13 @@ describe("unanswered — 正常な結果として表示する", () => {
         jsonResponse({
           status: "unanswered",
           reason: "out_of_area",
-          message: "「新宿」は POC の対象エリア（上野・浅草・渋谷）の外です。",
+          message: "「新宿」はこのアプリの対象エリア（上野・浅草・渋谷）の外です。",
         }),
     });
     await createBriefing(fetchImpl);
 
     await waitFor(() => expect(screen.getByText("該当するオープンデータがありません")).toBeInTheDocument());
-    expect(screen.getByText(/「新宿」は POC の対象エリア/)).toBeInTheDocument();
+    expect(screen.getByText(/「新宿」はこのアプリの対象エリア/)).toBeInTheDocument();
     // 理由分類を握りつぶさない
     expect(screen.getByText("分類: out_of_area")).toBeInTheDocument();
     // 障害の見出しは出ない
