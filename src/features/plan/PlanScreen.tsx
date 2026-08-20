@@ -86,14 +86,19 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
 
         {/* 「該当するオープンデータがありません」は正常な結果。エラー表示にしない（API.md §4） */}
         {request.status === "unanswered" && (
-          <div className="route-empty" role="status">
-            <p className="route-empty__title">該当するオープンデータがありません</p>
-            <p className="route-empty__message">{request.message}</p>
-            {/* 分類は応答全体を代表する1つ（引き上げをしないので other になる。Issue #94）。
-                候補ごとに違う理由は下の DataGapCard で内訳として出す */}
-            <p className="route-empty__reason">分類: {request.reason}</p>
+          <>
+            <div className="route-empty" role="status">
+              <p className="route-empty__title">該当するオープンデータがありません</p>
+              <p className="route-empty__message">{request.message}</p>
+              {/* 分類は応答全体を代表する1つ（引き上げをしないので other になる。Issue #94）。
+                  候補ごとに違う理由は次の DataGapCard で内訳として出す */}
+              <p className="route-empty__reason">分類: {request.reason}</p>
+            </div>
+            {/* カードの**兄弟**として並べる（`ready` 分岐と同じ形）。route-empty の中に入れると、
+                data-gap-card__title（15px）が親の route-empty__title（12.5px）より大きく、
+                見出しの階層が逆転する */}
             {request.gaps.length > 0 && <DataGapCard gaps={request.gaps} />}
-          </div>
+          </>
         )}
 
         {request.status === "failed" && <FailureNotice failure={request.failure} onRetry={() => void requestPlan()} />}

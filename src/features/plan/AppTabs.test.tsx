@@ -100,6 +100,35 @@ describe("あなたへタブへの切り替え", () => {
   });
 });
 
+describe("あなたへ画面の未回答の内訳（Issue #92・#94）", () => {
+  it("候補が全滅したとき、あなたへ画面でも分類と内訳の両方が出る", async () => {
+    // プラン画面だけで内訳を確かめると、あなたへ側の状態変換（useForYouState）や
+    // 描画（ForYouScreen）で内訳が落ちる退行を検出できない
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
+          gaps: [{ status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" }],
+        }),
+      [AGGREGATE_PATH]: () =>
+        jsonResponse({
+          status: "unanswered",
+          reason: "insufficient_granularity",
+          message: "「名所・史跡」は施設一覧ではなく集計表のため、個別の地物を抽出できません。",
+        }),
+    });
+    render(<AppTabs options={{ fetchImpl }} />);
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+    fireEvent.click(screen.getByRole("button", { name: "あなたへ" }));
+
+    await waitFor(() => expect(screen.getByText("分類: other")).toBeInTheDocument());
+    expect(screen.getByText("答えられなかった点があります")).toBeInTheDocument();
+    expect(screen.getByText("「ショッピング」に当たるものがありませんでした。")).toBeInTheDocument();
+    expect(screen.getByText(/施設一覧ではなく集計表のため/)).toBeInTheDocument();
+  });
+});
+
 describe("answered — 応答由来のルートと出典", () => {
   it("応答待ちのあいだローディングを出す（無反応に見せない）", async () => {
     const { fetchImpl } = stubSuccessfulPlan();
@@ -243,7 +272,9 @@ describe("unanswered — 正常な結果として表示する", () => {
     expect(screen.getByText(/施設一覧ではなく集計表のため/)).toBeInTheDocument();
   });
 
-  it("出典が突き合わなかった内容は、黙って消えず理由が画面に出る（Issue #92）", async () => {
+  it("出典が突き合わなかった内容は、黙って消えず障害として画面に出る（Issue #92）", async () => {
+    // データ欠損（DataGapCard）ではなく障害として出す。API.md §3.3 の契約により、出典が欠ける
+    // answered は仕様外なので、「そのデータが公開されていない」と読める見せ方にしない
     const { fetchImpl } = stubFetch({
       [SEARCH_PATH]: () =>
         jsonResponse({
@@ -258,9 +289,27 @@ describe("unanswered — 正常な結果として表示する", () => {
     });
     await createBriefing(fetchImpl);
 
+    // 障害の見出しは role="alert"（unanswered とは見た目から区別する）
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(screen.queryByText("答えられなかった点があります")).not.toBeInTheDocument();
+    expect(screen.queryByText("該当するオープンデータがありません")).not.toBeInTheDocument();
+  });
+
+  it("内訳が無い未回答では、空の DataGapCard を出さない", async () => {
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "unanswered",
+          reason: "out_of_area",
+          message: "「新宿」はこのアプリの対象エリア（上野・浅草・渋谷）の外です。",
+        }),
+    });
+    await createBriefing(fetchImpl);
+
     await waitFor(() => expect(screen.getByText("該当するオープンデータがありません")).toBeInTheDocument());
-    expect(screen.getByText("答えられなかった点があります")).toBeInTheDocument();
-    expect(screen.getByText("「寛永寺」は出典を確認できなかったため、表示を見送りました。")).toBeInTheDocument();
+    expect(screen.getByText("分類: out_of_area")).toBeInTheDocument();
+    // 中身の無いカードは出さない
+    expect(screen.queryByText("答えられなかった点があります")).not.toBeInTheDocument();
   });
 });
 

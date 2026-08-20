@@ -33,7 +33,10 @@ import type { ActiveInterest, Recommendation } from "./types";
  * **未回答は分類（`reason`）と内訳（`gaps`）を分けて運ぶ。** 候補が全滅したときも分類は
  * 汎用の `other` に置いたまま、個々の理由を `gaps` として画面へ出す（[Issue #94] の決定。
  * 引き上げると1件のデータセットについての判定を全体の判定として名乗ることになる）。
- * 出典が突き合わず落とした候補も黙って消さず、落とした事実を `gaps` に載せる（[Issue #92]）。
+ * **出典が突き合わない候補は `gaps` ではなく `parse` の障害にする**（[Issue #92]）。API.md §3.3 の
+ * 契約により、`answered` が返ったなら要求した datasetId すべてに出典が付く。付いていないのは
+ * バックエンドの不整合であって未公開データではないので、データ欠損の記録には混ぜない
+ * （`missingProvenanceFailure` の doc 参照）。黙って落とさない点は変わらない ―― 画面には障害として出る。
  *
  * [Issue #92]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/92
  * [Issue #94]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/94
@@ -119,55 +122,62 @@ export async function buildRecommendations(
     readSources,
     options,
   );
-  if (sourced.kind !== "answered") return sourced.outcome;
+  if (sourced.kind === "failure") return sourced.outcome;
+  if (sourced.kind === "unanswered") {
+    // 出典が取れないので回答は作れない。ただし**それまでに集めた内訳は捨てない**
+    // （Issue #92・#94。`callAndRead` が作る outcome は `gaps: []` なので、そのまま
+    // 返すと検索側・集計側の欠損が消える ―― この PR が直している握りつぶしそのもの）
+    return {
+      kind: "unanswered",
+      reason: sourced.unanswered.reason,
+      message: sourced.unanswered.message,
+      gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps]),
+    };
+  }
 
   const sourceByDatasetId = new Map(sourced.value.sources.map((source) => [source.datasetId, source]));
   const recommendations: Recommendation[] = [];
-  // 出典が突き合わない候補は落とす（絶対ルール #2）。ただし黙って落とさない（Issue #92）
-  const provenanceGaps: Unanswered[] = [];
   for (const { datasetId, result } of extracted) {
     const source = sourceByDatasetId.get(datasetId);
-    if (!source) {
-      provenanceGaps.push(missingProvenanceGap(result.name));
-      continue;
-    }
+    // 出典が欠けるのは**データ欠損ではなく仕様違反**（Issue #92）。API.md §3.3 の契約により、
+    // 知らない datasetId が1件でも混ざれば応答全体が `unanswered` になるので、`answered` なら
+    // 要求した ID すべてに出典が付く。欠けているのはバックエンドの不整合なので、`gaps`
+    // （＝公開されていないデータの記録）に混ぜず parse の障害として出す。混ぜると、実装のバグを
+    // 「このデータは公開されていない」と偽って主張することになる（絶対ルール #1）
+    if (!source) return missingProvenanceFailure(result.name, datasetId);
     recommendations.push({ name: result.name, blurb: result.summary, reason, source });
   }
 
-  if (recommendations.length === 0) {
-    return {
-      kind: "unanswered",
-      reason: "other",
-      message: "取り出した内容に対応する出典を取得できませんでした。",
-      gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps, ...provenanceGaps]),
-    };
-  }
+  // 上のループは全件 push か return するので到達しない。残しているのは、将来 `continue` を
+  // 戻した人が「出典なしの回答」を作れないようにするため（絶対ルール #2 の防波堤）
+  if (recommendations.length === 0) return missingProvenanceFailure();
 
   return {
     kind: "recommendations",
     recommendations,
-    gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps, ...provenanceGaps]),
+    gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps]),
   };
 }
 
 /**
- * 出典が突き合わなかった候補の欠損（Issue #92）。
+ * 出典の突き合わせが成立しなかったときの障害（Issue #92）。
  *
- * 落とすこと自体は絶対ルール #2（出典なしの回答を作らない）どおりで正しい。問題は落とし方が
- * 黙っていることで、利用者から見ると「その候補は最初から無かった」ように見える。
+ * **データ欠損（`gaps`）ではなく `parse` の障害にする。** [API.md](../../../docs/02-design/API.md) §3.3 の
+ * 契約は「知らない `datasetId` が1件でも混ざったら、既知のぶんだけ返さず全体を `unanswered` に
+ * する」なので、`answered` が返ったなら要求した ID すべてに出典が付く。付いていないのは
+ * バックエンドの不整合であって「そのデータが公開されていない」ではない。`gaps` に混ぜると
+ * 実装のバグを未公開データとして主張することになり（絶対ルール #1）、DOMAIN.md §7 の
+ * 未回答の集計も汚れる。
  *
- * 分類は `other`。`get_provenance` は個別の datasetId が欠けた理由を返さないので、ここで
- * 分かるのは「出典を確認できなかった」だけ。データの不在（`data_not_published`）を名乗ると、
- * 確かめていないことを確かめたと主張することになる（絶対ルール #1）。
- *
- * 名乗るのは地物の名称（`AggregateResult.name`）。`readCandidates` はデータセット名を
- * 意図的に捨てているうえ、利用者には「寛永寺」のほうが何が消えたか分かる。
+ * 落とすこと自体は絶対ルール #2 どおりだが、**黙って落とさない** ―― 画面には障害として出る。
  */
-const missingProvenanceGap = (name: string): Unanswered => ({
-  status: "unanswered",
-  reason: "other",
-  message: `「${name}」は出典を確認できなかったため、表示を見送りました。`,
-});
+const missingProvenanceFailure = (name?: string, datasetId?: string): RecommendationOutcome =>
+  malformed(
+    "get_provenance",
+    name && datasetId
+      ? `要求した datasetId の出典が返りませんでした（「${name}」・${datasetId}）`
+      : "出典と突き合わせられた候補が1件もありません",
+  );
 
 /**
  * 同じ分類・同じ文面の未回答を1件にまとめる。

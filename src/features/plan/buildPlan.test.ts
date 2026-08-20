@@ -377,8 +377,10 @@ describe("buildPlan", () => {
     expect(calls.map((c) => c.path)).not.toContain(PROVENANCE);
   });
 
-  it("出典が一部の内容だけ返らなかったら、黙って消さず gaps に載せる（Issue #92。foryou 側と対）", async () => {
-    // 落とすこと自体は正しい（絶対ルール #2）。落ちた事実が画面に出るかを見る
+  it("要求した datasetId の出典が返らないのは仕様違反なので、データ欠損に混ぜず障害にする（Issue #92。foryou 側と対）", async () => {
+    // API.md §3.3 の契約: 知らない datasetId が1件でも混ざれば応答全体が unanswered になる。
+    // よって answered で出典が欠けるのはバックエンドの不整合で、gaps に混ぜると実装のバグを
+    // 未公開データとして主張することになる（絶対ルール #1）
     const { fetchImpl } = stubFetch({
       [SEARCH]: () =>
         json({
@@ -396,19 +398,15 @@ describe("buildPlan", () => {
       [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
     });
 
-    const plan = expectPlan(await buildPlan(DEFAULT_TRIP, { fetchImpl }));
-    expect(plan.stops.map((s) => s.stop.place)).toEqual(["寛永寺"]);
-    expect(plan.gaps).toEqual([
-      {
-        status: "unanswered",
-        reason: "other",
-        message: "「国立西洋美術館」は出典を確認できなかったため、表示を見送りました。",
-      },
-    ]);
+    const outcome = await buildPlan(DEFAULT_TRIP, { fetchImpl });
+    expect(outcome.kind).toBe("failure");
+    if (outcome.kind !== "failure") return;
+    expect(outcome.failure.kind).toBe("parse");
+    expect(outcome.failure.detail).toContain("国立西洋美術館");
+    expect(outcome.failure.detail).toContain(BUNKA_ID);
   });
 
-  it("出典が1件も突き合わなければ、それまでに集めた gap ごと未回答にする（Issue #92。foryou 側と対）", async () => {
-    // 以前はここで aggregateGaps を丸ごと捨てて汎用の other だけを返していた
+  it("出典取得が unanswered なら、それまでに集めた内訳を保ったまま未回答にする（Issue #92・#94。foryou 側と対）", async () => {
     const { fetchImpl } = stubFetch({
       [SEARCH]: () =>
         json({
@@ -423,23 +421,17 @@ describe("buildPlan", () => {
         (body as { datasetId: string }).datasetId === MEISHO_ID
           ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
           : json({ status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" }),
-      // extracted に無い datasetId の出典だけを返す（突き合わせが1件も成立しない）
-      [PROVENANCE]: () => json({ status: "answered", sources: [source(BUNKAZAI_ID, "文化財")] }),
+      [PROVENANCE]: () => json({ status: "unanswered", reason: "other", message: "出典を生成できません。" }),
     });
 
     const outcome = await buildPlan(DEFAULT_TRIP, { fetchImpl });
     expect(outcome).toEqual({
       kind: "unanswered",
       reason: "other",
-      message: "取り出した内容に対応する出典を取得できませんでした。",
+      message: "出典を生成できません。",
       gaps: [
         { status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" },
         { status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" },
-        {
-          status: "unanswered",
-          reason: "other",
-          message: "「寛永寺」は出典を確認できなかったため、表示を見送りました。",
-        },
       ],
     });
   });
@@ -492,7 +484,11 @@ describe("buildPlan", () => {
     expect(outcome.kind === "unanswered" && outcome.message).toContain("出典");
   });
 
-  it("出典が一部の datasetId しか返らなければ、対応しない停留地を落とす", async () => {
+  it("出典が一部の datasetId しか返らなければ、残りを黙って落とさず障害にする（Issue #92 で変更）", async () => {
+    // **以前はここで「対応しない停留地を落とす」ことを期待していた。** その挙動は
+    // Issue #92 の指摘どおり握りつぶしで、しかも API.md §3.3 の契約（知らない datasetId が
+    // 1件でも混ざれば応答全体が unanswered）に照らすと、出典が欠ける answered はそもそも
+    // 仕様外。落とすのではなく仕様違反として表に出す
     const { fetchImpl } = stubFetch({
       [SEARCH]: () =>
         json({
@@ -507,9 +503,9 @@ describe("buildPlan", () => {
       [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
     });
 
-    const plan = expectPlan(await buildPlan(DEFAULT_TRIP, { fetchImpl }));
-    expect(plan.stops).toHaveLength(1);
-    expect(plan.stops[0].source.datasetId).toBe(MEISHO_ID);
+    const outcome = await buildPlan(DEFAULT_TRIP, { fetchImpl });
+    expect(outcome.kind).toBe("failure");
+    expect(outcome.kind === "failure" && outcome.failure.kind).toBe("parse");
   });
 
   it("HTTP エラーは unanswered と区別された障害にする", async () => {

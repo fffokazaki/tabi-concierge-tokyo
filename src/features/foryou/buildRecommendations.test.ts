@@ -348,8 +348,10 @@ describe("抽出・出典の欠落", () => {
   });
 
 
-  it("出典が一部の候補だけ返らなかったら、黙って消さず gaps に載せる（Issue #92）", async () => {
-    // 落とすこと自体は正しい（絶対ルール #2）。落ちた事実が画面に出るかを見る
+  it("要求した datasetId の出典が返らないのは仕様違反なので、データ欠損に混ぜず障害にする（Issue #92）", async () => {
+    // API.md §3.3 の契約: 知らない datasetId が1件でも混ざれば応答全体が unanswered になる。
+    // よって answered で出典が欠けるのはバックエンドの不整合で、「そのデータが公開されていない」
+    // ではない。gaps に混ぜると実装のバグを未公開データとして主張することになる（絶対ルール #1）
     const { fetchImpl } = stubFetch({
       [SEARCH]: () =>
         json({
@@ -367,19 +369,17 @@ describe("抽出・出典の欠落", () => {
       [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
     });
 
-    const outcome = expectRecs(await buildRecommendations("all", { fetchImpl }));
-    expect(outcome.recommendations.map((r) => r.name)).toEqual(["寛永寺"]);
-    expect(outcome.gaps).toEqual([
-      {
-        status: "unanswered",
-        reason: "other",
-        message: "「国立西洋美術館」は出典を確認できなかったため、表示を見送りました。",
-      },
-    ]);
+    const outcome = await buildRecommendations("all", { fetchImpl });
+    expect(outcome.kind).toBe("failure");
+    if (outcome.kind !== "failure") return;
+    expect(outcome.failure.kind).toBe("parse");
+    // どの内容の出典が欠けたかを検出できる形で残す（黙って落とさない）
+    expect(outcome.failure.detail).toContain("国立西洋美術館");
+    expect(outcome.failure.detail).toContain(BUNKA_ID);
   });
 
-  it("出典が1件も突き合わなければ、それまでに集めた gap ごと未回答にする（Issue #92）", async () => {
-    // 以前はここで aggregateGaps を丸ごと捨てて汎用の other だけを返していた
+  it("出典取得が unanswered なら、それまでに集めた内訳を保ったまま未回答にする（Issue #92・#94）", async () => {
+    // `callAndRead` が作る outcome は gaps: [] なので、そのまま返すと検索側・集計側の欠損が消える
     const { fetchImpl } = stubFetch({
       [SEARCH]: () =>
         json({
@@ -394,23 +394,17 @@ describe("抽出・出典の欠落", () => {
         (body as { datasetId: string }).datasetId === MEISHO_ID
           ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
           : json({ status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" }),
-      // extracted に無い datasetId の出典だけを返す（突き合わせが1件も成立しない）
-      [PROVENANCE]: () => json({ status: "answered", sources: [source(BUNKAZAI_ID, "文化財")] }),
+      [PROVENANCE]: () => json({ status: "unanswered", reason: "other", message: "出典を生成できません。" }),
     });
 
     const outcome = await buildRecommendations("all", { fetchImpl });
     expect(outcome).toEqual({
       kind: "unanswered",
       reason: "other",
-      message: "取り出した内容に対応する出典を取得できませんでした。",
+      message: "出典を生成できません。",
       gaps: [
         { status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" },
         { status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" },
-        {
-          status: "unanswered",
-          reason: "other",
-          message: "「寛永寺」は出典を確認できなかったため、表示を見送りました。",
-        },
       ],
     });
   });

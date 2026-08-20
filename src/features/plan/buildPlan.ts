@@ -31,13 +31,19 @@ import type { Stop, Trip } from "./types";
  * `gaps` は `search_datasets` が返したものだけではない。`aggregate_dataset` が候補ごとに
  * 返した未回答も同じ配列へ合流させる（Issue #95。あなたへ画面の Issue #89 と同型）。
  *
- * 直しきっていないものが2つある（どちらもあなたへ画面と共通の設計判断で、Issue は
- * あなたへ側で立っている）。**出典が取れずに落ちる候補（`get_provenance` 側）はまだ
- * 黙って消える**（[Issue #92]。集計側と違って持ち上げられる文面がサーバー応答に無い）。
- * **候補が全滅したときは個々の理由が汎用の `other` に丸められる**（[Issue #94]。
- * 可視性は残るが内訳が落ちる）。なお全滅時・出典が1件も取れなかったときの early return
- * （`PlanOutcome` の `unanswered`）は `gaps` を運べない形なので、そこまでに収集した
- * gaps は search 側の分も含めて画面に届かない。どう運ぶかも Issue #94 の設計判断に含める。
+ * **未回答は分類（`reason`）と内訳（`gaps`）を分けて運ぶ。** 候補が全滅したときも分類は
+ * 汎用の `other` に置いたまま、個々の理由を `gaps` として画面へ出す（[Issue #94] の決定。
+ * 引き上げると1件のデータセットについての判定を全体の判定として名乗ることになる）。
+ * `PlanOutcome` の `unanswered` は `gaps` を**必須**で持つので、内訳を運べる場所で黙って
+ * 落とす経路は型として作れない。
+ *
+ * **出典が突き合わない内容は `gaps` ではなく `parse` の障害にする**（[Issue #92]）。API.md §3.3 の
+ * 契約により、`answered` が返ったなら要求した datasetId すべてに出典が付く。付いていないのは
+ * バックエンドの不整合であって未公開データではないので、データ欠損の記録には混ぜない
+ * （`missingProvenanceFailure` の doc 参照）。黙って落とさない点は変わらない ―― 画面には障害として出る。
+ *
+ * 上記2つはあなたへ画面と共通の設計判断で、Issue はあなたへ側で立っている（同型の実装は
+ * `buildRecommendations.ts` にある。片方だけ直すと ACE-98-1 の言う対の崩れになる）。
  *
  * [Issue #92]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/92
  * [Issue #94]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/94
@@ -144,56 +150,66 @@ export async function buildPlan(trip: Trip, options: BuildPlanOptions = {}): Pro
     readSources,
     options,
   );
-  if (sourced.kind !== "answered") return sourced.outcome;
+  if (sourced.kind === "failure") return sourced.outcome;
+  if (sourced.kind === "unanswered") {
+    // 出典が取れないので回答は作れない。ただし**それまでに集めた内訳は捨てない**
+    // （Issue #92・#94。`callAndRead` が作る outcome は `gaps: []` なので、そのまま
+    // 返すと検索側・集計側の欠損が消える ―― この PR が直している握りつぶしそのもの）
+    return {
+      kind: "unanswered",
+      reason: sourced.unanswered.reason,
+      message: sourced.unanswered.message,
+      gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps]),
+    };
+  }
 
   // 出典を datasetId で突き合わせる。突き合わない内容は落とす（出典なしのまま表示しない）
   const sourceByDatasetId = new Map(sourced.value.sources.map((source) => [source.datasetId, source]));
   const stops: SourcedStop[] = [];
-  // 出典が突き合わない内容は落とす（絶対ルール #2）。ただし黙って落とさない（Issue #92）
-  const provenanceGaps: Unanswered[] = [];
   for (const { datasetId, result } of extracted) {
     const source = sourceByDatasetId.get(datasetId);
-    if (!source) {
-      provenanceGaps.push(missingProvenanceGap(result.name));
-      continue;
-    }
+    // 出典が欠けるのは**データ欠損ではなく仕様違反**（Issue #92）。API.md §3.3 の契約により、
+    // 知らない datasetId が1件でも混ざれば応答全体が `unanswered` になるので、`answered` なら
+    // 要求した ID すべてに出典が付く。欠けているのはバックエンドの不整合なので、`gaps`
+    // （＝公開されていないデータの記録）に混ぜず parse の障害として出す。混ぜると、実装のバグを
+    // 「このデータは公開されていない」と偽って主張することになる（絶対ルール #1）
+    if (!source) return missingProvenanceFailure(result.name, datasetId);
     // Stop.place ← name / Stop.note ← summary（2026-08-17 合意・API_REQUIREMENTS.md §2）。
     // マナーは出典を持つデータが無いので空。仮のマナー文を入れるのは出典なしの回答にあたる
     stops.push({ stop: { place: result.name, note: result.summary, etiquette: [] }, source });
   }
 
-  if (stops.length === 0) {
-    return {
-      kind: "unanswered",
-      reason: "other",
-      message: "取り出した内容に対応する出典を取得できませんでした。",
-      gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps, ...provenanceGaps]),
-    };
-  }
+  // 上のループは全件 push か return するので到達しない。残しているのは、将来 `continue` を
+  // 戻した人が「出典なしの回答」を作れないようにするため（絶対ルール #2 の防波堤）
+  if (stops.length === 0) return missingProvenanceFailure();
 
   return {
     kind: "plan",
     query,
     stops,
-    gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps, ...provenanceGaps]),
+    gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps]),
   };
 }
 
 /**
- * 出典が突き合わなかった内容の欠損（Issue #92。`buildRecommendations.ts` の同名関数と対）。
+ * 出典の突き合わせが成立しなかったときの障害（Issue #92）。
  *
- * 落とすこと自体は絶対ルール #2 どおりで正しい。問題は落とし方が黙っていることで、
- * 利用者から見ると「その停留地は最初から無かった」ように見える。
+ * **データ欠損（`gaps`）ではなく `parse` の障害にする。** [API.md](../../../docs/02-design/API.md) §3.3 の
+ * 契約は「知らない `datasetId` が1件でも混ざったら、既知のぶんだけ返さず全体を `unanswered` に
+ * する」なので、`answered` が返ったなら要求した ID すべてに出典が付く。付いていないのは
+ * バックエンドの不整合であって「そのデータが公開されていない」ではない。`gaps` に混ぜると
+ * 実装のバグを未公開データとして主張することになり（絶対ルール #1）、DOMAIN.md §7 の
+ * 未回答の集計も汚れる。
  *
- * 分類は `other`。`get_provenance` は個別の datasetId が欠けた理由を返さないため、ここで
- * 分かるのは「出典を確認できなかった」だけ。データの不在（`data_not_published`）を名乗ると、
- * 確かめていないことを確かめたと主張することになる（絶対ルール #1）。
+ * 落とすこと自体は絶対ルール #2 どおりだが、**黙って落とさない** ―― 画面には障害として出る。
  */
-const missingProvenanceGap = (name: string): Unanswered => ({
-  status: "unanswered",
-  reason: "other",
-  message: `「${name}」は出典を確認できなかったため、表示を見送りました。`,
-});
+const missingProvenanceFailure = (name?: string, datasetId?: string): PlanOutcome =>
+  malformed(
+    "get_provenance",
+    name && datasetId
+      ? `要求した datasetId の出典が返りませんでした（「${name}」・${datasetId}）`
+      : "出典と突き合わせられた内容が1件もありません",
+  );
 
 /**
  * 同じ分類・同じ文面の未回答を1件にまとめる。
