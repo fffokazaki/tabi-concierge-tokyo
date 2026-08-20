@@ -237,7 +237,7 @@ GitHub の closing keyword がデフォルトブランチへのマージでの�
 | Category   | process |
 | Origin     | PR #93 / Issue #89 |
 | Date       | 2026-08-20 |
-| Helpful    | 1       |
+| Helpful    | 2            |
 | Harmful    | 0       |
 | Status     | active  |
 

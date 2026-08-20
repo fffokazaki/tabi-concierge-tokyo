@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.30.1"
+version: "1.31.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-20"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 84
+ace_entry_count: 89
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -315,8 +315,30 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-98-1 | 意図的な重複ペアへ同型修正を写すときは、テストも対で写す | testing | [playbook/testing.md#ace-98-1](./playbook/testing.md#ace-98-1) |
 | ACE-98-2 | 複合キーの dedupe には「片方だけ一致では畳み込まない」テストを対で置く | testing | [playbook/testing.md#ace-98-2](./playbook/testing.md#ace-98-2) |
 | ACE-98-3 | 握りつぶしの修正は、これまで画面に出なかったサーバー文面を新たに露出させる | process | [playbook/process.md#ace-98-3](./playbook/process.md#ace-98-3) |
+| ACE-106-1 | 到達不能な分岐は、文面だけを純粋関数へ切り出して直接固定する | testing | [playbook/testing.md#ace-106-1](./playbook/testing.md#ace-106-1) |
+| ACE-106-2 | 完全一致テストは「実装と期待値の同時書き換え」を通す — 語彙は独立した不変条件で縛る | testing | [playbook/testing.md#ace-106-2](./playbook/testing.md#ace-106-2) |
+| ACE-108-1 | 「データが無い」と「実装が壊れている」を同じ器に入れない | architecture | [playbook/architecture.md#ace-108-1](./playbook/architecture.md#ace-108-1) |
+| ACE-108-2 | 内訳を運べる場所で黙って落とす経路は、フィールドを必須にすれば型で塞げる | architecture | [playbook/architecture.md#ace-108-2](./playbook/architecture.md#ace-108-2) |
+| ACE-108-3 | 自分の PR が自分の docstring を偽にする — 対のファイルは両方読み直す | documentation-quality | [playbook/documentation-quality.md#ace-108-3](./playbook/documentation-quality.md#ace-108-3) |
 
 ## Changelog
+
+### [1.31.0] - 2026-08-20
+
+#### 追加
+
+- ACE-106-1: 到達不能な分岐は、文面だけを純粋関数へ切り出して直接固定する（Issue #99 / PR #106）
+- ACE-106-2: 完全一致テストは「実装と期待値の同時書き換え」を通す — 語彙は独立した不変条件で縛る（Issue #99 / PR #106）
+- ACE-108-1: 「データが無い」と「実装が壊れている」を同じ器に入れない（Issue #92 / PR #108）
+- ACE-108-2: 内訳を運べる場所で黙って落とす経路は、フィールドを必須にすれば型で塞げる（Issue #94 / PR #108）
+- ACE-108-3: 自分の PR が自分の docstring を偽にする — 対のファイルは両方読み直す（PR #105 / #106 / #108）
+
+#### カウンター更新
+
+- ACE-93-2: Helpful +1（分類を引き上げない判断を Issue #94 の決定として確定させた）
+- ACE-93-3: Helpful +1（出典欠落を直す際に、同じ関数の下流とプラン画面の同型箇所を棚卸しした）
+- ACE-98-1: Helpful +1（両画面のテストを対で写した）
+- ACE-97-1: Helpful +1（vendored な形式ゲートの検証範囲を直さず開示し、上流 ff-dev-toolkit#21 へ起票した）
 
 ### [1.30.1] - 2026-08-20
 

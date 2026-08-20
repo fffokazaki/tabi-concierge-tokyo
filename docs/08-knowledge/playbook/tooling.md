@@ -90,7 +90,7 @@ const jsonRoute =
 | Category   | tooling |
 | Origin     | PR #97  |
 | Date       | 2026-08-20 |
-| Helpful    | 0       |
+| Helpful    | 1       |
 | Harmful    | 0       |
 | Status     | active  |
 
