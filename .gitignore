@@ -21,3 +21,6 @@ worker-configuration.d.ts
 
 # シードSQLは生成物（data/ と scripts/seed.ts から再生成できる）
 db/seed.generated.sql
+
+# Claude Code の個人ローカル設定（コミットしない）
+.claude/settings.local.json
