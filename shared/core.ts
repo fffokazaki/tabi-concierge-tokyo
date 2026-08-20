@@ -30,7 +30,7 @@ export const UNANSWERED_REASONS = [
 export type UnansweredReason = (typeof UNANSWERED_REASONS)[number];
 
 /**
- * 「該当するオープンデータがありません」の応答。
+ * 回答なし（該当するオープンデータが無い・見つからない）の応答。
  *
  * HTTP エラーではなく**正常な応答**として返す（API.md §4）。エラーにしてしまうと
  * 呼び出し側が握りつぶし、データ欠損が可視化されなくなる。

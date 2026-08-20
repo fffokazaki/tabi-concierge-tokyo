@@ -355,7 +355,7 @@ describe("マナー・作法の問い", () => {
   // 「解説に相当するデータ」と限定した文言（DATABASE.md §2.1 の調査範囲）。ルールを場所として
   // 公開したデータ（§2.2）はカタログに実在する（リンク切れ）ので「存在しない」と広げると嘘になる
   const ETIQUETTE_MESSAGE =
-    "該当するオープンデータがありません。訪日観光客向けのマナー・作法の解説に相当するデータは、東京都オープンデータカタログに存在しないことを確認済みです（2026-08-17 調査）。この未回答は記録され、東京都へのデータ公開リクエストの題材になります。";
+    "訪日観光客向けのマナー・作法の解説に相当するデータは、東京都オープンデータカタログに存在しないことを確認済みです（2026-08-17 調査）。この未回答は記録され、東京都へのデータ公開リクエストの題材になります。";
 
   it("マナーだけを訊かれたら、調査済みの data_not_published を返して記録する", async () => {
     const recorder = capturingGapRecorder();
@@ -436,7 +436,7 @@ describe("マナー・作法の問い", () => {
         status: "unanswered",
         reason: "insufficient_granularity",
         message:
-          "該当するオープンデータがありません。飲食店の店舗データは「東京都内の飲食店のバリアフリー情報」（210件・バリアフリー対応店に限定）のみで、ジャンルの列を持たないため「ラーメン」の粒度では答えられません。",
+          "飲食店の店舗データは「東京都内の飲食店のバリアフリー情報」（210件・バリアフリー対応店に限定）のみで、ジャンルの列を持たないため「ラーメン」の粒度では答えられません。",
       },
       { status: "unanswered", reason: "data_not_published", message: ETIQUETTE_MESSAGE },
     ]);
@@ -455,7 +455,7 @@ describe("マナー・作法の問い", () => {
       expect(output.reason).toBe("out_of_area");
       // 文面は利用者に見える。実装用語（POC）を出さない（Issue #99）
       expect(output.message).toBe(
-        "該当するオープンデータがありません。「新宿」はこのアプリの対象エリア（上野・浅草・渋谷）の外です。",
+        "「新宿」はこのアプリの対象エリア（上野・浅草・渋谷）の外です。",
       );
     });
 
@@ -507,7 +507,7 @@ describe("マナー・作法の問い", () => {
         status: "unanswered",
         reason: "other",
         message:
-          "該当するオープンデータがありません。質問文の語に当たるデータセットが無かったため、「上野」を収録するデータセットを、エリアの事実として提示しています。",
+          "質問文の語に当たるデータセットが無かったため、「上野」を収録するデータセットを、エリアの事実として提示しています。",
       },
     ]);
     expect(recorder.records).toEqual([
@@ -535,7 +535,7 @@ describe("分類指定の空振りの文言", () => {
     expect(output.reason).toBe("other");
     // 「10件全体に無い」と断定しない。渋谷区の都市公園・都立公園一覧が10件の中に実在する
     expect(output.message).toBe(
-      "該当するオープンデータが見つかりませんでした。「上野」で絞り込んだ候補には「公園」の語に当たるデータセットがありませんでした。",
+      "「上野」で絞り込んだ候補には「公園」の語に当たるデータセットがありませんでした。",
     );
 
     // 分類指定を黙って捨てない挙動は変えない（従来どおり unanswered("other") として記録される）
@@ -552,7 +552,7 @@ describe("分類指定の空振りの文言", () => {
     if (output.status !== "unanswered") return;
     expect(output.reason).toBe("other");
     expect(output.message).toBe(
-      "該当するオープンデータが見つかりませんでした。利用中の10データセットのキーワードには「劇場」の語に当たるものがありませんでした。",
+      "利用中の10データセットのキーワードには「劇場」の語に当たるものがありませんでした。",
     );
 
     // 文言だけでなく記録でも「分類ガードに到達した」ことを固定する（エリア未指定は area 列が空）
@@ -569,7 +569,7 @@ describe("分類指定の空振りの文言", () => {
     if (output.status !== "unanswered") return;
     expect(output.reason).toBe("other");
     expect(output.message).toBe(
-      "該当するオープンデータが見つかりませんでした。利用中の10データセットのキーワードには、質問文の語に当たるものがありませんでした。",
+      "利用中の10データセットのキーワードには、質問文の語に当たるものがありませんでした。",
     );
     expect(recorder.records).toEqual([
       { question: "演劇", area: undefined, category: undefined, reason: "other" },
@@ -687,7 +687,11 @@ describe("利用者向け文面の語彙", () => {
     "datasetId",
   ];
 
-  it("スタブが返しうる未回答・欠損の文面すべてに実装用語が無い", async () => {
+  /**
+   * 実際の呼び出しが返す `message` をすべて集める（`unanswered` 本体と `answered` の
+   * `gaps` の両方）。文面の不変条件テスト（実装用語・名乗りの一文）で共有する。
+   */
+  const collectUserFacingMessages = async (): Promise<string[]> => {
     const messages: string[] = [];
     // 引数を応答の型そのままで受ける。構造型（`{ status: string; message?: string }`）で
     // 受けると `Unanswered.message` をリネームしても型エラーにならず、静かに0件を集める
@@ -732,8 +736,22 @@ describe("利用者向け文面の語彙", () => {
 
     // 呼び出しが answered へ倒れて検査対象が消えていないことを確かめる（黙って緑にしない）
     expect(messages.length).toBeGreaterThanOrEqual(14);
-    for (const message of messages) {
+    return messages;
+  };
+
+  it("スタブが返しうる未回答・欠損の文面すべてに実装用語が無い", async () => {
+    for (const message of await collectUserFacingMessages()) {
       for (const term of DEV_TERMS) expect(message, `文面: ${message}`).not.toContain(term);
+    }
+  });
+
+  it("文面を「該当するオープンデータが〜」の名乗りで始めない（Issue #107）", async () => {
+    // 画面（PlanScreen / ForYouScreen）は未回答の見出しとして「該当するオープンデータがありません」
+    // を描画するため、message 側が名乗りを持つと同じ一文が見出しと本文で重複する。名乗りは
+    // status / reason（画面では見出し）が担い、message は確かめた事実だけを書く（API.md §4）。
+    // 断定（〜ません）と照合の結果（〜ませんでした）の使い分け（Issue #59）は文中の述語に残る
+    for (const message of await collectUserFacingMessages()) {
+      expect(message, `文面: ${message}`).not.toMatch(/^該当するオープンデータ/);
     }
   });
 });

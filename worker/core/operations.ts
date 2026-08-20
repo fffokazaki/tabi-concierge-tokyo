@@ -380,7 +380,7 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   return unansweredWith(
     unanswered(
       "other",
-      `該当するオープンデータが見つかりませんでした。利用中の10データセットのキーワードには、${askedLabel}に当たるものがありませんでした。`,
+      `利用中の10データセットのキーワードには、${askedLabel}に当たるものがありませんでした。`,
     ),
     unansweredExtras,
   );
@@ -431,7 +431,7 @@ function computeAggregateDataset(input: AggregateDatasetInput): AggregateDataset
     // 未回答の集計（DOMAIN.md §7）が汚れるため `other` に置く
     return unanswered(
       "other",
-      `該当するオープンデータがありません。データセットID「${datasetId}」は利用中の10件に含まれていません。`,
+      `データセットID「${datasetId}」は利用中の10件に含まれていません。`,
     );
   }
 
