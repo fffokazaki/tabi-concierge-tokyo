@@ -35,7 +35,9 @@ import type { Stop, Trip } from "./types";
  * あなたへ側で立っている）。**出典が取れずに落ちる候補（`get_provenance` 側）はまだ
  * 黙って消える**（[Issue #92]。集計側と違って持ち上げられる文面がサーバー応答に無い）。
  * **候補が全滅したときは個々の理由が汎用の `other` に丸められる**（[Issue #94]。
- * 可視性は残るが内訳が落ちる）。
+ * 可視性は残るが内訳が落ちる）。なお全滅時・出典が1件も取れなかったときの early return
+ * （`PlanOutcome` の `unanswered`）は `gaps` を運べない形なので、そこまでに収集した
+ * gaps は search 側の分も含めて画面に届かない。どう運ぶかも Issue #94 の設計判断に含める。
  *
  * [Issue #92]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/92
  * [Issue #94]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/94
@@ -168,8 +170,8 @@ export async function buildPlan(trip: Trip, options: BuildPlanOptions = {}): Pro
  * そこを揃えないと React の key が重複する。
  *
  * **どれだけ実際に畳み込まれるかは当てにしない。** `computeAggregateDataset`
- * （worker/core/operations.ts）が返す未回答は6分岐のうち5つがデータセット名を文面へ
- * 埋め込むため、同じ分類でも文面は候補ごとに異なる。ここは重複を防ぐ不変条件であって、
+ * （worker/core/operations.ts）が返す未回答は6分岐のうち5つがデータセット名または ID を
+ * 文面へ埋め込むため、同じ分類でも文面は候補ごとに異なる。ここは重複を防ぐ不変条件であって、
  * 件数を減らす仕組みではない。
  */
 function dedupeGaps(gaps: Unanswered[]): Unanswered[] {

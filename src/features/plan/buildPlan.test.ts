@@ -137,6 +137,11 @@ describe("buildPlan", () => {
 
     const outcome = await buildPlan(DEFAULT_TRIP, { fetchImpl });
     expect(outcome.kind).toBe("unanswered");
+    if (outcome.kind === "unanswered") {
+      // 個々の候補の理由を全体の分類へ引き上げない（引き上げの可否は Issue #94 の設計判断）
+      expect(outcome.reason).toBe("other");
+      expect(outcome.message).toContain("該当するオープンデータがありません");
+    }
     // 出典を取りに行く必要すら無い
     expect(calls.map((c) => c.path)).not.toContain(PROVENANCE);
   });
@@ -218,7 +223,8 @@ describe("buildPlan", () => {
     });
 
     const plan = expectPlan(await buildPlan(DEFAULT_TRIP, { fetchImpl }));
-    expect(plan.gaps).toHaveLength(1);
+    // 件数だけでなく中身も固定する。「畳み込みすぎて別物が消えた」場合も件数は1になる
+    expect(plan.gaps).toEqual([{ status: "unanswered", reason: "other", message: "固定データにその行がありません。" }]);
   });
 
   it("検索側と集計側から同じ分類・同じ文面が来ても1件にまとめる", async () => {
@@ -241,7 +247,92 @@ describe("buildPlan", () => {
     });
 
     const plan = expectPlan(await buildPlan(DEFAULT_TRIP, { fetchImpl }));
-    expect(plan.gaps).toHaveLength(1);
+    expect(plan.gaps).toEqual([shared]);
+  });
+
+  it("reason と message の片方だけが同じ gap は畳み込まない（別々の欠損として残す）", async () => {
+    // dedupe のキーは reason と message の組。片方だけの一致で畳み込むと、
+    // 同じ分類の別データセットの欠損（実装コメントの言う主ケース）が黙って1件に潰れる
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [
+            { datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" },
+            { datasetId: BUNKA_ID, title: "文化観光施設", provider: "台東区", url: "u", matchReason: "r" },
+            { datasetId: BUNKAZAI_ID, title: "文化財", provider: "台東区", url: "u", matchReason: "r" },
+          ],
+          gaps: [{ status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" }],
+        }),
+      [AGGREGATE]: (body) => {
+        const id = (body as { datasetId: string }).datasetId;
+        if (id === MEISHO_ID) return json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" });
+        // 検索側の gap と reason だけ同じ（message は別）
+        if (id === BUNKA_ID) return json({ status: "unanswered", reason: "other", message: "固定データにその行がありません。" });
+        // 検索側の gap と message だけ同じ（reason は別）
+        return json({
+          status: "unanswered",
+          reason: "insufficient_granularity",
+          message: "「ショッピング」に当たるものがありませんでした。",
+        });
+      },
+      [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
+    });
+
+    const plan = expectPlan(await buildPlan(DEFAULT_TRIP, { fetchImpl }));
+    expect(plan.gaps).toEqual([
+      { status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" },
+      { status: "unanswered", reason: "other", message: "固定データにその行がありません。" },
+      { status: "unanswered", reason: "insufficient_granularity", message: "「ショッピング」に当たるものがありませんでした。" },
+    ]);
+  });
+
+  it("unanswered が先に来ても、後続候補の集計は続ける", async () => {
+    // continue が break に変わる退行の検出。既存の合流テストは「成功→未回答」の順しか踏まない
+    const { fetchImpl, calls } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [
+            { datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" },
+            { datasetId: BUNKA_ID, title: "文化観光施設", provider: "台東区", url: "u", matchReason: "r" },
+          ],
+        }),
+      [AGGREGATE]: (body) =>
+        (body as { datasetId: string }).datasetId === MEISHO_ID
+          ? json({ status: "unanswered", reason: "insufficient_granularity", message: "サンプル行が無いため内容を取り出せません。" })
+          : json({ status: "answered", result: { name: "国立西洋美術館", summary: "…" }, query: "q" }),
+      [PROVENANCE]: () => json({ status: "answered", sources: [source(BUNKA_ID, "文化観光施設")] }),
+    });
+
+    const plan = expectPlan(await buildPlan(DEFAULT_TRIP, { fetchImpl }));
+    expect(plan.stops.map((s) => s.stop.place)).toEqual(["国立西洋美術館"]);
+    expect(plan.gaps.map((gap) => gap.message)).toEqual(["サンプル行が無いため内容を取り出せません。"]);
+    expect(calls.filter((c) => c.path === AGGREGATE)).toHaveLength(2);
+  });
+
+  it("集計の途中で障害が起きたら、それまでに集めた gap ごと打ち切って failure にする", async () => {
+    // unanswered（データが無い・積んで続行）と障害（システム異常・即打ち切り）を混ぜない（API.md §4）。
+    // 障害を gap 扱いで続行すると、HTTP 500 が「データがありません」として画面に出る
+    const { fetchImpl, calls } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [
+            { datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" },
+            { datasetId: BUNKA_ID, title: "文化観光施設", provider: "台東区", url: "u", matchReason: "r" },
+          ],
+        }),
+      [AGGREGATE]: (body) =>
+        (body as { datasetId: string }).datasetId === MEISHO_ID
+          ? json({ status: "unanswered", reason: "other", message: "固定データにその行がありません。" })
+          : json({ error: "internal_error", message: "D1 が応答しません" }, 500),
+      [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
+    });
+
+    const outcome = await buildPlan(DEFAULT_TRIP, { fetchImpl });
+    expect(outcome.kind === "failure" && outcome.failure.kind).toBe("http");
+    expect(calls.map((c) => c.path)).not.toContain(PROVENANCE);
   });
 
   it("出典が取れなければ、出典なしのまま停留地を返さない", async () => {
