@@ -293,6 +293,36 @@ describe("抽出・出典の欠落", () => {
     ]);
   });
 
+  it("同じ gap が別の gap を挟んで再登場しても1件にまとめる（dedupe は配列全体に効く）", async () => {
+    // 隣接要素だけを比較する実装へ退行しても、既存の dedupe テスト（隣接する重複のみ）は
+    // すべて通ってしまう盲点（PR #104 レビュー）。A, B, A の並びを先頭出現順の A, B へ畳むことを固定する
+    const gapA = { status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" };
+    const gapB = {
+      status: "unanswered",
+      reason: "insufficient_granularity",
+      message: "飲食店データはジャンルの列を持たないため「ラーメン」の粒度では答えられません。",
+    };
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [
+            { datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" },
+            { datasetId: BUNKA_ID, title: "文化観光施設", provider: "台東区", url: "u", matchReason: "r" },
+          ],
+          gaps: [gapA, gapB],
+        }),
+      [AGGREGATE]: (body) =>
+        (body as { datasetId: string }).datasetId === MEISHO_ID
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          : json(gapA),
+      [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
+    });
+
+    const outcome = expectRecs(await buildRecommendations("all", { fetchImpl }));
+    expect(outcome.gaps).toEqual([gapA, gapB]);
+  });
+
   it("集計の途中で障害が起きたら、それまでに集めた gap ごと打ち切って failure にする", async () => {
     const { fetchImpl, calls } = stubFetch({
       [SEARCH]: () =>
