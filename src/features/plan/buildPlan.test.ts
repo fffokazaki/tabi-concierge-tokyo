@@ -122,7 +122,14 @@ describe("buildPlan", () => {
     });
 
     const outcome = await buildPlan(DEFAULT_TRIP, { fetchImpl });
-    expect(outcome).toEqual({ kind: "unanswered", reason: "out_of_area", message: "「新宿」は対象エリアの外です。" });
+    // 検索そのものが unanswered の経路。サーバーが添える構造化欠損（Issue #70）は `areas` を
+    // 送らないと付かず、プラン画面は自然文に畳み込んで送るので常に空（Issue #94）
+    expect(outcome).toEqual({
+      kind: "unanswered",
+      reason: "out_of_area",
+      message: "「新宿」は対象エリアの外です。",
+      gaps: [],
+    });
   });
 
   it("抽出できなかった候補は落とすが、全滅したら空のルートを返さない", async () => {
@@ -138,9 +145,13 @@ describe("buildPlan", () => {
     const outcome = await buildPlan(DEFAULT_TRIP, { fetchImpl });
     expect(outcome.kind).toBe("unanswered");
     if (outcome.kind === "unanswered") {
-      // 個々の候補の理由を全体の分類へ引き上げない（引き上げの可否は Issue #94 の設計判断）
+      // 個々の候補の理由を全体の分類へ引き上げない（Issue #94 の決定。内訳は gaps で運ぶ）
       expect(outcome.reason).toBe("other");
-      expect(outcome.message).toContain("該当するオープンデータがありません");
+      expect(outcome.message).toContain("旅程に出せる地物を取り出せませんでした");
+      // 引き上げないぶん、内訳は gaps に残る（黙って捨てない）
+      expect(outcome.gaps).toEqual([
+        { status: "unanswered", reason: "other", message: "固定データにその行がありません。" },
+      ]);
     }
     // 出典を取りに行く必要すら無い
     expect(calls.map((c) => c.path)).not.toContain(PROVENANCE);
@@ -363,6 +374,104 @@ describe("buildPlan", () => {
 
     const outcome = await buildPlan(DEFAULT_TRIP, { fetchImpl });
     expect(outcome.kind === "failure" && outcome.failure.kind).toBe("http");
+    expect(calls.map((c) => c.path)).not.toContain(PROVENANCE);
+  });
+
+  it("出典が一部の内容だけ返らなかったら、黙って消さず gaps に載せる（Issue #92。foryou 側と対）", async () => {
+    // 落とすこと自体は正しい（絶対ルール #2）。落ちた事実が画面に出るかを見る
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [
+            { datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" },
+            { datasetId: BUNKA_ID, title: "文化観光施設", provider: "台東区", url: "u", matchReason: "r" },
+          ],
+        }),
+      [AGGREGATE]: (body) =>
+        (body as { datasetId: string }).datasetId === MEISHO_ID
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          : json({ status: "answered", result: { name: "国立西洋美術館", summary: "…" }, query: "q" }),
+      // BUNKA_ID の出典を返さない
+      [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
+    });
+
+    const plan = expectPlan(await buildPlan(DEFAULT_TRIP, { fetchImpl }));
+    expect(plan.stops.map((s) => s.stop.place)).toEqual(["寛永寺"]);
+    expect(plan.gaps).toEqual([
+      {
+        status: "unanswered",
+        reason: "other",
+        message: "「国立西洋美術館」は出典を確認できなかったため、表示を見送りました。",
+      },
+    ]);
+  });
+
+  it("出典が1件も突き合わなければ、それまでに集めた gap ごと未回答にする（Issue #92。foryou 側と対）", async () => {
+    // 以前はここで aggregateGaps を丸ごと捨てて汎用の other だけを返していた
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [
+            { datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" },
+            { datasetId: BUNKA_ID, title: "文化観光施設", provider: "台東区", url: "u", matchReason: "r" },
+          ],
+          gaps: [{ status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" }],
+        }),
+      [AGGREGATE]: (body) =>
+        (body as { datasetId: string }).datasetId === MEISHO_ID
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          : json({ status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" }),
+      // extracted に無い datasetId の出典だけを返す（突き合わせが1件も成立しない）
+      [PROVENANCE]: () => json({ status: "answered", sources: [source(BUNKAZAI_ID, "文化財")] }),
+    });
+
+    const outcome = await buildPlan(DEFAULT_TRIP, { fetchImpl });
+    expect(outcome).toEqual({
+      kind: "unanswered",
+      reason: "other",
+      message: "取り出した内容に対応する出典を取得できませんでした。",
+      gaps: [
+        { status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" },
+        { status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" },
+        {
+          status: "unanswered",
+          reason: "other",
+          message: "「寛永寺」は出典を確認できなかったため、表示を見送りました。",
+        },
+      ],
+    });
+  });
+
+  it("候補が全滅したら分類は other のまま、検索側と集計側の内訳を gaps で運ぶ（Issue #94。foryou 側と対）", async () => {
+    const { fetchImpl, calls } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [
+            { datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" },
+            { datasetId: BUNKA_ID, title: "文化観光施設", provider: "台東区", url: "u", matchReason: "r" },
+          ],
+          gaps: [{ status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" }],
+        }),
+      [AGGREGATE]: (body) =>
+        (body as { datasetId: string }).datasetId === MEISHO_ID
+          ? json({ status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" })
+          : json({ status: "unanswered", reason: "data_not_published", message: "「渋谷」の地物を収録していません。" }),
+    });
+
+    const outcome = await buildPlan(DEFAULT_TRIP, { fetchImpl });
+    expect(outcome).toEqual({
+      kind: "unanswered",
+      reason: "other",
+      message: "候補のデータセットから、旅程に出せる地物を取り出せませんでした。",
+      gaps: [
+        { status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" },
+        { status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" },
+        { status: "unanswered", reason: "data_not_published", message: "「渋谷」の地物を収録していません。" },
+      ],
+    });
     expect(calls.map((c) => c.path)).not.toContain(PROVENANCE);
   });
 

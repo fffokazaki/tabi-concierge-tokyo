@@ -66,7 +66,9 @@ export type PlanFailure = {
 
 export type PlanOutcome =
   | { kind: "plan"; query: string; stops: SourcedStop[]; gaps: Unanswered[] }
-  | { kind: "unanswered"; reason: UnansweredReason; message: string }
+  // `gaps` は**必須**（`buildRecommendations.ts` と対）。省略可にすると、内訳を運べる場所で
+  // 黙って落とす経路が型として許される。運ぶものが無いときは呼び出し側が空配列を明示する
+  | { kind: "unanswered"; reason: UnansweredReason; message: string; gaps: Unanswered[] }
   | { kind: "failure"; failure: PlanFailure };
 
 export type BuildPlanOptions = { fetchImpl?: typeof fetch };
@@ -123,13 +125,16 @@ export async function buildPlan(trip: Trip, options: BuildPlanOptions = {}): Pro
 
   if (extracted.length === 0) {
     // 候補は返ったが1件も中身を取り出せなかった。空のルートを「回答あり」として出さない。
-    // 個々の未回答理由（`aggregateGaps`）をここで画面全体の分類へ引き上げると、1件の
-    // データセットについての判定を全体の判定として名乗ることになるため、汎用の other に
-    // 置く。どの分類なら引き上げてよいかは設計判断なので Issue #94 で決める
+    // 個々の未回答理由をここで画面全体の分類へ引き上げると、1件のデータセットについての判定を
+    // 全体の判定として名乗ることになるため、分類は汎用の other に置く（Issue #94 の決定）。
+    // **内訳は分類ではなく `gaps` で運ぶ**（DataGapCard が理由ごとに列挙する）。
+    // 文面から「該当するオープンデータがありません。」を落としてあるのは、画面側が同じ一文を
+    // 見出しとして出すため（重複の全体像は Issue #107）
     return {
       kind: "unanswered",
       reason: "other",
-      message: "該当するオープンデータがありません。候補のデータセットから、旅程に出せる地物を取り出せませんでした。",
+      message: "候補のデータセットから、旅程に出せる地物を取り出せませんでした。",
+      gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps]),
     };
   }
 
@@ -144,9 +149,14 @@ export async function buildPlan(trip: Trip, options: BuildPlanOptions = {}): Pro
   // 出典を datasetId で突き合わせる。突き合わない内容は落とす（出典なしのまま表示しない）
   const sourceByDatasetId = new Map(sourced.value.sources.map((source) => [source.datasetId, source]));
   const stops: SourcedStop[] = [];
+  // 出典が突き合わない内容は落とす（絶対ルール #2）。ただし黙って落とさない（Issue #92）
+  const provenanceGaps: Unanswered[] = [];
   for (const { datasetId, result } of extracted) {
     const source = sourceByDatasetId.get(datasetId);
-    if (!source) continue;
+    if (!source) {
+      provenanceGaps.push(missingProvenanceGap(result.name));
+      continue;
+    }
     // Stop.place ← name / Stop.note ← summary（2026-08-17 合意・API_REQUIREMENTS.md §2）。
     // マナーは出典を持つデータが無いので空。仮のマナー文を入れるのは出典なしの回答にあたる
     stops.push({ stop: { place: result.name, note: result.summary, etiquette: [] }, source });
@@ -156,12 +166,34 @@ export async function buildPlan(trip: Trip, options: BuildPlanOptions = {}): Pro
     return {
       kind: "unanswered",
       reason: "other",
-      message: "該当するオープンデータがありません。取り出した内容に対応する出典を取得できませんでした。",
+      message: "取り出した内容に対応する出典を取得できませんでした。",
+      gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps, ...provenanceGaps]),
     };
   }
 
-  return { kind: "plan", query, stops, gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps]) };
+  return {
+    kind: "plan",
+    query,
+    stops,
+    gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps, ...provenanceGaps]),
+  };
 }
+
+/**
+ * 出典が突き合わなかった内容の欠損（Issue #92。`buildRecommendations.ts` の同名関数と対）。
+ *
+ * 落とすこと自体は絶対ルール #2 どおりで正しい。問題は落とし方が黙っていることで、
+ * 利用者から見ると「その停留地は最初から無かった」ように見える。
+ *
+ * 分類は `other`。`get_provenance` は個別の datasetId が欠けた理由を返さないため、ここで
+ * 分かるのは「出典を確認できなかった」だけ。データの不在（`data_not_published`）を名乗ると、
+ * 確かめていないことを確かめたと主張することになる（絶対ルール #1）。
+ */
+const missingProvenanceGap = (name: string): Unanswered => ({
+  status: "unanswered",
+  reason: "other",
+  message: `「${name}」は出典を確認できなかったため、表示を見送りました。`,
+});
 
 /**
  * 同じ分類・同じ文面の未回答を1件にまとめる。
@@ -230,7 +262,10 @@ async function callAndRead<T>(
   if (unanswered) {
     return {
       kind: "unanswered",
-      outcome: { kind: "unanswered", reason: unanswered.reason, message: unanswered.message },
+      // 内訳は空。サーバーが `unanswered` に添える構造化欠損（Issue #70）は構造化入力 `areas` を
+      // 要求する（worker/core/operations.ts の `unansweredExtras`）。プラン画面は `buildQuery` で
+      // 自然文に畳み込んで送るため1件も付かない。**`areas` を送るようになったら読み直すこと**
+      outcome: { kind: "unanswered", reason: unanswered.reason, message: unanswered.message, gaps: [] },
       unanswered,
     };
   }

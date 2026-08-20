@@ -30,10 +30,10 @@ import type { ActiveInterest, Recommendation } from "./types";
  * 候補を集計できないと、検索側は「覆えた」と判定して欠損を出さず、集計側で黙って落ちる
  * ―― その興味が答えられも報告もされない状態になる。
  *
- * 直しきっていないものが2つある。**出典が取れずに落ちる候補（`get_provenance` 側）は
- * まだ黙って消える**（[Issue #92]。集計側と違って持ち上げられる文面がサーバー応答に無い）。
- * **候補が全滅したときは個々の理由が汎用の `other` に丸められる**（[Issue #94]。可視性は
- * 残るが内訳が落ちる）。どちらも分類・表示の設計判断を要するため分けてある。
+ * **未回答は分類（`reason`）と内訳（`gaps`）を分けて運ぶ。** 候補が全滅したときも分類は
+ * 汎用の `other` に置いたまま、個々の理由を `gaps` として画面へ出す（[Issue #94] の決定。
+ * 引き上げると1件のデータセットについての判定を全体の判定として名乗ることになる）。
+ * 出典が突き合わず落とした候補も黙って消さず、落とした事実を `gaps` に載せる（[Issue #92]）。
  *
  * [Issue #92]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/92
  * [Issue #94]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/94
@@ -41,7 +41,9 @@ import type { ActiveInterest, Recommendation } from "./types";
 
 export type RecommendationOutcome =
   | { kind: "recommendations"; recommendations: Recommendation[]; gaps: Unanswered[] }
-  | { kind: "unanswered"; reason: UnansweredReason; message: string }
+  // `gaps` は**必須**。省略可にすると、内訳を運べる場所で黙って落とす経路が型として許される
+  // （Issue #92・#94 が直したのはまさにそれ）。運ぶものが無いときは呼び出し側が空配列を明示する
+  | { kind: "unanswered"; reason: UnansweredReason; message: string; gaps: Unanswered[] }
   | { kind: "failure"; failure: RecommendationFailure };
 
 export type RecommendationFailure = {
@@ -96,15 +98,18 @@ export async function buildRecommendations(
   }
 
   if (extracted.length === 0) {
-    // 候補が全滅したときは分類を汎用の other に置く。個々の未回答理由（`aggregateGaps`）を
-    // ここで画面全体の分類へ引き上げると、1件のデータセットについての判定を全体の判定として
+    // 候補が全滅したときも分類は汎用の other に置く（Issue #94 の決定）。個々の未回答理由を
+    // 画面全体の分類へ引き上げると、1件のデータセットについての判定を全体の判定として
     // 名乗ることになる ―― `data_not_published` は「カタログに該当データが存在しないことを
     // 確かめられた場合」（shared/core.ts）だが、実際に確かめたのは候補1件の不足でしかない。
-    // どの分類なら引き上げてよいかは設計判断なので Issue #94 で決める
+    // **内訳は分類ではなく `gaps` で運ぶ**（DataGapCard が理由ごとに列挙する）。
+    // 文面から「該当するオープンデータがありません。」を落としてあるのは、画面側が同じ一文を
+    // 見出しとして出すため（重複の全体像は Issue #107）
     return {
       kind: "unanswered",
       reason: "other",
-      message: "該当するオープンデータがありません。候補のデータセットから、おすすめに出せる地物を取り出せませんでした。",
+      message: "候補のデータセットから、おすすめに出せる地物を取り出せませんでした。",
+      gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps]),
     };
   }
 
@@ -118,9 +123,14 @@ export async function buildRecommendations(
 
   const sourceByDatasetId = new Map(sourced.value.sources.map((source) => [source.datasetId, source]));
   const recommendations: Recommendation[] = [];
+  // 出典が突き合わない候補は落とす（絶対ルール #2）。ただし黙って落とさない（Issue #92）
+  const provenanceGaps: Unanswered[] = [];
   for (const { datasetId, result } of extracted) {
     const source = sourceByDatasetId.get(datasetId);
-    if (!source) continue;
+    if (!source) {
+      provenanceGaps.push(missingProvenanceGap(result.name));
+      continue;
+    }
     recommendations.push({ name: result.name, blurb: result.summary, reason, source });
   }
 
@@ -128,16 +138,36 @@ export async function buildRecommendations(
     return {
       kind: "unanswered",
       reason: "other",
-      message: "該当するオープンデータがありません。取り出した内容に対応する出典を取得できませんでした。",
+      message: "取り出した内容に対応する出典を取得できませんでした。",
+      gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps, ...provenanceGaps]),
     };
   }
 
   return {
     kind: "recommendations",
     recommendations,
-    gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps]),
+    gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps, ...provenanceGaps]),
   };
 }
+
+/**
+ * 出典が突き合わなかった候補の欠損（Issue #92）。
+ *
+ * 落とすこと自体は絶対ルール #2（出典なしの回答を作らない）どおりで正しい。問題は落とし方が
+ * 黙っていることで、利用者から見ると「その候補は最初から無かった」ように見える。
+ *
+ * 分類は `other`。`get_provenance` は個別の datasetId が欠けた理由を返さないので、ここで
+ * 分かるのは「出典を確認できなかった」だけ。データの不在（`data_not_published`）を名乗ると、
+ * 確かめていないことを確かめたと主張することになる（絶対ルール #1）。
+ *
+ * 名乗るのは地物の名称（`AggregateResult.name`）。`readCandidates` はデータセット名を
+ * 意図的に捨てているうえ、利用者には「寛永寺」のほうが何が消えたか分かる。
+ */
+const missingProvenanceGap = (name: string): Unanswered => ({
+  status: "unanswered",
+  reason: "other",
+  message: `「${name}」は出典を確認できなかったため、表示を見送りました。`,
+});
 
 /**
  * 同じ分類・同じ文面の未回答を1件にまとめる。
@@ -200,7 +230,11 @@ async function callAndRead<T>(
   if (unanswered) {
     return {
       kind: "unanswered",
-      outcome: { kind: "unanswered", reason: unanswered.reason, message: unanswered.message },
+      // 内訳は空。サーバーが `unanswered` に添える構造化欠損（Issue #70）は
+      // `unansweredExtras`（worker/core/operations.ts）が構造化入力 `areas` を要求するため、
+      // `interests` と `limit` だけを送るこの画面の呼び出しでは1件も付かない。
+      // **`areas` を送るようになったら、ここで落ちる**ので読み直すこと
+      outcome: { kind: "unanswered", reason: unanswered.reason, message: unanswered.message, gaps: [] },
       unanswered,
     };
   }

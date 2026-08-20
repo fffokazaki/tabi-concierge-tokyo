@@ -21,7 +21,8 @@ export type PlanRequestState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "ready"; query: string; stops: SourcedStop[]; gaps: Unanswered[] }
-  | { status: "unanswered"; reason: UnansweredReason; message: string }
+  // `gaps` は未回答の**内訳**（Issue #92・#94）。分類（`reason`）は全体を代表する1つだけ
+  | { status: "unanswered"; reason: UnansweredReason; message: string; gaps: Unanswered[] }
   | { status: "failed"; failure: PlanFailure };
 
 export type OrderedStop = {
@@ -115,7 +116,7 @@ export function usePlanState(options: BuildPlanOptions = {}) {
       outcome.kind === "plan"
         ? { status: "ready", query: outcome.query, stops: outcome.stops, gaps: outcome.gaps }
         : outcome.kind === "unanswered"
-          ? { status: "unanswered", reason: outcome.reason, message: outcome.message }
+          ? { status: "unanswered", reason: outcome.reason, message: outcome.message, gaps: outcome.gaps }
           : { status: "failed", failure: outcome.failure },
     );
   };

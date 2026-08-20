@@ -21,7 +21,9 @@ export type ForYouRequestState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "ready"; recommendations: Recommendation[]; gaps: Unanswered[] }
-  | { status: "unanswered"; reason: UnansweredReason; message: string }
+  // `gaps` は未回答の**内訳**（Issue #92・#94）。分類（`reason`）は全体を代表する1つだけなので、
+  // 候補ごとに違う理由はこちらで運ぶ
+  | { status: "unanswered"; reason: UnansweredReason; message: string; gaps: Unanswered[] }
   | { status: "failed"; failure: RecommendationFailure };
 
 /**
@@ -44,7 +46,7 @@ export function useForYouState(options: BuildRecommendationsOptions = {}) {
       outcome.kind === "recommendations"
         ? { status: "ready", recommendations: outcome.recommendations, gaps: outcome.gaps }
         : outcome.kind === "unanswered"
-          ? { status: "unanswered", reason: outcome.reason, message: outcome.message }
+          ? { status: "unanswered", reason: outcome.reason, message: outcome.message, gaps: outcome.gaps }
           : { status: "failed", failure: outcome.failure },
     );
   };
