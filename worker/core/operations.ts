@@ -488,11 +488,14 @@ function computeAggregateDataset(input: AggregateDatasetInput): AggregateDataset
 /**
  * `areas` に収録があるのに固定サンプルの行が無いときの未回答（Issue #99）。
  *
- * **現行カタログからは到達しない** — 全 entry の `areas` は固定サンプルが持つエリアに含まれ、
- * `samples` が空の集計表は手前の分岐で弾かれる（2026-08-20 実測）。踏めない分岐は
- * `aggregateDataset` 経由ではテストできないため、文面だけを切り出して直接固定する。
- * ここを固定しないと、カタログを増やしたときに開発者向けの語（「スタブ」等）が黙って
- * 利用者の画面へ出る経路が残る（`search-gaps.ts` の文面ヘルパと同じ形にしてある）。
+ * **この分岐はスイートを通るどのカタログからも到達しない。** `scripts/catalog-samples.test.ts`
+ * の「収録エリアには必ず固定データがある」が `areas` ⊇ 固定サンプルのエリアを両方向で
+ * 強制しており、`samples` が空の集計表は手前の分岐で弾かれる。つまり文面を切り出したのは
+ * 「カタログを増やしたときの備え」ではなく、**その不変条件テストを緩めた人に対する多層防御**
+ * である。緩めようとしている場合は先に上記テストを読むこと。
+ *
+ * 呼び出し経由で踏めない文面はテストで固定できないので、ヘルパとして export して直接固定する
+ * （`search-gaps.ts` の文面ヘルパと同じ形）。
  */
 export const rowMissingUnanswered = (title: string, area: RepresentativeArea): Unanswered =>
   unanswered(
@@ -500,7 +503,16 @@ export const rowMissingUnanswered = (title: string, area: RepresentativeArea): U
     `「${title}」は「${area}」を収録していますが、このアプリではまだその内容を取り出せません。`,
   );
 
-/** `areas` に無いエリアを求められたときの未回答。収録範囲を確かめた上での応答なので最も強い分類を使う。 */
+/**
+ * `areas` に無いエリアを求められたときの未回答。
+ *
+ * `data_not_published`（「存在しないことを確かめられた場合。最も強い主張」・shared/core.ts）を
+ * 使える根拠は、**カタログ10件がすべて区単位で提供されていること**（台東区8件・渋谷区1件）。
+ * `areas` 自体は町字マッピングで解決できた行の範囲でしかなく（`scripts/lib/area.ts`。未知の
+ * 町字は `null` になり、めぐりん停留所72件のうち40件が判定不能 — DATABASE.md §2）、
+ * 「`areas` に無い」ことだけでは不在の証明にならない。**区をまたがないデータセットを足すときは、
+ * この分類が過剰主張にならないか読み直すこと**（絶対ルール #1）。
+ */
 export const areaNotPublishedUnanswered = (title: string, area: RepresentativeArea): Unanswered =>
   unanswered("data_not_published", `「${title}」は「${area}」の地物を収録していません。`);
 
