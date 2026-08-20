@@ -6,6 +6,7 @@ import type {
   GetProvenanceInput,
   GetProvenanceOutput,
   NonEmpty,
+  RepresentativeArea,
   SearchDatasetsInput,
   SearchDatasetsOutput,
   Unanswered,
@@ -480,12 +481,28 @@ function computeAggregateDataset(input: AggregateDatasetInput): AggregateDataset
 
   return entry.areas.includes(intendedArea)
     ? // `areas` にあるのに固定データが無い ＝ スタブ側の欠落。データそのものの欠損と混ぜない
-      unanswered(
-        "other",
-        `「${entry.title}」は「${intendedArea}」を収録していますが、このアプリではまだその内容を取り出せません。`,
-      )
-    : unanswered("data_not_published", `「${entry.title}」は「${intendedArea}」の地物を収録していません。`);
+      rowMissingUnanswered(entry.title, intendedArea)
+    : areaNotPublishedUnanswered(entry.title, intendedArea);
 }
+
+/**
+ * `areas` に収録があるのに固定サンプルの行が無いときの未回答（Issue #99）。
+ *
+ * **現行カタログからは到達しない** — 全 entry の `areas` は固定サンプルが持つエリアに含まれ、
+ * `samples` が空の集計表は手前の分岐で弾かれる（2026-08-20 実測）。踏めない分岐は
+ * `aggregateDataset` 経由ではテストできないため、文面だけを切り出して直接固定する。
+ * ここを固定しないと、カタログを増やしたときに開発者向けの語（「スタブ」等）が黙って
+ * 利用者の画面へ出る経路が残る（`search-gaps.ts` の文面ヘルパと同じ形にしてある）。
+ */
+export const rowMissingUnanswered = (title: string, area: RepresentativeArea): Unanswered =>
+  unanswered(
+    "other",
+    `「${title}」は「${area}」を収録していますが、このアプリではまだその内容を取り出せません。`,
+  );
+
+/** `areas` に無いエリアを求められたときの未回答。収録範囲を確かめた上での応答なので最も強い分類を使う。 */
+export const areaNotPublishedUnanswered = (title: string, area: RepresentativeArea): Unanswered =>
+  unanswered("data_not_published", `「${title}」は「${area}」の地物を収録していません。`);
 
 /**
  * 出典取得。

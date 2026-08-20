@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { capturingGapRecorder, expectAnswered } from "../test-support";
-import { aggregateDataset, getProvenance, searchDatasets, MAX_SEARCH_LIMIT } from "./operations";
+import {
+  aggregateDataset,
+  areaNotPublishedUnanswered,
+  getProvenance,
+  rowMissingUnanswered,
+  searchDatasets,
+  MAX_SEARCH_LIMIT,
+} from "./operations";
 
 /**
  * コア関数を**境界（parse.ts）を通さずに直接呼ぶ**経路のテスト。
@@ -577,6 +584,40 @@ describe("aggregateDataset（直接呼び出し）", () => {
     );
 
     expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    // 文面は DataGapCard 経由で利用者に見える。分類・文面ごと固定して実装用語の混入を止める（Issue #99）
+    expect(output.reason).toBe("data_not_published");
+    expect(output.message).toBe("「都市公園・都立公園一覧」は「上野」の地物を収録していません。");
+  });
+
+  // `aggregateDataset` 経由では踏めない分岐の文面（Issue #99）。現行カタログでは
+  // `areas` ⊆ 固定サンプルのエリアなので到達しないが、踏めないことは
+  // 「実装用語が出ても気づけない」を意味するので、文面ヘルパを直接固定する
+  describe("未回答文面のヘルパ（呼び出し経由では踏めない分岐）", () => {
+    it("収録はあるが行が無いときの文面に実装用語を出さない", () => {
+      expect(rowMissingUnanswered("名所・史跡一覧", "上野")).toEqual({
+        status: "unanswered",
+        reason: "other",
+        message: "「名所・史跡一覧」は「上野」を収録していますが、このアプリではまだその内容を取り出せません。",
+      });
+    });
+
+    it("収録が無いときの文面は、確かめた範囲だけを述べる", () => {
+      expect(areaNotPublishedUnanswered("名所・史跡一覧", "渋谷")).toEqual({
+        status: "unanswered",
+        reason: "data_not_published",
+        message: "「名所・史跡一覧」は「渋谷」の地物を収録していません。",
+      });
+    });
+
+    it("どちらの文面にも開発者向けの語が混ざらない", () => {
+      // 語の一覧で縛る。文面を書き換える人が「スタブ」「POC」を持ち込む退行を、
+      // 完全一致テストの更新と一緒に通してしまわないため
+      const devTerms = ["スタブ", "POC", "固定データ", "サンプル", "D1", "TODO"];
+      for (const gap of [rowMissingUnanswered("t", "上野"), areaNotPublishedUnanswered("t", "上野")]) {
+        for (const term of devTerms) expect(gap.message).not.toContain(term);
+      }
+    });
   });
 
   it("対象エリア外の文面に実装用語（POC）を出さない（Issue #99）", async () => {
