@@ -146,7 +146,7 @@ export const cuisineGenreUnanswered = (genre: string): Unanswered =>
 export const outOfAreaUnanswered = (label: string): Unanswered =>
   unanswered(
     "out_of_area",
-    `該当するオープンデータがありません。「${label}」は POC の対象エリア（${REPRESENTATIVE_AREAS.join("・")}）の外です。`,
+    `該当するオープンデータがありません。「${label}」はこのアプリの対象エリア（${REPRESENTATIVE_AREAS.join("・")}）の外です。`,
   );
 
 export const shibuyaSightseeingUnanswered = (): Unanswered =>

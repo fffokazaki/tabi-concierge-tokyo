@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
+import type { AggregateDatasetOutput, SearchDatasetsOutput } from "../../shared/core";
 import { capturingGapRecorder, expectAnswered } from "../test-support";
-import { aggregateDataset, getProvenance, searchDatasets, MAX_SEARCH_LIMIT } from "./operations";
+import { RESTAURANT_DATASET_ID, STATISTICS_DATASET_ID } from "./catalog";
+import {
+  aggregateDataset,
+  areaNotPublishedUnanswered,
+  getProvenance,
+  rowMissingUnanswered,
+  searchDatasets,
+  MAX_SEARCH_LIMIT,
+} from "./operations";
 
 /**
  * コア関数を**境界（parse.ts）を通さずに直接呼ぶ**経路のテスト。
@@ -444,6 +453,10 @@ describe("マナー・作法の問い", () => {
       expect(output.status).toBe("unanswered");
       if (output.status !== "unanswered") return;
       expect(output.reason).toBe("out_of_area");
+      // 文面は利用者に見える。実装用語（POC）を出さない（Issue #99）
+      expect(output.message).toBe(
+        "該当するオープンデータがありません。「新宿」はこのアプリの対象エリア（上野・浅草・渋谷）の外です。",
+      );
     });
 
     it("ジャンル指定の飲食が先勝ちし、マナーの記録は残らない（既知の取りこぼし）", async () => {
@@ -573,6 +586,45 @@ describe("aggregateDataset（直接呼び出し）", () => {
     );
 
     expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    // 文面は DataGapCard 経由で利用者に見える。分類・文面ごと固定して実装用語の混入を止める（Issue #99）
+    expect(output.reason).toBe("data_not_published");
+    expect(output.message).toBe("「都市公園・都立公園一覧」は「上野」の地物を収録していません。");
+  });
+
+  // `aggregateDataset` 経由では踏めない分岐の文面（Issue #99）。現行カタログでは
+  // `areas` ⊆ 固定サンプルのエリアなので到達しないが、踏めないことは
+  // 「実装用語が出ても気づけない」を意味するので、文面ヘルパを直接固定する
+  describe("未回答文面のヘルパ（呼び出し経由では踏めない分岐）", () => {
+    it("収録はあるが行が無いときの文面に実装用語を出さない", () => {
+      expect(rowMissingUnanswered("名所・史跡一覧", "上野")).toEqual({
+        status: "unanswered",
+        reason: "other",
+        message: "「名所・史跡一覧」は「上野」を収録していますが、このアプリではまだその内容を取り出せません。",
+      });
+    });
+
+    it("収録が無いときの文面は、確かめた範囲だけを述べる", () => {
+      expect(areaNotPublishedUnanswered("名所・史跡一覧", "渋谷")).toEqual({
+        status: "unanswered",
+        reason: "data_not_published",
+        message: "「名所・史跡一覧」は「渋谷」の地物を収録していません。",
+      });
+    });
+  });
+
+  it("対象エリア外の文面に実装用語（POC）を出さない（Issue #99）", async () => {
+    // unanswered の message は DataGapCard 経由で利用者に見える。開発者向けの語が
+    // 混ざる退行をここで止める（到達不能な「スタブ」の分岐は、下の「未回答文面のヘルパ」で直接固定した）
+    const output = await aggregateDataset(
+      { datasetId: MEISHO_ID, intent: "新宿の寺を1件" },
+      capturingGapRecorder(),
+    );
+
+    expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    expect(output.reason).toBe("out_of_area");
+    expect(output.message).toBe("「新宿」はこのアプリの対象エリア（上野・浅草・渋谷）の外です。");
   });
 
   it("既知のエリア名が無い answered は、固定サンプル先頭という選定根拠を query に明記する（Issue #78）", async () => {
@@ -599,6 +651,89 @@ describe("aggregateDataset（直接呼び出し）", () => {
       expect(output.status).toBe("answered");
       if (output.status !== "answered") return;
       expect(output.query).toContain("intent の内容との照合はしていない");
+    }
+  });
+});
+
+/**
+ * 利用者に見える文面に開発者向けの語が混ざらないこと（Issue #99）。
+ *
+ * 個々の文面の完全一致テストは、実装と期待値を**同時に**書き換えれば通ってしまう。
+ * こちらは語彙リストを独立した不変条件として持ち、混入の経路そのものを塞ぐ。
+ *
+ * 集めるのは実際の呼び出しが返した `message`（`unanswered` 本体と `answered` の
+ * `gaps` の両方）。ヘルパを個別に列挙するのではなく応答から集めるのは、**新しい分岐を
+ * 足した人が語彙チェックの対象へ追加し忘れても効く**ようにするため。ただし呼び出しが
+ * すべて `answered`（欠損なし）に倒れると検査対象ゼロで緑になるので、件数でも縛る。
+ */
+describe("利用者向け文面の語彙", () => {
+  // 出典の query は対象外（`get_provenance` は呼び出し側の入力をそのまま返す）。
+  // `aggregate_dataset` の answered が返す `query` も対象外 — あれは API/MCP 利用者向けに
+  // 選定根拠を明記するフィールドで、画面には出ない（Issue #80 に申し送り済み）
+  const DEV_TERMS = [
+    "スタブ",
+    "stub",
+    "POC",
+    "poc",
+    "固定データ",
+    "固定サンプル",
+    "サンプル行",
+    "プロトタイプ",
+    "D1",
+    "TODO",
+    "Step 5",
+    "Text-to-SQL",
+    "CSV",
+    "datasetId",
+  ];
+
+  it("スタブが返しうる未回答・欠損の文面すべてに実装用語が無い", async () => {
+    const messages: string[] = [];
+    // 引数を応答の型そのままで受ける。構造型（`{ status: string; message?: string }`）で
+    // 受けると `Unanswered.message` をリネームしても型エラーにならず、静かに0件を集める
+    const collect = (label: string, output: SearchDatasetsOutput | AggregateDatasetOutput): void => {
+      const before = messages.length;
+      if (output.status === "unanswered") messages.push(output.message);
+      if ("gaps" in output) for (const gap of output.gaps ?? []) messages.push(gap.message);
+      // **入力ごとに**1件以上を主張する。合計の下限だけだと、gaps を複数返す別の入力が
+      // 埋めてしまい「この呼び出しが answered へ倒れて検査対象が消えた」を見逃す
+      expect(messages.length, `${label} から文面を集められなかった`).toBeGreaterThan(before);
+    };
+
+    // 検索側の分岐: 対象エリア外 / ジャンル指定の飲食 / マナー / 渋谷の観光 /
+    // エリアのみのフォールバック / 訊かれたエリアの取り落ち / 分類の空振り / 興味の取り落ち
+    for (const input of [
+      { query: "新宿のマナー" },
+      { query: "上野のラーメン" },
+      { query: "浅草のマナー" },
+      { query: "渋谷の美術館", area: "渋谷" as const },
+      { query: "ナイトライフ、渋谷で夜遊びしたい" },
+      { query: "上野・渋谷の美術館" },
+      { query: "美術館を回りたい", areas: ["上野", "新宿"] },
+      { query: "上野", category: "ナイトライフ" },
+      { interests: ["文化", "ラーメン"] },
+    ]) {
+      collect(JSON.stringify(input), await searchDatasets(input, capturingGapRecorder()));
+    }
+
+    // 集計側の分岐: 未知の ID / ジャンル指定の飲食 / 集計表 / 対象エリア外 / 収録なし
+    for (const input of [
+      { datasetId: "t000000d0000000000", intent: "上野の寺を1件" },
+      { datasetId: RESTAURANT_DATASET_ID, intent: "上野のラーメンを1件" },
+      { datasetId: STATISTICS_DATASET_ID, intent: "上野の統計を1件" },
+      { datasetId: MEISHO_ID, intent: "新宿の寺を1件" },
+      { datasetId: "t131130d2025000003", intent: "上野の公園を1件" },
+    ]) {
+      collect(JSON.stringify(input), await aggregateDataset(input, capturingGapRecorder()));
+    }
+
+    // 到達不能な分岐はヘルパから直接
+    messages.push(rowMissingUnanswered("名所・史跡一覧", "上野").message);
+
+    // 呼び出しが answered へ倒れて検査対象が消えていないことを確かめる（黙って緑にしない）
+    expect(messages.length).toBeGreaterThanOrEqual(14);
+    for (const message of messages) {
+      for (const term of DEV_TERMS) expect(message, `文面: ${message}`).not.toContain(term);
     }
   });
 });
