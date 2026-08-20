@@ -38,7 +38,11 @@ export type UnansweredReason = (typeof UNANSWERED_REASONS)[number];
 export type Unanswered = {
   status: "unanswered";
   reason: UnansweredReason;
-  /** 画面に出せる日本語の説明。何が無くて答えられなかったのかを具体的に書く */
+  /**
+   * 画面に出せる日本語の説明。何が無くて答えられなかったのかを具体的に書く。
+   * 「該当するオープンデータが〜」の名乗りは付けない — 名乗りは `status` / `reason`
+   * （画面では見出し）が担う（API.md §4・Issue #107）
+   */
   message: string;
 };
 

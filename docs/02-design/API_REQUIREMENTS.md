@@ -110,7 +110,7 @@ changeImpact: "medium"
 | --- | --- |
 | `gaps` が無い | 今までどおり。何も足さない |
 | `gaps` がある | ルートは通常どおり表示し、**その下に「答えられなかった点があります」の注記**を `message` つきで出す（見出しは「一部」を名乗らない。エリア・フォールバックで全体が代替表示になっているケース（Issue #50・#54）で「一部は答えられた」という誤った主張になるため） |
-| `status: "unanswered"` | 従来どおり見出し「該当するオープンデータがありません」＋ `message`。エラー表示にはしない。名乗りは見出しだけが持ち、`message` は事実だけを述べる（[Issue #107](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/107) で `message` 側の名乗りを外した） |
+| `status: "unanswered"` | 従来どおり見出し「該当するオープンデータがありません」＋ `message`。エラー表示にはしない。名乗りは見出しだけが持ち、`message` は事実だけを述べる（[Issue #107](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/107) で `message` 側の名乗りを外した）。見出しは `reason` を問わず固定文のため、API.md §4 の断定／照合の使い分けは `message` 内でのみ成立する（見出しの扱いは [Issue #110](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/110)） |
 
 **意図**: `gaps` をエラー扱いにしない。データが無いことは本プロジェクトでは**正常な出力**（DOMAIN.md §8 不変条件4）で、むしろ「どのデータが公開されていないか」を利用者に見せることが企画の芯の半分にあたる（DOMAIN.md §7 の「未回答 → データ公開リクエスト」）。赤いエラーバナーにすると、この意味が伝わらない。
 
