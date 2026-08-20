@@ -27,6 +27,20 @@ import type { Stop, Trip } from "./types";
  *   通信エラーとして表示され、欠損が可視化されなくなる（API.md §4）
  * - **応答の形を検証する。** `coreOperations.ts` は JSON として読めれば `ok` を返すだけなので、
  *   ここで検証しないと `undefined` がそのまま画面に出る
+ *
+ * `gaps` は `search_datasets` が返したものだけではない。`aggregate_dataset` が候補ごとに
+ * 返した未回答も同じ配列へ合流させる（Issue #95。あなたへ画面の Issue #89 と同型）。
+ *
+ * 直しきっていないものが2つある（どちらもあなたへ画面と共通の設計判断で、Issue は
+ * あなたへ側で立っている）。**出典が取れずに落ちる候補（`get_provenance` 側）はまだ
+ * 黙って消える**（[Issue #92]。集計側と違って持ち上げられる文面がサーバー応答に無い）。
+ * **候補が全滅したときは個々の理由が汎用の `other` に丸められる**（[Issue #94]。
+ * 可視性は残るが内訳が落ちる）。なお全滅時・出典が1件も取れなかったときの early return
+ * （`PlanOutcome` の `unanswered`）は `gaps` を運べない形なので、そこまでに収集した
+ * gaps は search 側の分も含めて画面に届かない。どう運ぶかも Issue #94 の設計判断に含める。
+ *
+ * [Issue #92]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/92
+ * [Issue #94]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/94
  */
 
 /**
@@ -87,6 +101,10 @@ export async function buildPlan(trip: Trip, options: BuildPlanOptions = {}): Pro
   if (searched.kind !== "answered") return searched.outcome;
 
   const extracted: { datasetId: string; result: AggregateResult }[] = [];
+  // 抽出できなかった候補の理由。黙って落とすと「最初から候補が無かった」ように見える
+  // （Issue #95・#89 のプラン版）ため、search_datasets の gaps と同じ経路で画面に出す。
+  // サーバー側の記録（Issue #27）に残ることは、画面に出さない理由にならない（DOMAIN.md §7）
+  const aggregateGaps: Unanswered[] = [];
   for (const candidate of searched.value.candidates) {
     const aggregated = await callAndRead(
       "aggregate_dataset",
@@ -96,13 +114,18 @@ export async function buildPlan(trip: Trip, options: BuildPlanOptions = {}): Pro
     );
     // 障害はここで止める。1件が通信断なら残りも同じ結果になる
     if (aggregated.kind === "failure") return aggregated.outcome;
-    // 抽出できなかった候補は落とす。その未回答はサーバー側で gaps に記録済み（Issue #27）
-    if (aggregated.kind === "unanswered") continue;
+    if (aggregated.kind === "unanswered") {
+      aggregateGaps.push(aggregated.unanswered);
+      continue;
+    }
     extracted.push({ datasetId: candidate.datasetId, result: aggregated.value });
   }
 
   if (extracted.length === 0) {
-    // 候補は返ったが1件も中身を取り出せなかった。空のルートを「回答あり」として出さない
+    // 候補は返ったが1件も中身を取り出せなかった。空のルートを「回答あり」として出さない。
+    // 個々の未回答理由（`aggregateGaps`）をここで画面全体の分類へ引き上げると、1件の
+    // データセットについての判定を全体の判定として名乗ることになるため、汎用の other に
+    // 置く。どの分類なら引き上げてよいかは設計判断なので Issue #94 で決める
     return {
       kind: "unanswered",
       reason: "other",
@@ -137,7 +160,28 @@ export async function buildPlan(trip: Trip, options: BuildPlanOptions = {}): Pro
     };
   }
 
-  return { kind: "plan", query, stops, gaps: searched.value.gaps ?? [] };
+  return { kind: "plan", query, stops, gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps]) };
+}
+
+/**
+ * 同じ分類・同じ文面の未回答を1件にまとめる。
+ *
+ * 畳み込む単位は `DataGapCard` が行の区別に使う組（`reason` と `message`）と同じ。
+ * そこを揃えないと React の key が重複する。
+ *
+ * **どれだけ実際に畳み込まれるかは当てにしない。** `computeAggregateDataset`
+ * （worker/core/operations.ts）が返す未回答は6分岐のうち5つがデータセット名または ID を
+ * 文面へ埋め込むため、同じ分類でも文面は候補ごとに異なる。ここは重複を防ぐ不変条件であって、
+ * 件数を減らす仕組みではない。
+ */
+function dedupeGaps(gaps: Unanswered[]): Unanswered[] {
+  const seen = new Set<string>();
+  return gaps.filter((gap) => {
+    const key = `${gap.reason}:${gap.message}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +196,9 @@ export async function buildPlan(trip: Trip, options: BuildPlanOptions = {}): Pro
  */
 type ReadOutcome<T> =
   | { kind: "answered"; value: T }
-  | { kind: "unanswered"; outcome: PlanOutcome }
+  // `outcome`（そのまま画面へ返す形）と `unanswered`（gaps へ積む形）の両方を持つ。
+  // 呼び出し側が「打ち切る」か「記録して続ける」かを選べるようにするため（Issue #95）
+  | { kind: "unanswered"; outcome: PlanOutcome; unanswered: Unanswered }
   | { kind: "failure"; outcome: PlanOutcome };
 
 async function callAndRead<T>(
@@ -182,7 +228,11 @@ async function callAndRead<T>(
 
   const unanswered = readUnanswered(result.body);
   if (unanswered) {
-    return { kind: "unanswered", outcome: { kind: "unanswered", reason: unanswered.reason, message: unanswered.message } };
+    return {
+      kind: "unanswered",
+      outcome: { kind: "unanswered", reason: unanswered.reason, message: unanswered.message },
+      unanswered,
+    };
   }
 
   if (result.body.status !== "answered") {

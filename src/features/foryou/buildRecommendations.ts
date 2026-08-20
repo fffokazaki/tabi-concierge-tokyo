@@ -146,8 +146,8 @@ export async function buildRecommendations(
  * そこを揃えないと React の key が重複する。
  *
  * **どれだけ実際に畳み込まれるかは当てにしない。** `computeAggregateDataset`
- * （worker/core/operations.ts）が返す未回答は6分岐のうち5つがデータセット名を文面へ
- * 埋め込むため、同じ分類でも文面は候補ごとに異なる。ここは重複を防ぐ不変条件であって、
+ * （worker/core/operations.ts）が返す未回答は6分岐のうち5つがデータセット名または ID を
+ * 文面へ埋め込むため、同じ分類でも文面は候補ごとに異なる。ここは重複を防ぐ不変条件であって、
  * 件数を減らす仕組みではない。
  */
 function dedupeGaps(gaps: Unanswered[]): Unanswered[] {
