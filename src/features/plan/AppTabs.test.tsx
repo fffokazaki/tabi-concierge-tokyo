@@ -215,6 +215,53 @@ describe("unanswered — 正常な結果として表示する", () => {
     // 障害の見出しは出ない
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
+
+  it("候補が全滅したときは、汎用の分類だけでなく個々の理由も画面に出る（Issue #94）", async () => {
+    // 分類は引き上げないので other 1つだけ。それが「答えられなかった内訳が消える」ことに
+    // ならないよう、DataGapCard が理由ごとに列挙することを画面で確かめる
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
+          gaps: [{ status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" }],
+        }),
+      [AGGREGATE_PATH]: () =>
+        jsonResponse({
+          status: "unanswered",
+          reason: "insufficient_granularity",
+          message: "「名所・史跡」は施設一覧ではなく集計表のため、個別の地物を抽出できません。",
+        }),
+    });
+    await createBriefing(fetchImpl);
+
+    await waitFor(() => expect(screen.getByText("該当するオープンデータがありません")).toBeInTheDocument());
+    expect(screen.getByText("分類: other")).toBeInTheDocument();
+    // 内訳（検索側・集計側の両方）が列挙される
+    expect(screen.getByText("答えられなかった点があります")).toBeInTheDocument();
+    expect(screen.getByText("「ショッピング」に当たるものがありませんでした。")).toBeInTheDocument();
+    expect(screen.getByText(/施設一覧ではなく集計表のため/)).toBeInTheDocument();
+  });
+
+  it("出典が突き合わなかった内容は、黙って消えず理由が画面に出る（Issue #92）", async () => {
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
+        }),
+      [AGGREGATE_PATH]: () =>
+        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" }),
+      // extracted に無い datasetId の出典だけを返す（突き合わせが成立しない）
+      [PROVENANCE_PATH]: () =>
+        jsonResponse({ status: "answered", sources: [provenanceSource("t131067d0000000252", "別のデータ")] }),
+    });
+    await createBriefing(fetchImpl);
+
+    await waitFor(() => expect(screen.getByText("該当するオープンデータがありません")).toBeInTheDocument());
+    expect(screen.getByText("答えられなかった点があります")).toBeInTheDocument();
+    expect(screen.getByText("「寛永寺」は出典を確認できなかったため、表示を見送りました。")).toBeInTheDocument();
+  });
 });
 
 describe("障害 — unanswered と区別して表示する", () => {
