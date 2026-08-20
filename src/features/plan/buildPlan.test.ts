@@ -436,6 +436,43 @@ describe("buildPlan", () => {
     });
   });
 
+  it("早期 return の経路でも dedupe が効く（同じ理由・同じ文面を二重に出さない。foryou 側と対）", async () => {
+    const shared = { status: "unanswered", reason: "other", message: "同じ理由・同じ文面。" };
+
+    // (1) 候補が全滅する経路
+    const allDeadStub = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
+          gaps: [shared],
+        }),
+      [AGGREGATE]: () => json(shared),
+    });
+    const allDead = await buildPlan(DEFAULT_TRIP, { fetchImpl: allDeadStub.fetchImpl });
+    expect(allDead.kind === "unanswered" && allDead.gaps).toEqual([shared]);
+
+    // (2) 出典取得が unanswered の経路
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [
+            { datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" },
+            { datasetId: BUNKA_ID, title: "t", provider: "p", url: "u", matchReason: "r" },
+          ],
+          gaps: [shared],
+        }),
+      [AGGREGATE]: (body) =>
+        (body as { datasetId: string }).datasetId === MEISHO_ID
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          : json(shared),
+      [PROVENANCE]: () => json({ status: "unanswered", reason: "other", message: "出典を生成できません。" }),
+    });
+    const noProvenance = await buildPlan(DEFAULT_TRIP, { fetchImpl });
+    expect(noProvenance.kind === "unanswered" && noProvenance.gaps).toEqual([shared]);
+  });
+
   it("候補が全滅したら分類は other のまま、検索側と集計側の内訳を gaps で運ぶ（Issue #94。foryou 側と対）", async () => {
     const { fetchImpl, calls } = stubFetch({
       [SEARCH]: () =>

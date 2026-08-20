@@ -409,6 +409,46 @@ describe("抽出・出典の欠落", () => {
     });
   });
 
+  it("早期 return の経路でも dedupe が効く（同じ理由・同じ文面を二重に出さない）", async () => {
+    // 成功経路の dedupe はテスト済みだが、#92・#94 で足した2つの早期 return は
+    // 別々の gap しか踏んでいなかった。呼び忘れると DataGapCard の React key が重複する
+    const shared = { status: "unanswered", reason: "other", message: "同じ理由・同じ文面。" };
+    const stub = (provenance?: () => Response) => ({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
+          gaps: [shared],
+        }),
+      [AGGREGATE]: () => json(shared),
+      ...(provenance ? { [PROVENANCE]: provenance } : {}),
+    });
+
+    // (1) 候補が全滅する経路
+    const allDead = await buildRecommendations("all", { fetchImpl: stubFetch(stub()).fetchImpl });
+    expect(allDead.kind === "unanswered" && allDead.gaps).toEqual([shared]);
+
+    // (2) 出典取得が unanswered の経路（1件は集計できている必要があるので別スタブ）
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [
+            { datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" },
+            { datasetId: BUNKA_ID, title: "t", provider: "p", url: "u", matchReason: "r" },
+          ],
+          gaps: [shared],
+        }),
+      [AGGREGATE]: (body) =>
+        (body as { datasetId: string }).datasetId === MEISHO_ID
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          : json(shared),
+      [PROVENANCE]: () => json({ status: "unanswered", reason: "other", message: "出典を生成できません。" }),
+    });
+    const noProvenance = await buildRecommendations("all", { fetchImpl });
+    expect(noProvenance.kind === "unanswered" && noProvenance.gaps).toEqual([shared]);
+  });
+
   it("候補が全滅したら分類は other のまま、個々の理由を gaps で運ぶ（Issue #94）", async () => {
     // 分類の引き上げはしない（1件のデータセットの判定を全体の判定として名乗らない）。
     // 代わりに検索側1件＋集計側2件の内訳をそのまま運ぶ

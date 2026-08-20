@@ -129,6 +129,89 @@ describe("あなたへ画面の未回答の内訳（Issue #92・#94）", () => {
   });
 });
 
+describe("DataGapCard の配置と、あなたへ画面の障害表示", () => {
+  /** ブリーフィングを出してからあなたへタブへ移る */
+  async function openForYou(fetchImpl: typeof fetch) {
+    const view = render(<AppTabs options={{ fetchImpl }} />);
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+    fireEvent.click(screen.getByRole("button", { name: "あなたへ" }));
+    return view;
+  }
+
+  const allDeadStub = () =>
+    stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
+          gaps: [{ status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" }],
+        }),
+      [AGGREGATE_PATH]: () =>
+        jsonResponse({ status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" }),
+    });
+
+  it.each([
+    ["プラン", false],
+    ["あなたへ", true],
+  ])("%s画面では DataGapCard を route-empty の中に入れない（見出しの階層が逆転する）", async (_label, isForYou) => {
+    // 文字列の存在だけを見ていると、カードを route-empty 内へ戻しても通ってしまう
+    const { fetchImpl } = allDeadStub();
+    const { container } = isForYou
+      ? await openForYou(fetchImpl)
+      : (render(<AppTabs options={{ fetchImpl }} />),
+        fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" })),
+        { container: document.body });
+
+    await waitFor(() => expect(screen.getByText("答えられなかった点があります")).toBeInTheDocument());
+    const empty = container.querySelector(".route-empty");
+    const card = container.querySelector(".data-gap-card");
+    expect(empty).not.toBeNull();
+    expect(card).not.toBeNull();
+    // 入れ子ではなく兄弟（同じ親の直接の子）
+    expect(empty?.contains(card as Node)).toBe(false);
+    expect(card?.parentElement).toBe(empty?.parentElement);
+  });
+
+  it("あなたへ画面でも、出典の不整合はデータ欠損ではなく障害として出る（Issue #92）", async () => {
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
+        }),
+      [AGGREGATE_PATH]: () =>
+        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" }),
+      // 要求したものと違う datasetId の出典だけを返す
+      [PROVENANCE_PATH]: () =>
+        jsonResponse({ status: "answered", sources: [provenanceSource("t131067d0000000252", "別のデータ")] }),
+    });
+    await openForYou(fetchImpl);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    // 未回答・データ欠損として誤表示しない
+    expect(screen.queryByText("答えられなかった点があります")).not.toBeInTheDocument();
+    expect(screen.queryByText("該当するオープンデータがありません")).not.toBeInTheDocument();
+    // 出典なしのレコメンドを部分表示しない
+    expect(screen.queryByText("寛永寺")).not.toBeInTheDocument();
+  });
+
+  it("あなたへ画面でも、内訳が無い未回答では空の DataGapCard を出さない", async () => {
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "unanswered",
+          reason: "insufficient_granularity",
+          message: "飲食店データはジャンルの列を持たないため答えられません。",
+        }),
+    });
+    await openForYou(fetchImpl);
+
+    await waitFor(() => expect(screen.getByText("分類: insufficient_granularity")).toBeInTheDocument());
+    expect(screen.getByText(/ジャンルの列を持たないため/)).toBeInTheDocument();
+    expect(screen.queryByText("答えられなかった点があります")).not.toBeInTheDocument();
+  });
+});
+
 describe("answered — 応答由来のルートと出典", () => {
   it("応答待ちのあいだローディングを出す（無反応に見せない）", async () => {
     const { fetchImpl } = stubSuccessfulPlan();
