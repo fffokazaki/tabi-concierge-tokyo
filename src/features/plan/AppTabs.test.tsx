@@ -168,7 +168,7 @@ describe("answered — 応答由来のルートと出典", () => {
     fireEvent.click(screen.getByText("寛永寺").closest(".stop-card") as HTMLElement);
 
     expect(screen.getByText("参考: JNTO")).toBeInTheDocument();
-    expect(screen.getByText(/鳥居や山門をくぐる前に一礼し/)).toBeInTheDocument();
+    expect(screen.getByText(/鳥居をくぐる前に一礼し/)).toBeInTheDocument();
     // 「出典のあるマナー情報はありません」（CC BY 出典の空表示）は置き換えられず併記される
     expect(screen.getByText(/出典のあるマナー情報はありません/)).toBeInTheDocument();
     // 選択中は JNTO ノートがすぐ下に出るため、誘導文は不要（未選択のときだけの文言）
@@ -177,7 +177,7 @@ describe("answered — 応答由来のルートと出典", () => {
     // 燕湯（銭湯のカテゴリ）へ選び直すと内容が切り替わる
     fireEvent.click(screen.getByText("燕湯").closest(".stop-card") as HTMLElement);
     expect(screen.getByText(/浴槽に入る前に、洗い場で体をしっかり洗い流します/)).toBeInTheDocument();
-    expect(screen.queryByText(/鳥居や山門をくぐる前に一礼し/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/鳥居をくぐる前に一礼し/)).not.toBeInTheDocument();
   });
 
   it("表示上限で伏せた停留地があるとき、DataGapCard とは別の注記を出す", async () => {

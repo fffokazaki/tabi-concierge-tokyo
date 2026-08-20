@@ -4,7 +4,7 @@ import type { JntoReference } from "../jntoEtiquette";
 import { JntoReferenceNote } from "./JntoReferenceNote";
 
 const REFERENCE: JntoReference = {
-  summary: "鳥居や山門をくぐる前に一礼し、参道の中央は避けて端を歩きます。",
+  summary: "鳥居をくぐる前に一礼し、参道の中央は避けて端を歩きます。",
   url: "https://www.japan.travel/en/guide/shrine-and-temple-traditions/",
 };
 

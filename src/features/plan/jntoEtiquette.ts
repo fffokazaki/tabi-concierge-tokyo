@@ -3,11 +3,14 @@
  *
  * **これは出典ではない。** `ProvenanceSource`（CC BY 4.0 のカタログ出典）とは型もラベルも
  * 意図的に分ける。JNTO は東京都オープンデータカタログとは無関係な外部サイトで、この参考情報が
- * 埋めるのは「マナー欄」だけ — 停留地名・所在地など回答の事実データには使わない
- * （CLAUDE.md 絶対ルール #4 の例外・ADR-012 参照）。
+ * 埋めるのはマナー・作法の参考情報の用途（プラン画面のマナー欄・あなたへ画面の各レコメンド
+ * カード）だけ — 停留地名・所在地など回答の事実データには使わない（CLAUDE.md 絶対ルール #4
+ * の例外・ADR-012 参照）。
  *
- * 要約文は 2026-08-20 時点で実際の JNTO ページ（下記 URL）の内容に基づいて人手で作成した
- * ものであり、推測で書き足していない（絶対ルール #1 と同じ精神）。JNTO 側のページ内容が
+ * 要約文は実際の JNTO ページ（下記 URL）の内容に基づいて人手で作成したものであり、推測で
+ * 書き足していない（絶対ルール #1 と同じ精神）。2026-08-21 に Futoshi が各ページの実内容を
+ * 直接照合し、検索スニペットとずれていた4カテゴリ（神社・寺／銭湯／公園・バス停・公共交通／
+ * 一般）を修正した（飲食店は当初から実ページ確認済みで変更なし）。JNTO 側のページ内容が
  * 変わった場合、本ファイルは自動追従しない（ADR-012「影響」参照。人手更新が必要）。
  */
 
@@ -24,12 +27,12 @@ export type JntoReference = {
  */
 const JNTO_REFERENCES = {
   shrineTemple: {
-    summary:
-      "鳥居や山門をくぐる前に一礼し、参道の中央は避けて端を歩きます。手水舎があれば、お参りの前に手と口を清めましょう。",
+    summary: "鳥居をくぐる前に一礼し、参道の中央は避けて端を歩きます。手水舎では、お参りの前に手と口を清めましょう。",
     url: "https://www.japan.travel/en/guide/shrine-and-temple-traditions/",
   },
   bathhouse: {
-    summary: "浴槽に入る前に、洗い場で体をしっかり洗い流します。タオルや石鹸を湯船の中に持ち込まないようにしましょう。",
+    summary:
+      "浴槽に入る前に、洗い場で体をしっかり洗い流します。体を拭くタオルは、湯船の中に持ち込まないようにしましょう。",
     url: "https://www.japan.travel/en/guide/bathing-manners-and-tips/",
   },
   restaurant: {
@@ -38,11 +41,13 @@ const JNTO_REFERENCES = {
     url: "https://www.japan.travel/en/guide/understanding-and-mastering-japanese-manners-and-etiquette/",
   },
   transitPark: {
-    summary: "電車やバスの中では通話を控え、携帯はマナーモードに。優先席は必要な方に譲りましょう。",
+    summary:
+      "電車やバスの中では通話を控え、携帯はマナーモードにしましょう。周囲の乗客への配慮を忘れずに、迷ったときは地元の人の行動を参考にしましょう。",
     url: "https://www.japan.travel/en/plan/custom-manners/",
   },
   general: {
-    summary: "公共の場では周囲への配慮が重視されます。ゴミは持ち帰り、静かに過ごすことが基本的なマナーです。",
+    summary:
+      "家庭や一部の飲食店・寺院などでは、入り口で靴を脱ぐのが習慣です。困ったときは「すみません」と声をかけ、丁寧な会釈を心がけましょう。",
     url: "https://www.japan.travel/en/guide/japanese-manners-dos-and-donts/",
   },
 } as const satisfies Record<string, JntoReference>;

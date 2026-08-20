@@ -51,7 +51,7 @@ describe("RecommendationCard", () => {
 
     // SOURCE.datasetId は名所・史跡（神社・寺のカテゴリ）
     expect(screen.getByText("参考: JNTO")).toBeInTheDocument();
-    expect(screen.getByText(/鳥居や山門をくぐる前に一礼し/)).toBeInTheDocument();
+    expect(screen.getByText(/鳥居をくぐる前に一礼し/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /JNTO/ })).toHaveAttribute(
       "href",
       "https://www.japan.travel/en/guide/shrine-and-temple-traditions/",
