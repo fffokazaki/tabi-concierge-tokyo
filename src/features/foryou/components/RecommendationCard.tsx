@@ -1,3 +1,5 @@
+import { JntoReferenceNote } from "../../plan/components/JntoReferenceNote";
+import { getJntoReference } from "../../plan/jntoEtiquette";
 import { ProvenanceChip } from "../../plan/components/ProvenanceChip";
 import type { Recommendation } from "../types";
 
@@ -25,6 +27,8 @@ export function RecommendationCard({ recommendation }: { recommendation: Recomme
       <div className="recommendation-card__name">{name}</div>
       <div className="recommendation-card__blurb">{blurb}</div>
       <ProvenanceChip source={source} />
+      {/* 出典（CC BY・上の ProvenanceChip）とは別物。JNTO の「参考」情報は置き換えではなく追加（ADR-012） */}
+      <JntoReferenceNote reference={getJntoReference(source.datasetId)} />
     </div>
   );
 }

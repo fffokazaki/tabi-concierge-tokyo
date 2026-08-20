@@ -1,8 +1,10 @@
 import type { DragEvent } from "react";
 import { DataGapCard } from "./components/DataGapCard";
 import { EtiquetteList } from "./components/EtiquetteList";
+import { JntoReferenceNote } from "./components/JntoReferenceNote";
 import { ProvenanceChip } from "./components/ProvenanceChip";
 import { RouteStopCard } from "./components/RouteStopCard";
+import { getJntoReference } from "./jntoEtiquette";
 import type { PlanFailure } from "./buildPlan";
 import type { PlanScreenState } from "./usePlanState";
 
@@ -26,6 +28,11 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
     reorderStop,
     setDragOverPos,
   } = state;
+
+  // JNTO 参考情報は選択中の停留地のカテゴリだけに出す（ADR-012）。停留地未選択（「このルートの
+  // マナー」）のときは複数カテゴリが混在しうるため、特定の参考情報を出さない
+  const selectedSource = orderedStops.find((s) => s.selected)?.source;
+  const jntoReference = selectedSource ? getJntoReference(selectedSource.datasetId) : null;
 
   const handleDragStart = (pos: number) => (e: DragEvent<HTMLDivElement>) => {
     e.dataTransfer.effectAllowed = "move";
@@ -136,12 +143,19 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
               /* 仮のマナー文を出すのは出典なしの回答にあたる（CLAUDE.md 絶対ルール #2）。
                  「まだ無い」ではなく「調査済み・存在しないことを確認済み」と書く（Issue #67）。
                  カタログ外の出典で埋めることもしない（ADR-010）。文言は worker/core/search-gaps.ts の
-                 etiquetteUnanswered と同じ語り口に揃えてある */
+                 etiquetteUnanswered と同じ語り口に揃えてある。
+                 未選択のときだけ「停留地を選ぶと…」の誘導文を足す。選択中は JNTO ノートが
+                 すぐ下に出るため誘導は不要（JNTO はカタログ出典ではないと誤読させないよう、
+                 この一文はあくまで操作の案内であって出典の存在を示唆しない） */
               <p className="route-status">
                 出典のあるマナー情報はありません。訪日観光客向けのマナー・作法の解説にあたるデータは、東京都オープンデータカタログに存在しないことを確認済みです（2026-08-17
                 調査）。都へのデータ公開リクエストの候補として記録しています。
+                {!jntoReference && "停留地を選ぶと、JNTOの参考情報を表示します。"}
               </p>
             )}
+
+            {/* JNTO の参考情報は上記の誠実な空表示を置き換えない。両方見せる（ADR-012） */}
+            {jntoReference && <JntoReferenceNote reference={jntoReference} />}
           </>
         )}
       </div>

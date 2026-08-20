@@ -152,6 +152,32 @@ describe("answered — 応答由来のルートと出典", () => {
     // 「まだ」を使わない — 調査済み・存在しないことを確認済みという意味にする（Issue #67）
     expect(screen.queryByText(/まだありません/)).not.toBeInTheDocument();
     expect(screen.queryByText(/鳥居をくぐる前に一礼/)).not.toBeInTheDocument();
+    // 未選択のときだけ、停留地を選べばJNTO参考情報が出ることの誘導文を添える
+    expect(screen.getByText(/停留地を選ぶと、JNTOの参考情報を表示します/)).toBeInTheDocument();
+  });
+
+  it("停留地を選ぶと、そのカテゴリのJNTO参考情報が出典の空表示と併記される（ADR-012）", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    await createBriefing(fetchImpl);
+    await waitFor(() => expect(screen.getByText("寛永寺")).toBeInTheDocument());
+
+    // 未選択のうちは JNTO 参考情報を出さない（複数カテゴリが混在しうるため）
+    expect(screen.queryByText("参考: JNTO")).not.toBeInTheDocument();
+
+    // 寛永寺（名所・史跡 → 神社・寺のカテゴリ）を選ぶ
+    fireEvent.click(screen.getByText("寛永寺").closest(".stop-card") as HTMLElement);
+
+    expect(screen.getByText("参考: JNTO")).toBeInTheDocument();
+    expect(screen.getByText(/鳥居や山門をくぐる前に一礼し/)).toBeInTheDocument();
+    // 「出典のあるマナー情報はありません」（CC BY 出典の空表示）は置き換えられず併記される
+    expect(screen.getByText(/出典のあるマナー情報はありません/)).toBeInTheDocument();
+    // 選択中は JNTO ノートがすぐ下に出るため、誘導文は不要（未選択のときだけの文言）
+    expect(screen.queryByText(/停留地を選ぶと、JNTOの参考情報を表示します/)).not.toBeInTheDocument();
+
+    // 燕湯（銭湯のカテゴリ）へ選び直すと内容が切り替わる
+    fireEvent.click(screen.getByText("燕湯").closest(".stop-card") as HTMLElement);
+    expect(screen.getByText(/浴槽に入る前に、洗い場で体をしっかり洗い流します/)).toBeInTheDocument();
+    expect(screen.queryByText(/鳥居や山門をくぐる前に一礼し/)).not.toBeInTheDocument();
   });
 
   it("表示上限で伏せた停留地があるとき、DataGapCard とは別の注記を出す", async () => {
