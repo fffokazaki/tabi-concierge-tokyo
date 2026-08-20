@@ -389,7 +389,7 @@
 | Category   | architecture |
 | Origin     | PR #93 / Issue #89 |
 | Date       | 2026-08-20 |
-| Helpful    | 0            |
+| Helpful    | 1            |
 | Harmful    | 0            |
 | Status     | active       |
 

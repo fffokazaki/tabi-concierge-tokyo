@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.29.0"
+version: "1.30.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-20"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 81
+ace_entry_count: 84
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -311,8 +311,25 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-93-4 | レビューで解決策が割れたら、まず両者が依拠している事実をソースで確認する | process | [playbook/process.md#ace-93-4](./playbook/process.md#ace-93-4) |
 | ACE-97-1 | vendored なツールの欠陥は直さず、開示して上流へ送る | tooling | [playbook/tooling.md#ace-97-1](./playbook/tooling.md#ace-97-1) |
 | ACE-97-2 | 再同期で消える場所に、再同期の警告を書かない | tooling | [playbook/tooling.md#ace-97-2](./playbook/tooling.md#ace-97-2) |
+| ACE-98-1 | 意図的な重複ペアへ同型修正を写すときは、テストも対で写す | testing | [playbook/testing.md#ace-98-1](./playbook/testing.md#ace-98-1) |
+| ACE-98-2 | 複合キーの dedupe には「片方だけ一致では畳み込まない」テストを対で置く | testing | [playbook/testing.md#ace-98-2](./playbook/testing.md#ace-98-2) |
+| ACE-98-3 | 握りつぶしの修正は、これまで画面に出なかったサーバー文面を新たに露出させる | process | [playbook/process.md#ace-98-3](./playbook/process.md#ace-98-3) |
 
 ## Changelog
+
+### [1.30.0] - 2026-08-20
+
+#### 追加
+
+- ACE-98-1: 意図的な重複ペアへ同型修正を写すときは、テストも対で写す（Issue #95 / PR #98）
+- ACE-98-2: 複合キーの dedupe には「片方だけ一致では畳み込まない」テストを対で置く（Issue #95 / PR #98）
+- ACE-98-3: 握りつぶしの修正は、これまで画面に出なかったサーバー文面を新たに露出させる（Issue #95 / PR #98）
+
+#### カウンター更新
+
+- ACE-93-2: Helpful +1（全滅時に個別理由を全体分類へ引き上げない判断をプラン側のコメント・テスト固定に適用）
+- ACE-93-3: Helpful +1（#92・#94・#42 へプラン側の同型箇所・将来リスクを棚卸しして追記）
+- ACE-93-4: Helpful +1（「6分岐のうち5つ」のレビュー間の食い違いを worker/core/operations.ts の実測で解決）
 
 ### [1.29.0] - 2026-08-20
 
