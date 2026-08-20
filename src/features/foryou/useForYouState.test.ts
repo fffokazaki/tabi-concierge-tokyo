@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { jsonResponse, stubFetch } from "../../test/planFixtures";
-import { SEARCH_PATH, stubSuccessfulRecommendations } from "../../test/forYouFixtures";
+import { jsonResponse, MEISHO_ID, stubFetch } from "../../test/planFixtures";
+import { AGGREGATE_PATH, SEARCH_PATH, stubSuccessfulRecommendations } from "../../test/forYouFixtures";
 import { useForYouState } from "./useForYouState";
 
 describe("useForYouState", () => {
@@ -23,6 +23,28 @@ describe("useForYouState", () => {
 
     await waitFor(() => expect(result.current.request.status).toBe("ready"));
     expect(result.current.request.status === "ready" && result.current.request.recommendations).toHaveLength(2);
+  });
+
+  it("未回答の内訳（gaps）をそのまま状態へ運ぶ（Issue #92・#94）", async () => {
+    // ビルダーが gaps を載せても、フックが落としたら画面には出ない
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
+          gaps: [{ status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" }],
+        }),
+      [AGGREGATE_PATH]: () =>
+        jsonResponse({ status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" }),
+    });
+    const { result } = renderHook(() => useForYouState({ fetchImpl }));
+
+    act(() => result.current.ensureLoaded());
+    await waitFor(() => expect(result.current.request.status).toBe("unanswered"));
+    expect(result.current.request.status === "unanswered" && result.current.request.gaps).toEqual([
+      { status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" },
+      { status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" },
+    ]);
   });
 
   it("ensureLoaded を2回呼んでも、idle から動いたあとは再度読み込まない", async () => {

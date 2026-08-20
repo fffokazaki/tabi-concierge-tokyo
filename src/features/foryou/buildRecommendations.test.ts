@@ -91,6 +91,9 @@ describe("単一チップ", () => {
       kind: "unanswered",
       reason: "insufficient_granularity",
       message: "飲食店データはジャンルの列を持たないため「ラーメン」の粒度では答えられません。",
+      // 検索そのものが unanswered の経路。サーバーが添える構造化欠損（Issue #70）は
+      // `areas` を送らないと付かないので、この画面の呼び出しでは常に空（Issue #94）
+      gaps: [],
     });
   });
 });
@@ -344,6 +347,141 @@ describe("抽出・出典の欠落", () => {
     expect(calls.map((c) => c.path)).not.toContain(PROVENANCE);
   });
 
+
+  it("要求した datasetId の出典が返らないのは仕様違反なので、データ欠損に混ぜず障害にする（Issue #92）", async () => {
+    // API.md §3.3 の契約: 知らない datasetId が1件でも混ざれば応答全体が unanswered になる。
+    // よって answered で出典が欠けるのはバックエンドの不整合で、「そのデータが公開されていない」
+    // ではない。gaps に混ぜると実装のバグを未公開データとして主張することになる（絶対ルール #1）
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [
+            { datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" },
+            { datasetId: BUNKA_ID, title: "文化観光施設", provider: "台東区", url: "u", matchReason: "r" },
+          ],
+        }),
+      [AGGREGATE]: (body) =>
+        (body as { datasetId: string }).datasetId === MEISHO_ID
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          : json({ status: "answered", result: { name: "国立西洋美術館", summary: "…" }, query: "q" }),
+      // BUNKA_ID の出典を返さない
+      [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
+    });
+
+    const outcome = await buildRecommendations("all", { fetchImpl });
+    expect(outcome.kind).toBe("failure");
+    if (outcome.kind !== "failure") return;
+    expect(outcome.failure.kind).toBe("parse");
+    // どの内容の出典が欠けたかを検出できる形で残す（黙って落とさない）
+    expect(outcome.failure.detail).toContain("国立西洋美術館");
+    expect(outcome.failure.detail).toContain(BUNKA_ID);
+  });
+
+  it("出典取得が unanswered なら、それまでに集めた内訳を保ったまま未回答にする（Issue #92・#94）", async () => {
+    // `callAndRead` が作る outcome は gaps: [] なので、そのまま返すと検索側・集計側の欠損が消える
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [
+            { datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" },
+            { datasetId: BUNKA_ID, title: "文化観光施設", provider: "台東区", url: "u", matchReason: "r" },
+          ],
+          gaps: [{ status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" }],
+        }),
+      [AGGREGATE]: (body) =>
+        (body as { datasetId: string }).datasetId === MEISHO_ID
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          : json({ status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" }),
+      [PROVENANCE]: () => json({ status: "unanswered", reason: "other", message: "出典を生成できません。" }),
+    });
+
+    const outcome = await buildRecommendations("all", { fetchImpl });
+    expect(outcome).toEqual({
+      kind: "unanswered",
+      reason: "other",
+      message: "出典を生成できません。",
+      gaps: [
+        { status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" },
+        { status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" },
+      ],
+    });
+  });
+
+  it("早期 return の経路でも dedupe が効く（同じ理由・同じ文面を二重に出さない）", async () => {
+    // 成功経路の dedupe はテスト済みだが、#92・#94 で足した2つの早期 return は
+    // 別々の gap しか踏んでいなかった。呼び忘れると DataGapCard の React key が重複する
+    const shared = { status: "unanswered", reason: "other", message: "同じ理由・同じ文面。" };
+    const stub = (provenance?: () => Response) => ({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
+          gaps: [shared],
+        }),
+      [AGGREGATE]: () => json(shared),
+      ...(provenance ? { [PROVENANCE]: provenance } : {}),
+    });
+
+    // (1) 候補が全滅する経路
+    const allDead = await buildRecommendations("all", { fetchImpl: stubFetch(stub()).fetchImpl });
+    expect(allDead.kind === "unanswered" && allDead.gaps).toEqual([shared]);
+
+    // (2) 出典取得が unanswered の経路（1件は集計できている必要があるので別スタブ）
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [
+            { datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" },
+            { datasetId: BUNKA_ID, title: "t", provider: "p", url: "u", matchReason: "r" },
+          ],
+          gaps: [shared],
+        }),
+      [AGGREGATE]: (body) =>
+        (body as { datasetId: string }).datasetId === MEISHO_ID
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          : json(shared),
+      [PROVENANCE]: () => json({ status: "unanswered", reason: "other", message: "出典を生成できません。" }),
+    });
+    const noProvenance = await buildRecommendations("all", { fetchImpl });
+    expect(noProvenance.kind === "unanswered" && noProvenance.gaps).toEqual([shared]);
+  });
+
+  it("候補が全滅したら分類は other のまま、個々の理由を gaps で運ぶ（Issue #94）", async () => {
+    // 分類の引き上げはしない（1件のデータセットの判定を全体の判定として名乗らない）。
+    // 代わりに検索側1件＋集計側2件の内訳をそのまま運ぶ
+    const { fetchImpl, calls } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: [
+            { datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" },
+            { datasetId: BUNKA_ID, title: "文化観光施設", provider: "台東区", url: "u", matchReason: "r" },
+          ],
+          gaps: [{ status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" }],
+        }),
+      [AGGREGATE]: (body) =>
+        (body as { datasetId: string }).datasetId === MEISHO_ID
+          ? json({ status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" })
+          : json({ status: "unanswered", reason: "data_not_published", message: "「渋谷」の地物を収録していません。" }),
+    });
+
+    const outcome = await buildRecommendations("all", { fetchImpl });
+    expect(outcome).toEqual({
+      kind: "unanswered",
+      reason: "other",
+      message: "候補のデータセットから、おすすめに出せる地物を取り出せませんでした。",
+      gaps: [
+        { status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" },
+        { status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" },
+        { status: "unanswered", reason: "data_not_published", message: "「渋谷」の地物を収録していません。" },
+      ],
+    });
+    // 出典を取りに行く必要すら無い
+    expect(calls.map((c) => c.path)).not.toContain(PROVENANCE);
+  });
 
   it("出典が取れなければ、出典なしのままレコメンドを返さない", async () => {
     const { fetchImpl } = stubFetch({

@@ -30,10 +30,13 @@ import type { ActiveInterest, Recommendation } from "./types";
  * 候補を集計できないと、検索側は「覆えた」と判定して欠損を出さず、集計側で黙って落ちる
  * ―― その興味が答えられも報告もされない状態になる。
  *
- * 直しきっていないものが2つある。**出典が取れずに落ちる候補（`get_provenance` 側）は
- * まだ黙って消える**（[Issue #92]。集計側と違って持ち上げられる文面がサーバー応答に無い）。
- * **候補が全滅したときは個々の理由が汎用の `other` に丸められる**（[Issue #94]。可視性は
- * 残るが内訳が落ちる）。どちらも分類・表示の設計判断を要するため分けてある。
+ * **未回答は分類（`reason`）と内訳（`gaps`）を分けて運ぶ。** 候補が全滅したときも分類は
+ * 汎用の `other` に置いたまま、個々の理由を `gaps` として画面へ出す（[Issue #94] の決定。
+ * 引き上げると1件のデータセットについての判定を全体の判定として名乗ることになる）。
+ * **出典が突き合わない候補は `gaps` ではなく `parse` の障害にする**（[Issue #92]）。API.md §3.3 の
+ * 契約により、`answered` が返ったなら要求した datasetId すべてに出典が付く。付いていないのは
+ * バックエンドの不整合であって未公開データではないので、データ欠損の記録には混ぜない
+ * （`missingProvenanceFailure` の doc 参照）。黙って落とさない点は変わらない ―― 画面には障害として出る。
  *
  * [Issue #92]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/92
  * [Issue #94]: https://github.com/fffokazaki/tabi-concierge-tokyo/issues/94
@@ -41,7 +44,9 @@ import type { ActiveInterest, Recommendation } from "./types";
 
 export type RecommendationOutcome =
   | { kind: "recommendations"; recommendations: Recommendation[]; gaps: Unanswered[] }
-  | { kind: "unanswered"; reason: UnansweredReason; message: string }
+  // `gaps` は**必須**。省略可にすると、内訳を運べる場所で黙って落とす経路が型として許される
+  // （Issue #92・#94 が直したのはまさにそれ）。運ぶものが無いときは呼び出し側が空配列を明示する
+  | { kind: "unanswered"; reason: UnansweredReason; message: string; gaps: Unanswered[] }
   | { kind: "failure"; failure: RecommendationFailure };
 
 export type RecommendationFailure = {
@@ -96,15 +101,18 @@ export async function buildRecommendations(
   }
 
   if (extracted.length === 0) {
-    // 候補が全滅したときは分類を汎用の other に置く。個々の未回答理由（`aggregateGaps`）を
-    // ここで画面全体の分類へ引き上げると、1件のデータセットについての判定を全体の判定として
+    // 候補が全滅したときも分類は汎用の other に置く（Issue #94 の決定）。個々の未回答理由を
+    // 画面全体の分類へ引き上げると、1件のデータセットについての判定を全体の判定として
     // 名乗ることになる ―― `data_not_published` は「カタログに該当データが存在しないことを
     // 確かめられた場合」（shared/core.ts）だが、実際に確かめたのは候補1件の不足でしかない。
-    // どの分類なら引き上げてよいかは設計判断なので Issue #94 で決める
+    // **内訳は分類ではなく `gaps` で運ぶ**（DataGapCard が理由ごとに列挙する）。
+    // 文面から「該当するオープンデータがありません。」を落としてあるのは、画面側が同じ一文を
+    // 見出しとして出すため（重複の全体像は Issue #107）
     return {
       kind: "unanswered",
       reason: "other",
-      message: "該当するオープンデータがありません。候補のデータセットから、おすすめに出せる地物を取り出せませんでした。",
+      message: "候補のデータセットから、おすすめに出せる地物を取り出せませんでした。",
+      gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps]),
     };
   }
 
@@ -114,23 +122,35 @@ export async function buildRecommendations(
     readSources,
     options,
   );
-  if (sourced.kind !== "answered") return sourced.outcome;
+  if (sourced.kind === "failure") return sourced.outcome;
+  if (sourced.kind === "unanswered") {
+    // 出典が取れないので回答は作れない。ただし**それまでに集めた内訳は捨てない**
+    // （Issue #92・#94。`callAndRead` が作る outcome は `gaps: []` なので、そのまま
+    // 返すと検索側・集計側の欠損が消える ―― この PR が直している握りつぶしそのもの）
+    return {
+      kind: "unanswered",
+      reason: sourced.unanswered.reason,
+      message: sourced.unanswered.message,
+      gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps]),
+    };
+  }
 
   const sourceByDatasetId = new Map(sourced.value.sources.map((source) => [source.datasetId, source]));
   const recommendations: Recommendation[] = [];
   for (const { datasetId, result } of extracted) {
     const source = sourceByDatasetId.get(datasetId);
-    if (!source) continue;
+    // 出典が欠けるのは**データ欠損ではなく仕様違反**（Issue #92）。API.md §3.3 の契約により、
+    // 知らない datasetId が1件でも混ざれば応答全体が `unanswered` になるので、`answered` なら
+    // 要求した ID すべてに出典が付く。欠けているのはバックエンドの不整合なので、`gaps`
+    // （＝公開されていないデータの記録）に混ぜず parse の障害として出す。混ぜると、実装のバグを
+    // 「このデータは公開されていない」と偽って主張することになる（絶対ルール #1）
+    if (!source) return missingProvenanceFailure(result.name, datasetId);
     recommendations.push({ name: result.name, blurb: result.summary, reason, source });
   }
 
-  if (recommendations.length === 0) {
-    return {
-      kind: "unanswered",
-      reason: "other",
-      message: "該当するオープンデータがありません。取り出した内容に対応する出典を取得できませんでした。",
-    };
-  }
+  // 上のループは全件 push か return するので到達しない。残しているのは、将来 `continue` を
+  // 戻した人が「出典なしの回答」を作れないようにするため（絶対ルール #2 の防波堤）
+  if (recommendations.length === 0) return missingProvenanceFailure();
 
   return {
     kind: "recommendations",
@@ -138,6 +158,26 @@ export async function buildRecommendations(
     gaps: dedupeGaps([...(searched.value.gaps ?? []), ...aggregateGaps]),
   };
 }
+
+/**
+ * 出典の突き合わせが成立しなかったときの障害（Issue #92）。
+ *
+ * **データ欠損（`gaps`）ではなく `parse` の障害にする。** [API.md](../../../docs/02-design/API.md) §3.3 の
+ * 契約は「知らない `datasetId` が1件でも混ざったら、既知のぶんだけ返さず全体を `unanswered` に
+ * する」なので、`answered` が返ったなら要求した ID すべてに出典が付く。付いていないのは
+ * バックエンドの不整合であって「そのデータが公開されていない」ではない。`gaps` に混ぜると
+ * 実装のバグを未公開データとして主張することになり（絶対ルール #1）、DOMAIN.md §7 の
+ * 未回答の集計も汚れる。
+ *
+ * 落とすこと自体は絶対ルール #2 どおりだが、**黙って落とさない** ―― 画面には障害として出る。
+ */
+const missingProvenanceFailure = (name?: string, datasetId?: string): RecommendationOutcome =>
+  malformed(
+    "get_provenance",
+    name && datasetId
+      ? `要求した datasetId の出典が返りませんでした（「${name}」・${datasetId}）`
+      : "出典と突き合わせられた候補が1件もありません",
+  );
 
 /**
  * 同じ分類・同じ文面の未回答を1件にまとめる。
@@ -200,7 +240,11 @@ async function callAndRead<T>(
   if (unanswered) {
     return {
       kind: "unanswered",
-      outcome: { kind: "unanswered", reason: unanswered.reason, message: unanswered.message },
+      // 内訳は空。サーバーが `unanswered` に添える構造化欠損（Issue #70）は
+      // `unansweredExtras`（worker/core/operations.ts）が構造化入力 `areas` を要求するため、
+      // `interests` と `limit` だけを送るこの画面の呼び出しでは1件も付かない。
+      // **`areas` を送るようになったら、ここで落ちる**ので読み直すこと
+      outcome: { kind: "unanswered", reason: unanswered.reason, message: unanswered.message, gaps: [] },
       unanswered,
     };
   }
