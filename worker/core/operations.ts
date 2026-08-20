@@ -54,6 +54,8 @@ import {
  * スタブでも守ること:
  * - 返す出典は実在のカタログデータセット。固定の集計結果も原本CSVに実在する行だけを使う
  * - 答えられないものは HTTP エラーではなく `unanswered` ＋ 理由分類で返す（API.md §4）
+ * - `message` に「該当するオープンデータが〜」の名乗りを付けない。名乗りは `status` / `reason`
+ *   （画面では見出し）が担い、message は確かめた事実だけを書く（API.md §4・Issue #107）
  * - **問われたものと違うものを返さない。** 「それらしい何か」を返すくらいなら答えない
  *
  * **`worker/core/` は境界（`parse.ts`）を通らずに直接呼ばれうる**（Step 5 の `/mcp`）。
@@ -380,7 +382,7 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   return unansweredWith(
     unanswered(
       "other",
-      `該当するオープンデータが見つかりませんでした。利用中の10データセットのキーワードには、${askedLabel}に当たるものがありませんでした。`,
+      `利用中の10データセットのキーワードには、${askedLabel}に当たるものがありませんでした。`,
     ),
     unansweredExtras,
   );
@@ -431,7 +433,7 @@ function computeAggregateDataset(input: AggregateDatasetInput): AggregateDataset
     // 未回答の集計（DOMAIN.md §7）が汚れるため `other` に置く
     return unanswered(
       "other",
-      `該当するオープンデータがありません。データセットID「${datasetId}」は利用中の10件に含まれていません。`,
+      `データセットID「${datasetId}」は利用中の10件に含まれていません。`,
     );
   }
 

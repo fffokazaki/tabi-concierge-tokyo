@@ -165,7 +165,7 @@ curl -s localhost:5173/api/provenance \
 curl -s localhost:5173/api/search-datasets \
   -H 'content-type: application/json' \
   -d '{"query":"上野でラーメンが食べたい","area":"上野"}'
-# → {"status":"unanswered","reason":"insufficient_granularity","message":"該当するオープンデータがありません。..."}
+# → {"status":"unanswered","reason":"insufficient_granularity","message":"飲食店の店舗データは…「ラーメン」の粒度では答えられません。"}
 ```
 
 400 になるのは**入力の形の違反だけ**（必須項目の欠落・`limit` の範囲外など）:

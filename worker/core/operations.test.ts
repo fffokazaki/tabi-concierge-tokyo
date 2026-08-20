@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AggregateDatasetOutput, SearchDatasetsOutput } from "../../shared/core";
+import type { AggregateDatasetOutput, GetProvenanceOutput, SearchDatasetsOutput } from "../../shared/core";
 import { capturingGapRecorder, expectAnswered } from "../test-support";
 import { RESTAURANT_DATASET_ID, STATISTICS_DATASET_ID } from "./catalog";
 import {
@@ -355,7 +355,7 @@ describe("マナー・作法の問い", () => {
   // 「解説に相当するデータ」と限定した文言（DATABASE.md §2.1 の調査範囲）。ルールを場所として
   // 公開したデータ（§2.2）はカタログに実在する（リンク切れ）ので「存在しない」と広げると嘘になる
   const ETIQUETTE_MESSAGE =
-    "該当するオープンデータがありません。訪日観光客向けのマナー・作法の解説に相当するデータは、東京都オープンデータカタログに存在しないことを確認済みです（2026-08-17 調査）。この未回答は記録され、東京都へのデータ公開リクエストの題材になります。";
+    "訪日観光客向けのマナー・作法の解説に相当するデータは、東京都オープンデータカタログに存在しないことを確認済みです（2026-08-17 調査）。この未回答は記録され、東京都へのデータ公開リクエストの題材になります。";
 
   it("マナーだけを訊かれたら、調査済みの data_not_published を返して記録する", async () => {
     const recorder = capturingGapRecorder();
@@ -436,7 +436,7 @@ describe("マナー・作法の問い", () => {
         status: "unanswered",
         reason: "insufficient_granularity",
         message:
-          "該当するオープンデータがありません。飲食店の店舗データは「東京都内の飲食店のバリアフリー情報」（210件・バリアフリー対応店に限定）のみで、ジャンルの列を持たないため「ラーメン」の粒度では答えられません。",
+          "飲食店の店舗データは「東京都内の飲食店のバリアフリー情報」（210件・バリアフリー対応店に限定）のみで、ジャンルの列を持たないため「ラーメン」の粒度では答えられません。",
       },
       { status: "unanswered", reason: "data_not_published", message: ETIQUETTE_MESSAGE },
     ]);
@@ -455,7 +455,7 @@ describe("マナー・作法の問い", () => {
       expect(output.reason).toBe("out_of_area");
       // 文面は利用者に見える。実装用語（POC）を出さない（Issue #99）
       expect(output.message).toBe(
-        "該当するオープンデータがありません。「新宿」はこのアプリの対象エリア（上野・浅草・渋谷）の外です。",
+        "「新宿」はこのアプリの対象エリア（上野・浅草・渋谷）の外です。",
       );
     });
 
@@ -507,7 +507,7 @@ describe("マナー・作法の問い", () => {
         status: "unanswered",
         reason: "other",
         message:
-          "該当するオープンデータがありません。質問文の語に当たるデータセットが無かったため、「上野」を収録するデータセットを、エリアの事実として提示しています。",
+          "質問文の語に当たるデータセットが無かったため、「上野」を収録するデータセットを、エリアの事実として提示しています。",
       },
     ]);
     expect(recorder.records).toEqual([
@@ -535,7 +535,7 @@ describe("分類指定の空振りの文言", () => {
     expect(output.reason).toBe("other");
     // 「10件全体に無い」と断定しない。渋谷区の都市公園・都立公園一覧が10件の中に実在する
     expect(output.message).toBe(
-      "該当するオープンデータが見つかりませんでした。「上野」で絞り込んだ候補には「公園」の語に当たるデータセットがありませんでした。",
+      "「上野」で絞り込んだ候補には「公園」の語に当たるデータセットがありませんでした。",
     );
 
     // 分類指定を黙って捨てない挙動は変えない（従来どおり unanswered("other") として記録される）
@@ -552,7 +552,7 @@ describe("分類指定の空振りの文言", () => {
     if (output.status !== "unanswered") return;
     expect(output.reason).toBe("other");
     expect(output.message).toBe(
-      "該当するオープンデータが見つかりませんでした。利用中の10データセットのキーワードには「劇場」の語に当たるものがありませんでした。",
+      "利用中の10データセットのキーワードには「劇場」の語に当たるものがありませんでした。",
     );
 
     // 文言だけでなく記録でも「分類ガードに到達した」ことを固定する（エリア未指定は area 列が空）
@@ -569,7 +569,7 @@ describe("分類指定の空振りの文言", () => {
     if (output.status !== "unanswered") return;
     expect(output.reason).toBe("other");
     expect(output.message).toBe(
-      "該当するオープンデータが見つかりませんでした。利用中の10データセットのキーワードには、質問文の語に当たるものがありませんでした。",
+      "利用中の10データセットのキーワードには、質問文の語に当たるものがありませんでした。",
     );
     expect(recorder.records).toEqual([
       { question: "演劇", area: undefined, category: undefined, reason: "other" },
@@ -578,6 +578,20 @@ describe("分類指定の空振りの文言", () => {
 });
 
 describe("aggregateDataset（直接呼び出し）", () => {
+  it("未知の datasetId は other の未回答にする（呼び出し側の指定違いを欠損統計に混ぜない）", async () => {
+    const output = await aggregateDataset(
+      { datasetId: "t000000d0000000000", intent: "上野の寺を1件" },
+      capturingGapRecorder(),
+    );
+
+    expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    // 文面ごと固定する（Issue #99 と同じ理由）。この分岐は語彙ゲートの収集経路でしか
+    // 踏まれておらず、文面・分類の回帰を単体で見張るテストが無かった（PR #109 レビュー指摘）
+    expect(output.reason).toBe("other");
+    expect(output.message).toBe("データセットID「t000000d0000000000」は利用中の10件に含まれていません。");
+  });
+
   it("エリアを指定されたら、そのエリアの行が無い限り answered を返さない", async () => {
     // 渋谷区の公園データに上野を求める
     const output = await aggregateDataset(
@@ -625,6 +639,22 @@ describe("aggregateDataset（直接呼び出し）", () => {
     if (output.status !== "unanswered") return;
     expect(output.reason).toBe("out_of_area");
     expect(output.message).toBe("「新宿」はこのアプリの対象エリア（上野・浅草・渋谷）の外です。");
+  });
+
+  it("対象エリア外の文面は検索側と同文にする（画面の dedupeGaps で1件に畳めるように）", async () => {
+    // 名乗りの除去（Issue #107）で検索側・集計側の out_of_area が同文になり、画面側の
+    // 重複除去（reason と message の組）が畳み込めるようになった。片側だけ文言を直すと
+    // この畳み込みが静かに割れるため、同文であること自体を固定する
+    const searched = await searchDatasets({ query: "新宿の寺を1件" }, capturingGapRecorder());
+    const aggregated = await aggregateDataset(
+      { datasetId: MEISHO_ID, intent: "新宿の寺を1件" },
+      capturingGapRecorder(),
+    );
+
+    expect(searched.status).toBe("unanswered");
+    expect(aggregated.status).toBe("unanswered");
+    if (searched.status !== "unanswered" || aggregated.status !== "unanswered") return;
+    expect(searched.message).toBe(aggregated.message);
   });
 
   it("既知のエリア名が無い answered は、固定サンプル先頭という選定根拠を query に明記する（Issue #78）", async () => {
@@ -687,11 +717,18 @@ describe("利用者向け文面の語彙", () => {
     "datasetId",
   ];
 
-  it("スタブが返しうる未回答・欠損の文面すべてに実装用語が無い", async () => {
+  /**
+   * 実際の呼び出しが返す `message` をすべて集める（`unanswered` 本体と `answered` の
+   * `gaps` の両方）。文面の不変条件テスト（実装用語・名乗りの一文）で共有する。
+   */
+  const collectUserFacingMessages = async (): Promise<string[]> => {
     const messages: string[] = [];
     // 引数を応答の型そのままで受ける。構造型（`{ status: string; message?: string }`）で
     // 受けると `Unanswered.message` をリネームしても型エラーにならず、静かに0件を集める
-    const collect = (label: string, output: SearchDatasetsOutput | AggregateDatasetOutput): void => {
+    const collect = (
+      label: string,
+      output: SearchDatasetsOutput | AggregateDatasetOutput | GetProvenanceOutput,
+    ): void => {
       const before = messages.length;
       if (output.status === "unanswered") messages.push(output.message);
       if ("gaps" in output) for (const gap of output.gaps ?? []) messages.push(gap.message);
@@ -701,7 +738,10 @@ describe("利用者向け文面の語彙", () => {
     };
 
     // 検索側の分岐: 対象エリア外 / ジャンル指定の飲食 / マナー / 渋谷の観光 /
-    // エリアのみのフォールバック / 訊かれたエリアの取り落ち / 分類の空振り / 興味の取り落ち
+    // エリアのみのフォールバック / 訊かれたエリアの取り落ち / 分類の空振り（代表エリア・
+    // エリア無しの両枝） / 最後のフォールバック / 興味の取り落ち / unanswered に添える
+    // 目的地の取り落ち。**文面を生む分岐を1つでも欠くと、その分岐は完全一致テストの
+    // 同時書き換えで不変条件ごとすり抜ける**（PR #109 レビューで2分岐の欠けを検出）
     for (const input of [
       { query: "新宿のマナー" },
       { query: "上野のラーメン" },
@@ -711,7 +751,11 @@ describe("利用者向け文面の語彙", () => {
       { query: "上野・渋谷の美術館" },
       { query: "美術館を回りたい", areas: ["上野", "新宿"] },
       { query: "上野", category: "ナイトライフ" },
+      { query: "演劇", category: "劇場" },
+      { query: "演劇" },
       { interests: ["文化", "ラーメン"] },
+      { query: "上野の美術館", interests: ["演劇"] },
+      { query: "ラーメン", areas: ["上野", "渋谷"] },
     ]) {
       collect(JSON.stringify(input), await searchDatasets(input, capturingGapRecorder()));
     }
@@ -727,13 +771,38 @@ describe("利用者向け文面の語彙", () => {
       collect(JSON.stringify(input), await aggregateDataset(input, capturingGapRecorder()));
     }
 
+    // 出典側の分岐: 未知の ID（名乗りを持ったことは無いが、両不変条件の傘に入れる。
+    // PR #109 レビューで、収集経路に一度も乗っていないことを検出）
+    collect(
+      "getProvenance unknown id",
+      await getProvenance({ datasetIds: ["t000000d0000000000"], query: "上野の寺社" }, capturingGapRecorder()),
+    );
+
     // 到達不能な分岐はヘルパから直接
     messages.push(rowMissingUnanswered("名所・史跡一覧", "上野").message);
 
     // 呼び出しが answered へ倒れて検査対象が消えていないことを確かめる（黙って緑にしない）
-    expect(messages.length).toBeGreaterThanOrEqual(14);
-    for (const message of messages) {
+    expect(messages.length).toBeGreaterThanOrEqual(18);
+    return messages;
+  };
+
+  it("スタブが返しうる未回答・欠損の文面すべてに実装用語が無い", async () => {
+    for (const message of await collectUserFacingMessages()) {
       for (const term of DEV_TERMS) expect(message, `文面: ${message}`).not.toContain(term);
+    }
+  });
+
+  it("文面を「該当するオープンデータが〜」の名乗りで始めない（Issue #107）", async () => {
+    // 画面（PlanScreen / ForYouScreen）は未回答の見出しとして「該当するオープンデータがありません」
+    // を描画するため、message 側が名乗りを持つと同じ一文が見出しと本文で重複する。名乗りは
+    // status / reason（画面では見出し）が担い、message は確かめた事実だけを書く（API.md §4）。
+    // 断定（〜ません）と照合の結果（〜ませんでした）の使い分け（Issue #59）は文中の述語に残る
+    for (const message of await collectUserFacingMessages()) {
+      // 先頭に空白・改行を挟むと ^ アンカーをすり抜けるため、整形の乱れごと禁止する
+      expect(message, `文面: ${message}`).toBe(message.trim());
+      // 文頭だけでなく文中への挿し込みも禁止する。見出しとの重複（Issue #107 の症状）は
+      // 名乗りがどこに書かれても起きる
+      expect(message, `文面: ${message}`).not.toContain("該当するオープンデータ");
     }
   });
 });

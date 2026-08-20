@@ -13,6 +13,12 @@ import type { CatalogEntry } from "./catalog";
  * 3操作の**判定の順序**（どの分岐がどの欠損を返すか）は operations.ts が持つ。
  * 順序に意味がある（`searchDatasets` の doc 参照）ため、ここの関数は順序を仮定しない
  * 純粋な判定・生成に限る。message の文言は API.md §4 と対応する契約（ACE-62-3）。
+ *
+ * **message に「該当するオープンデータが〜」の名乗りを付けない**（Issue #107）。画面
+ * （PlanScreen / ForYouScreen）が同じ一文を未回答の見出しとして描画するため、message 側が
+ * 名乗ると見出しと本文で重複する。名乗りは `status` / `reason`（画面では見出し）が担い、
+ * message は確かめた事実だけを書く。断定（〜ません）と照合の結果（〜ませんでした）の
+ * 使い分け（Issue #59）は文中の述語で行う。
  */
 /**
  * 「ジャンル指定の飲食」を表す語。
@@ -140,19 +146,19 @@ export const normalizedList = (values: readonly string[] | undefined): string[] 
 export const cuisineGenreUnanswered = (genre: string): Unanswered =>
   unanswered(
     "insufficient_granularity",
-    `該当するオープンデータがありません。飲食店の店舗データは「東京都内の飲食店のバリアフリー情報」（210件・バリアフリー対応店に限定）のみで、ジャンルの列を持たないため「${genre}」の粒度では答えられません。`,
+    `飲食店の店舗データは「東京都内の飲食店のバリアフリー情報」（210件・バリアフリー対応店に限定）のみで、ジャンルの列を持たないため「${genre}」の粒度では答えられません。`,
   );
 
 export const outOfAreaUnanswered = (label: string): Unanswered =>
   unanswered(
     "out_of_area",
-    `該当するオープンデータがありません。「${label}」はこのアプリの対象エリア（${REPRESENTATIVE_AREAS.join("・")}）の外です。`,
+    `「${label}」はこのアプリの対象エリア（${REPRESENTATIVE_AREAS.join("・")}）の外です。`,
   );
 
 export const shibuyaSightseeingUnanswered = (): Unanswered =>
   unanswered(
     "data_not_published",
-    "該当するオープンデータがありません。渋谷区のカタログ掲載データは17件で、観光ポイント・名所・文化施設に相当するデータは公開されていません（2026-08-16 調査）。",
+    "渋谷区のカタログ掲載データは17件で、観光ポイント・名所・文化施設に相当するデータは公開されていません（2026-08-16 調査）。",
   );
 
 /**
@@ -188,7 +194,7 @@ export const ETIQUETTE_TERMS = ["マナー", "作法", "エチケット", "お�
 export const etiquetteUnanswered = (): Unanswered =>
   unanswered(
     "data_not_published",
-    "該当するオープンデータがありません。訪日観光客向けのマナー・作法の解説に相当するデータは、東京都オープンデータカタログに存在しないことを確認済みです（2026-08-17 調査）。この未回答は記録され、東京都へのデータ公開リクエストの題材になります。",
+    "訪日観光客向けのマナー・作法の解説に相当するデータは、東京都オープンデータカタログに存在しないことを確認済みです（2026-08-17 調査）。この未回答は記録され、東京都へのデータ公開リクエストの題材になります。",
   );
 
 /**
@@ -212,16 +218,15 @@ export const etiquetteUnanswered = (): Unanswered =>
 export const areaOnlyFallbackUnanswered = (area: RepresentativeArea): Unanswered =>
   unanswered(
     "other",
-    `該当するオープンデータがありません。質問文の語に当たるデータセットが無かったため、「${area}」を収録するデータセットを、エリアの事実として提示しています。`,
+    `質問文の語に当たるデータセットが無かったため、「${area}」を収録するデータセットを、エリアの事実として提示しています。`,
   );
 
 /**
  * 訊かれたエリアのうち、返した候補が収録していないもの（Issue #52）。
  *
- * `unanswered` の頭に付く「該当するオープンデータがありません」を**使わない**。渋谷には
- * データがある（都市公園・都立公園一覧123件）のに返していないだけなので、無いと書くと嘘になる。
- * 実際に行ったこと（`answering` のエリアで絞り込んだ結果、このエリアのデータセットが
- * 候補に入っていない）だけを書く。
+ * 「無い」と**書かない**。渋谷にはデータがある（都市公園・都立公園一覧123件）のに
+ * 返していないだけなので、無いと書くと嘘になる。実際に行ったこと（`answering` のエリアで
+ * 絞り込んだ結果、このエリアのデータセットが候補に入っていない）だけを書く。
  *
  * `reason` は `other`。`data_not_published` は「カタログ側に無いことを確かめてある」場合に
  * しか使えず、`out_of_area` は対象エリア外の分類なので、対象エリアである渋谷には当たらない。
@@ -548,7 +553,7 @@ type MatchedArea = Exclude<ResolvedArea, { kind: "out_of_area" }>;
  * 渋谷区の都市公園・都立公園一覧は10件の中に実在する）。`areaOnlyFallbackUnanswered` と
  * 同じ判断で、**実際に照合した集合と結果だけを書く**。
  *
- * 書き出しも「ありません」（存在の断定）ではなく「見つかりませんでした」（照合の結果）。
+ * 述語も「ありません」（存在の断定）ではなく「ありませんでした」（照合の結果）。
  * 断定してよいのは無いことを確かめた分岐（ジャンル粒度・エリア外・渋谷の観光データ）だけで、
  * ここはキーワード表に当たらなかっただけだから（API.md §4）。
  *
@@ -560,8 +565,8 @@ export const categoryMissUnanswered = (area: MatchedArea, category: string): Una
   unanswered(
     "other",
     area.kind === "representative"
-      ? `該当するオープンデータが見つかりませんでした。「${area.area}」で絞り込んだ候補には「${category}」の語に当たるデータセットがありませんでした。`
-      : `該当するオープンデータが見つかりませんでした。利用中の10データセットのキーワードには「${category}」の語に当たるものがありませんでした。`,
+      ? `「${area.area}」で絞り込んだ候補には「${category}」の語に当たるデータセットがありませんでした。`
+      : `利用中の10データセットのキーワードには「${category}」の語に当たるものがありませんでした。`,
   );
 
 /** 質問文に現れたキーワードの数。多く当たったデータセットほど候補として上に出す。 */
