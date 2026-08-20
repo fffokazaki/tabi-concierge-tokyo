@@ -32,11 +32,11 @@ GitHub Discussions が「人間が読むためのナラティブ（物語的記�
 > | スクリプト | 状態 |
 > | --- | --- |
 > | `sync-playbook-frontmatter` | **導入済み**。`npm run ace:check-playbook-frontmatter`（検証）/ `ace:sync-playbook-frontmatter`（`--write`）。CI の `verify` ジョブでも実行する |
-> | `check-entry-format` | **導入済み**（Issue #102）。`npm run ace:check-entry-format`（検証）。CI の `verify` ジョブでも実行する。旧テーブル形式の新規追記を exit 1 で止め、既存の旧形式エントリは同階層の `legacy-format-allowlist.txt` で読み取り互換として通す |
+> | `check-entry-format` | **導入済み**（Issue #102）。`npm run ace:check-entry-format`（検証）。CI の `verify` ジョブでも実行する。旧テーブル形式**マーカー**の新規追記を exit 1 で止め、既存の旧形式エントリは同階層の `legacy-format-allowlist.txt` で読み取り互換として通す。コンパクト正準の構造そのもの（anchor・メタ4行等）は検証せず、allowlist 済み ID を再利用した旧形式追記も素通りする（実測 2026-08-20。[feel-flow/ff-dev-toolkit#21](https://github.com/feel-flow/ff-dev-toolkit/issues/21)） |
 > | `check-category-size` | **導入済み（ライブラリとしてのみ）**。上記2つが集計ロジックを import する。単体の CLI としては使っておらず、`npm run ace:*` も生やしていない |
 > | `ace-reuse-report` / `ace-refine-report` / `check-archive-links` | **未導入**。必要になった時点で ff-dev-toolkit の `docs-template/scripts/ace/` から導入する |
 >
-> 導入済みのゲートが見るのは `ace_entry_count` の実数一致・`version` ↔ `## Changelog` 最新版の一致・`changeImpact` の値域の3点。**次の2つは検出できない**（上流 ff-dev-toolkit 側の fail-open。[feel-flow/ff-dev-toolkit#19](https://github.com/feel-flow/ff-dev-toolkit/issues/19)）— (1) `## Changelog` セクションごと消すと version の検証はスキップされて通る (2) `version` / `ace_entry_count` を `metadata:` 配下にネストしてもトップレベルとして受理される。どちらも `/ace-curate` が起こすドリフトではないため、導入を待たずに使っている。
+> frontmatter ゲート（`sync-playbook-frontmatter`）が見るのは `ace_entry_count` の実数一致・`version` ↔ `## Changelog` 最新版の一致・`changeImpact` の値域の3点。**次の2つは検出できない**（上流 ff-dev-toolkit 側の fail-open。[feel-flow/ff-dev-toolkit#19](https://github.com/feel-flow/ff-dev-toolkit/issues/19)）— (1) `## Changelog` セクションごと消すと version の検証はスキップされて通る (2) `version` / `ace_entry_count` を `metadata:` 配下にネストしてもトップレベルとして受理される。どちらも `/ace-curate` が起こすドリフトではないため、導入を待たずに使っている。
 >
 > 未導入のスクリプトに関して以降に登場する「機械ゲートが強制する / exit 1 でブロックする」という記述は、**導入後に有効になる規約**として読むこと。
 

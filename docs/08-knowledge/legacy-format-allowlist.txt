@@ -1,6 +1,8 @@
 # 旧テーブル形式のまま読み取り互換として残す既存エントリ（Issue #102）。
 # 新規追記はコンパクト正準フォーマットを使うこと（PLAYBOOK.md §エントリテンプレート）。
 # /ace-refine で正準化したエントリは、この一覧から当該 ID を削除する。
+
+# playbook/architecture.md
 ACE-28-1
 ACE-51-1
 ACE-51-3
@@ -21,6 +23,8 @@ ACE-86-1
 ACE-86-2
 ACE-93-1
 ACE-93-2
+
+# playbook/data-processing.md
 ACE-25-1
 ACE-25-2
 ACE-28-3
@@ -28,6 +32,8 @@ ACE-28-4
 ACE-64-1
 ACE-69-2
 ACE-69-4
+
+# playbook/documentation-quality.md
 ACE-51-2
 ACE-64-3
 ACE-66-2
@@ -36,6 +42,8 @@ ACE-49-4
 ACE-79-1
 ACE-82-3
 ACE-86-4
+
+# playbook/process.md
 ACE-34-2
 ACE-51-5
 ACE-57-4
@@ -48,12 +56,16 @@ ACE-49-2
 ACE-86-5
 ACE-93-3
 ACE-93-4
+
+# playbook/testing.md
 ACE-28-2
 ACE-51-4
 ACE-62-3
 ACE-49-5
 ACE-82-4
 ACE-86-3
+
+# playbook/tooling.md
 ACE-28-5
 ACE-34-1
 ACE-97-1
