@@ -1,6 +1,6 @@
 ---
 title: "ace-cycle"
-version: "1.3.0"
+version: "1.4.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -27,25 +27,29 @@ changeImpact: "medium"
 >
 > 次は**本リポジトリに未導入**のため、記載どおりには実行できない:
 >
-> - `scripts/ace/*.ts` のうち `check-entry-format` / `ace-refine-report` / `ace-reuse-report` / `check-archive-links` — 未導入。必要になった時点で ff-dev-toolkit の `docs-template/scripts/ace/` から導入する
+> - `scripts/ace/*.ts` のうち `ace-refine-report` / `ace-reuse-report` / `check-archive-links` — 未導入。必要になった時点で ff-dev-toolkit の `docs-template/scripts/ace/` から導入する
 > - `knowledge-management.md` / `git-workflow.md` / `ace-autonomous.md` — 未導入（必要時に ff-dev-toolkit の `docs-template/05-operations/deployment/` から同一相対パスでコピー）
 > - 本文中の例示（Prisma の `findMany`・N+1 対策など）は上流テンプレートのサンプルであり、本プロジェクトの実態ではない（本プロジェクトは DB を使わない → [DATABASE.md](../../02-design/DATABASE.md)）
 >
-> 次は**導入済み**（2026-08-20・[PR #97](https://github.com/fffokazaki/tabi-concierge-tokyo/pull/97)）:
+> 次は**導入済み**（2026-08-20）:
 >
-> - `sync-playbook-frontmatter` — `npm run ace:check-playbook-frontmatter`（検証・CI の `verify` でも実行）/ `npm run ace:sync-playbook-frontmatter`（`--write`）。**Phase 3 の frontmatter 更新後・コミット前に検証すること**
+> - `sync-playbook-frontmatter`（[PR #97](https://github.com/fffokazaki/tabi-concierge-tokyo/pull/97)）— `npm run ace:check-playbook-frontmatter`（検証・CI の `verify` でも実行）/ `npm run ace:sync-playbook-frontmatter`（`--write`）。**Phase 3 の frontmatter 更新後・コミット前に検証すること**
+> - `check-entry-format`（Issue #102）— `npm run ace:check-entry-format`（検証・CI の `verify` でも実行）。旧テーブル形式マーカー（メタ表ヘッダ・区切り行・Insight/Context/Action ブロック）の**新規追記**と ID 形状違反を exit 1 で、未閉フェンスを exit 2 で止める形式ゲート。既存の旧形式エントリは `docs/08-knowledge/legacy-format-allowlist.txt` で読み取り互換として通す（`/ace-refine` で正準化したら当該 ID を allowlist から削除する）。**Phase 3 のエントリ追記後・コミット前に検証すること**
+> - 形式ゲートが検証**しない**もの（実測 2026-08-20・[feel-flow/ff-dev-toolkit#21](https://github.com/feel-flow/ff-dev-toolkit/issues/21)）: (1) コンパクト正準の構造そのもの（anchor・メタ4行・終端 `---` を欠く新規エントリは、旧形式マーカーが無ければ通る）(2) allowlist 済み ID を再利用した旧形式の新規追記（ID 単位の照合のため素通りする。守るのは allowlist 差分の PR レビュー）(3) `ACE-1.` のような認識されない不正見出し（エントリとして数えられず直前エントリへ吸収される）
 > - `check-category-size` — 上記が集計ロジックを import するためだけに置いている。**CLI としては使っていない**（`npm run ace:*` を生やしておらず、CI も呼ばない）。本文の以降に出てくる「`check-category-size` の件数ゲートがブロックする」という記述は、**この入口を足したあとで有効になる規約**として読むこと
-> - ゲートが見るのは `ace_entry_count` の実数一致・`version` ↔ `## Changelog` 最新版の一致・`changeImpact` の値域の3点。**`## Changelog` ごと消した場合と、`version` / `ace_entry_count` を `metadata:` 配下へネストした場合は検出できない**（上流の fail-open。[feel-flow/ff-dev-toolkit#19](https://github.com/feel-flow/ff-dev-toolkit/issues/19)）
+> - frontmatter ゲート（`sync-playbook-frontmatter`）が見るのは `ace_entry_count` の実数一致・`version` ↔ `## Changelog` 最新版の一致・`changeImpact` の値域の3点。**`## Changelog` ごと消した場合と、`version` / `ace_entry_count` を `metadata:` 配下へネストした場合は検出できない**（上流の fail-open。[feel-flow/ff-dev-toolkit#19](https://github.com/feel-flow/ff-dev-toolkit/issues/19)）
 >
-> **再同期の手引き（`scripts/ace/`）**: 3ファイルとも **ff-dev-toolkit 0.28.0** の `docs-template/scripts/ace/` 由来。
+> **再同期の手引き（`scripts/ace/`）**: 5ファイルとも **ff-dev-toolkit 0.28.0** の `docs-template/scripts/ace/` 由来。
 >
 > | ファイル | 上流との関係 |
 > | --- | --- |
 > | `sync-playbook-frontmatter.ts` | **挙動に関わる改変は1行**。`import ... from "./check-category-size"` の拡張子を `.js` → `.ts`（このリポジトリは tsx を使わず Node の型ストリップで実行するため）。加えてその理由を説明するコメント5行を import 文の直前に足しているので、上流との `diff` は7行になる。再同期のたびに再適用すること |
+> | `check-entry-format.ts` | **挙動に関わる改変は1行**。`import ... from "./check-category-size"` に拡張子 `.ts` を追加（上流は拡張子なし。理由は上と同じ）。説明コメント5行を import 文の直前に足しているので、上流との `diff` は7行になる（sync-playbook-frontmatter.ts と同じ数え方）。再同期のたびに再適用すること |
 > | `check-category-size.ts` | 上流とバイト一致。**ローカルで編集しない**（編集すると上流のテストが担保している範囲から外れ、こちらにはその検証手段が無い） |
 > | `sync-playbook-frontmatter.test.ts` | 上流とバイト一致。同上 |
+> | `check-entry-format.test.ts` | 上流とバイト一致。同上 |
 >
-> この表をファイル内コメントではなくここに置いているのは、**丸ごと上書きする再同期ではファイルごとコメントが消える**ため。
+> この表をファイル内コメントではなくここに置いているのは、**丸ごと上書きする再同期ではファイルごとコメントが消える**ため。なお vendored ファイル内のコメントが参照する Issue 番号（`#286` `#318` `#339` など）は上流 ff-dev-toolkit のもので、本リポジトリの Issue ではない。
 >
 > 本リポジトリで実際に使うのは `/ace-curate <PR番号>`（ff-dev-toolkit プラグインが提供）と、その追記先である [PLAYBOOK.md](../../08-knowledge/PLAYBOOK.md)。
 
@@ -310,6 +314,7 @@ Generate → Reflect → Curate は「増やす」一方向のサイクルであ
 - [ ] Frontmatter 更新（version=minor+1 on 新規 / updated / changeImpact=medium / ace_entry_count）
 - [ ] Changelog 更新（当該版の `#### 追加` / `#### カウンター更新`。version と最新見出し一致）
 - [ ] `npm run ace:check-playbook-frontmatter` が exit 0（count + version↔Changelog + changeImpact）
+- [ ] `npm run ace:check-entry-format` が exit 0（旧テーブル形式の新規追記が無いこと。正準構造そのものは検証しない — 冒頭 callout 参照）
 - [ ] コミット（件名 `knowledge: ACE-XXX <要約>`、カテゴリは body の `Categories:` 行）
 
 ### 並行作業（任意）
@@ -427,6 +432,12 @@ ACE_REUSE_STALE_DAYS=120 npm run ace:reuse-report
 ---
 
 ## Changelog
+
+### [1.4.0] - 2026-08-20
+
+#### 変更
+
+- `check-entry-format`（形式ゲート）を導入済みへ更新（Issue #102）。`npm run ace:check-entry-format` と CI の `verify` で実行し、旧テーブル形式の新規追記を exit 1 で止める。既存 57 件は `docs/08-knowledge/legacy-format-allowlist.txt` に登録して読み取り互換とした。再同期の手引きへ `check-entry-format.ts`（import 拡張子1行の改変あり）と `check-entry-format.test.ts`（バイト一致）の2行を追加し、Phase 3 チェックリストにも形式ゲートの実行を足した
 
 ### [1.3.0] - 2026-08-20
 

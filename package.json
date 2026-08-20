@@ -21,6 +21,7 @@
     "prepare": "wrangler types",
     "test:scripts": "vitest run --project scripts",
     "ace:check-playbook-frontmatter": "node scripts/ace/sync-playbook-frontmatter.ts docs/08-knowledge/PLAYBOOK.md --check",
+    "ace:check-entry-format": "node scripts/ace/check-entry-format.ts docs/08-knowledge/PLAYBOOK.md",
     "ace:sync-playbook-frontmatter": "node scripts/ace/sync-playbook-frontmatter.ts docs/08-knowledge/PLAYBOOK.md --write",
     "data:fetch": "node scripts/fetch-data.ts",
     "db:migrate:local": "wrangler d1 migrations apply tabi-concierge-tokyo --local",

@@ -39,6 +39,11 @@ jobs:
       - name: ACE Playbook の frontmatter 検証
         run: npm run ace:check-playbook-frontmatter
 
+      # ACE エントリの形式ゲート（Issue #102）。旧テーブル形式の新規追記を発生源で止める。
+      # 既存の旧形式エントリは docs/08-knowledge/legacy-format-allowlist.txt で読み取り互換として通す。
+      - name: ACE エントリの形式検証
+        run: npm run ace:check-entry-format
+
       # src/ は jsdom、worker/ は workerd。1コマンドで両方走る。
       - name: テスト
         run: npm test
