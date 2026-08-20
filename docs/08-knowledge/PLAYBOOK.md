@@ -1,6 +1,6 @@
 ---
 title: "PLAYBOOK"
-version: "1.30.0"
+version: "1.30.1"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-20"
@@ -32,8 +32,9 @@ GitHub Discussions が「人間が読むためのナラティブ（物語的記�
 > | スクリプト | 状態 |
 > | --- | --- |
 > | `sync-playbook-frontmatter` | **導入済み**。`npm run ace:check-playbook-frontmatter`（検証）/ `ace:sync-playbook-frontmatter`（`--write`）。CI の `verify` ジョブでも実行する |
-> | `check-category-size` | **導入済み（ライブラリとしてのみ）**。上記が集計ロジックを import する。単体の CLI としては使っておらず、`npm run ace:*` も生やしていない |
-> | `check-entry-format` / `ace-reuse-report` / `ace-refine-report` / `check-archive-links` | **未導入**。必要になった時点で ff-dev-toolkit の `docs-template/scripts/ace/` から導入する |
+> | `check-entry-format` | **導入済み**（Issue #102）。`npm run ace:check-entry-format`（検証）。CI の `verify` ジョブでも実行する。旧テーブル形式の新規追記を exit 1 で止め、既存の旧形式エントリは同階層の `legacy-format-allowlist.txt` で読み取り互換として通す |
+> | `check-category-size` | **導入済み（ライブラリとしてのみ）**。上記2つが集計ロジックを import する。単体の CLI としては使っておらず、`npm run ace:*` も生やしていない |
+> | `ace-reuse-report` / `ace-refine-report` / `check-archive-links` | **未導入**。必要になった時点で ff-dev-toolkit の `docs-template/scripts/ace/` から導入する |
 >
 > 導入済みのゲートが見るのは `ace_entry_count` の実数一致・`version` ↔ `## Changelog` 最新版の一致・`changeImpact` の値域の3点。**次の2つは検出できない**（上流 ff-dev-toolkit 側の fail-open。[feel-flow/ff-dev-toolkit#19](https://github.com/feel-flow/ff-dev-toolkit/issues/19)）— (1) `## Changelog` セクションごと消すと version の検証はスキップされて通る (2) `version` / `ace_entry_count` を `metadata:` 配下にネストしてもトップレベルとして受理される。どちらも `/ace-curate` が起こすドリフトではないため、導入を待たずに使っている。
 >
@@ -316,6 +317,12 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-98-3 | 握りつぶしの修正は、これまで画面に出なかったサーバー文面を新たに露出させる | process | [playbook/process.md#ace-98-3](./playbook/process.md#ace-98-3) |
 
 ## Changelog
+
+### [1.30.1] - 2026-08-20
+
+#### 変更
+
+- 形式ゲート `check-entry-format` の導入（Issue #102）に合わせ、冒頭 callout の導入状態テーブルを更新。既存の旧形式 57 件は `legacy-format-allowlist.txt` で読み取り互換として通し、新規追記のみコンパクト正準フォーマットを機械強制する
 
 ### [1.30.0] - 2026-08-20
 
