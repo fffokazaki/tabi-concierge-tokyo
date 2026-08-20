@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.31.0"
+version: "1.32.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-20"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 89
+ace_entry_count: 91
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -320,8 +320,22 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-108-1 | 「データが無い」と「実装が壊れている」を同じ器に入れない | architecture | [playbook/architecture.md#ace-108-1](./playbook/architecture.md#ace-108-1) |
 | ACE-108-2 | 内訳を運べる場所で黙って落とす経路は、フィールドを必須にすれば型で塞げる | architecture | [playbook/architecture.md#ace-108-2](./playbook/architecture.md#ace-108-2) |
 | ACE-108-3 | 自分の PR が自分の docstring を偽にする — 対のファイルは両方読み直す | documentation-quality | [playbook/documentation-quality.md#ace-108-3](./playbook/documentation-quality.md#ace-108-3) |
+| ACE-109-1 | 分類の名乗り文は message に埋め込まない — 名乗りは構造化フィールドと表示面の見出しが担う | architecture | [playbook/architecture.md#ace-109-1](./playbook/architecture.md#ace-109-1) |
+| ACE-109-2 | 文面収集型の不変条件テストは、入力→分岐のマッピングまで検証して初めて防御になる | testing | [playbook/testing.md#ace-109-2](./playbook/testing.md#ace-109-2) |
 
 ## Changelog
+
+### [1.32.0] - 2026-08-20
+
+#### 追加
+
+- ACE-109-1: 分類の名乗り文は message に埋め込まない — 名乗りは構造化フィールドと表示面の見出しが担う（Issue #107 / PR #109）
+- ACE-109-2: 文面収集型の不変条件テストは、入力→分岐のマッピングまで検証して初めて防御になる（Issue #107 / PR #109）
+
+#### カウンター更新
+
+- ACE-62-1: Helpful +1（名乗り除去で断定／照合の区別を述語へ移す判断の下敷き。定型句が運ぶ主張の分析をこの原則で行った）
+- ACE-106-2: Helpful +1（名乗り禁止の回帰テストを #99 の語彙ゲートと同じ独立不変条件として設計し、コレクタを共有した）
 
 ### [1.31.0] - 2026-08-20
 
