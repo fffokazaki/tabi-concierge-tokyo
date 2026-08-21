@@ -1,10 +1,10 @@
 ---
 title: "DEPLOYMENT"
-version: "1.4.15"
+version: "1.4.16"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-20"
+updated: "2026-08-21"
 changeImpact: "low"
 ---
 
@@ -205,6 +205,7 @@ npm run deploy  # vite build → wrangler deploy
 
 | 日時 | Version ID | 内容 | 確認 |
 | --- | --- | --- | --- |
+| 2026-08-21 | `5aebf720-384e-41e5-a119-30ce85a0c3b8` | プラン画面の `search_datasets` 送信を構造化入力（`interests` + `query` は自由文のみ）へ切り替え（#53 / PR #113）。`src/features/plan/buildPlan.ts` の挙動変更に加え、`worker/core/operations.ts`・`worker/core/search-gaps.ts` はコメントのみの変更だが、`worker/` `src/` の変更のためデプロイ（§3「いつデプロイするか」）。`migrations/` `data/` `scripts/` は未変更のため、マイグレーション・シードは実行していない | チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。`index.html` のバンドル（`assets/index-mRCnRsbT.js`）はローカルビルドとハッシュ一致。Issue #53 の実測ケースを本番で確認 — `{"query":"上野で夜遊びしたい","interests":["ナイトライフ"]}` が `answered`（銭湯）を返しつつ `gaps` に「『ナイトライフ』について訊かれましたが…当たるものがありませんでした」を載せる（切り替え前は gaps 0件で沈黙していた入力）。同じ候補で aggregate（燕湯）→ provenance（銭湯・CC BY 4.0）の一連も `answered`。**本番 D1 への書き込みが発生している** — 上記の実測で `gaps` に `ナイトライフ、上野で夜遊びしたい / 上野 / other` の行（13:40:29）が記録されたことを確認（ADR-010 の想定どおりの通常挙動。構造化入力の興味は `question` 列へ「、」で畳み込まれて残る仕様） |
 | 2026-08-20 | `45f1755e-16ee-4682-8291-90b1c29accfe` | 未回答 `message` から名乗りの一文（「該当するオープンデータが（あり／見つかり）ません。」）を除去し、画面見出しとの重複を解消（#107 / PR #109）。`worker/core/search-gaps.ts`・`worker/core/operations.ts`・`shared/core.ts` の変更のためデプロイ（§3「いつデプロイするか」）。`migrations/` `data/` `scripts/` は未変更のため、マイグレーション・シードは実行していない | チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。`index.html` のバンドル（`assets/index-y-EHawRN.js`）はローカルビルドとハッシュ一致（`src/` は無変更だが、squash 後の develop からビルドして一致を確認）。コア3操作の代表経路を実測 — `上野の寺社をめぐりたい` が `answered`（名所・史跡）、`新宿の美術館に行きたい` が HTTP 200 の `unanswered(out_of_area)` で**新文面（名乗りなし・「「新宿」はこのアプリの対象エリア（上野・浅草・渋谷）の外です。」）**が返ること。**本番 D1 への書き込みが発生している** — 上記の実測で `gaps` に `新宿の美術館に行きたい / 新宿 / out_of_area` の行が記録されたことを確認（ADR-010 の想定どおりの通常挙動） |
 | 2026-08-20 | `b52c99fb-ad26-4f74-96df-7c2a30ade11b` | プラン画面で `aggregate_dataset` の `unanswered` を握りつぶさず `gaps` へ合流させる修正（#95 / PR #98。#89 のプラン版）。**`src/` のみの変更**だが、フロントエンドはデプロイしないと画面に出ないためデプロイ（§3「いつデプロイするか」）。`worker/` `shared/` `migrations/` `data/` `scripts/` は未変更のため、マイグレーション・シードは実行していない | チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。`index.html` のバンドル（`assets/index-Cb0O0LlG.js`）はローカルビルドとハッシュ一致。コア3操作も実測（`上野の寺社をめぐりたい` の search → aggregate（寛永寺）→ provenance（CC BY 4.0 の出典1件）が一連で `answered`）。**修正が効く条件（集計側の `unanswered`）が本番で発生することも確認した** — クエリ `統計` で `samples: []` の `t000012d0000000081`（R6国・地域別外国人旅行者行動特性調査）が候補に入り、それを集計すると `insufficient_granularity` の `unanswered` が返る。修正前のプラン画面はこの応答で停留地が黙って消えていた（PR #93 のデプロイ時に確認した「到達条件」と同一で、今回はプラン側=自然文 `query` 経由でも候補に入ることを確認）。**本番 D1 への書き込みが発生している** — 上記の実測で `gaps` に `統計` の `insufficient_granularity` が記録される（ADR-010 の想定どおりの通常挙動） |
 | 2026-08-20 | `9d4ee8c8-728c-4cad-a06a-c7538ae724ff` | あなたへ画面で `aggregate_dataset` の `unanswered` を握りつぶさず `gaps` へ合流させる修正（#89 / PR #93）。**`src/` のみの変更**だが、フロントエンドはデプロイしないと画面に出ないためデプロイ（§3「いつデプロイするか」）。`worker/` `shared/` `migrations/` `data/` `scripts/` は未変更のため、マイグレーション・シードは実行していない | チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。`index.html` のバンドル（`assets/index-D7Z439oZ.js`）はローカルビルドとハッシュ一致。コア3操作も実測（`上野の寺社をめぐりたい` が `answered`、対象エリア外が HTTP 200 の `unanswered(out_of_area)`）。**本修正は現行のチップ構成では画面の見え方を変えない。それを実測で確かめた** — あなたへ画面の現行呼び出し（`interests` 4件・`limit: 6`）が返す候補6件すべてを `aggregate_dataset` に通し、6件とも `answered`（集計側の欠損が1件も出ない）ことを確認。Issue #89 の「現行の `FORYOU_INTEREST_TAGS` では到達しない」が本番でも成立している。**到達したときに修正が効く条件も本番で確認した** — 興味「統計」を送ると `samples: []` の`t000012d0000000081`（R6国・地域別外国人旅行者行動特性調査）が候補に入り、それを集計すると `insufficient_granularity` の `unanswered` が返る。修正前はこの応答でカードが黙って消えていた。**本番 D1 への書き込みが発生している** — 上記の実測で `gaps` に4行（`統計` の `insufficient_granularity` / `other`、`ラーメン、文化、家族向け、自然` の `insufficient_granularity` ×2、`新宿の美術館に行きたい` の `out_of_area`）が記録されたことを確認（ADR-010 の想定どおりの通常挙動） |
@@ -409,6 +410,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.4.16] - 2026-08-21
+
+#### 変更
+
+- §3「デプロイ記録」に 2026-08-21 の反映（Version ID `5aebf720-384e-41e5-a119-30ce85a0c3b8`）を追記。Issue #53 / PR #113（プラン画面の構造化送信への切り替え）の `worker/` `src/` 変更を §3「いつデプロイするか」の契機に従って反映した。確認はチェックリスト全項目に加え、Issue #53 の実測ケース（切り替え前は欠損が沈黙していた入力）が本番で `gaps` を返し、D1 に記録されることまで実測した
 
 ### [1.4.15] - 2026-08-20
 
