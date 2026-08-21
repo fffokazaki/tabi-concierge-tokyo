@@ -277,6 +277,30 @@ npx wrangler d1 execute tabi-concierge-tokyo --remote \
 
 **3 が最重要。** `gaps` テーブルが無くても未回答の応答は 200 で正常に返り、記録の失敗は `console.error` に出るだけなので、**画面を見ても API を叩いても気づけない**（[Issue #27](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/27) でテストを2通り書いて捕まえた失敗モードそのもの）。
 
+#### AI Gateway / Workers AI の確認（[ADR-013](../06-reference/DECISIONS.md)）
+
+**ここは自動テストが**意図的に**見ていない領域である。** `vitest.worker.config.ts` の `remoteBindings: false` は、CI を外部 API・認証情報・無料枠から切り離すために置いてある（外すと認証情報を持たない CI が全滅する）。その代償として、**バインディングが本番に渡っているか・ゲートウェイを実際に経由しているかを検証するのはこの手順だけ**になる。デプロイのたびに飛ばさずに実行する。
+
+```bash
+# 5. バインディングが本番の Worker に渡っている
+#    （deploy の出力に AI と AI_GATEWAY_ID が並ぶことを目視する。
+#     wrangler.jsonc を直しても deploy しなければ本番には反映されない）
+npm run deploy 2>&1 | grep -A10 'Your Worker has access to'
+```
+
+推論を実際に叩く確認（LLM 経路が入る [#119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119) / [#120](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/120) 以降に有効）:
+
+| 確認すること | 見る場所 |
+| --- | --- |
+| 推論が成功している | コア操作の応答が LLM 経路の結果になっている（縮退していない） |
+| **ゲートウェイを経由している** | ダッシュボード AI → AI Gateway → `default` にログが積まれる。**積まれない＝素の `env.AI.run()` を書いてしまっている**（ADR-013 決定1 違反） |
+| キャッシュが効いている | 同一入力を2回投げて2回目が Cache HIT になる |
+| 無料枠の残り | 同ダッシュボードのニューロン消費。10,000/日が上限 |
+
+> **縮退は静かに起きる。** LLM 障害時はキーワード実装へ落ちて 200 を返す設計なので（#119・#120）、**応答が返ることは推論が動いている証拠にならない**。`console.error`（`npx wrangler tail`）とゲートウェイのログの両方で確かめる。これは上の「3 が最重要」と同じ失敗モードである。
+
+`ai` バインディングと `vars.AI_GATEWAY_ID` の導入時（[Issue #116](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/116)）に、ローカル実 API で `env.AI.run()` の成功・ゲートウェイ経由・`default` の自動作成を実測済み。
+
 2026-08-17 の反映後、4項目すべてが期待どおりであることを確認済み。`gaps` には `out_of_area`（area=新宿・category=美術館）と `insufficient_granularity`（area=上野）が**解決後のエリアつきで**記録された。
 
 ### 静的アセットの挙動（注意）
@@ -435,6 +459,7 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 
 - §3 に「AI Gateway / Workers AI」小節を追加（[Issue #116](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/116)・ADR-013）。ゲートウェイ ID `default` が自動作成される予約名であること、名前付きへ切り替える手順、未作成の名前を指定すると推論が `AiGatewayError: 2001` で落ちること、ローカル開発でも実 API を叩くこと、テストは `remoteBindings: false` で外へ出さないことを記載
 - §3 のデプロイ契機の表に「`wrangler.jsonc` のバインディング・`vars` を変更したとき」の行を追加。バインディングは `npm run deploy` でしか本番へ渡らない
+- §3 のデプロイ後の確認に「AI Gateway / Workers AI の確認」を追加（PR #123 の Codex レビュー指摘）。`remoteBindings: false` で CI が触らない領域を、デプロイ後手順で塞ぐ。ゲートウェイ経由でないと素の `env.AI.run()` を書いた事故に気づけない点、縮退が静かに起きる点を明記
 
 ### [1.4.16] - 2026-08-21
 
