@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.33.0"
+version: "1.35.0"
 status: "approved"
 created: "2026-08-15"
-updated: "2026-08-21"
+updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 93
+ace_entry_count: 99
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -324,8 +324,39 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-109-2 | 文面収集型の不変条件テストは、入力→分岐のマッピングまで検証して初めて防御になる | testing | [playbook/testing.md#ace-109-2](./playbook/testing.md#ace-109-2) |
 | ACE-113-1 | 「境界が弾いてくれる」という根拠は、その呼び出しが実際に作る入力の組で発火するかを分岐単位で確かめる | documentation-quality | [playbook/documentation-quality.md#ace-113-1](./playbook/documentation-quality.md#ace-113-1) |
 | ACE-113-2 | 前提を廃止した後の横断 grep は、実装語だけでなく概念の言い換えへ広げ、テストファイルを除外しない | documentation-quality | [playbook/documentation-quality.md#ace-113-2](./playbook/documentation-quality.md#ace-113-2) |
+| ACE-137-1 | 検査した文字列と実行する文字列が別物なら、その差がそのまま迂回路になる | architecture | [playbook/architecture.md#ace-137-1](./playbook/architecture.md#ace-137-1) |
+| ACE-137-2 | 構文上の存在チェックは条件式で無効化できる — 不変条件は実行結果の側で確かめる | architecture | [playbook/architecture.md#ace-137-2](./playbook/architecture.md#ace-137-2) |
+| ACE-137-3 | リファクタで到達不能になったガードは、変異を入れても全件緑のまま残る | architecture | [playbook/architecture.md#ace-137-3](./playbook/architecture.md#ace-137-3) |
+| ACE-137-4 | 依存ライブラリの「これは◯◯を受け付けない」は、API 名や用途から推し量らず叩いて確かめる | documentation-quality | [playbook/documentation-quality.md#ace-137-4](./playbook/documentation-quality.md#ace-137-4) |
+| ACE-138-1 | 新機能のテストは、その機能を無効化しても通る入力を選んでいないか変異で確かめる | testing | [playbook/testing.md#ace-138-1](./playbook/testing.md#ace-138-1) |
+| ACE-138-2 | API の応答が正しくても画面が壊れていることがある — 画面を出す変更は画面で確かめる | process | [playbook/process.md#ace-138-2](./playbook/process.md#ace-138-2) |
 
 ## Changelog
+
+### [1.35.0] - 2026-08-22
+
+#### 追加
+
+- ACE-138-1: 新機能のテストは、その機能を無効化しても通る入力を選んでいないか変異で確かめる（Issue #120 / PR #138）
+- ACE-138-2: API の応答が正しくても画面が壊れていることがある — 画面を出す変更は画面で確かめる（Issue #119・#120 / PR #138）
+
+#### カウンター更新
+
+- ACE-86-3: Helpful +1（新機能テストの判別力を変異で測り、機能を無効化しても12件緑のまま通ることを検出した）
+
+### [1.34.0] - 2026-08-22
+
+#### 追加
+
+- ACE-137-1: 検査した文字列と実行する文字列が別物なら、その差がそのまま迂回路になる（Issue #119 / PR #137）
+- ACE-137-2: 構文上の存在チェックは条件式で無効化できる — 不変条件は実行結果の側で確かめる（Issue #119 / PR #137）
+- ACE-137-3: リファクタで到達不能になったガードは、変異を入れても全件緑のまま残る（Issue #119 / PR #137）
+- ACE-137-4: 依存ライブラリの「これは◯◯を受け付けない」は、API 名や用途から推し量らず叩いて確かめる（Issue #118 / PR #137）
+
+#### カウンター更新
+
+- ACE-113-1: Helpful +1（「偽の防波堤」の型として3回参照し、そのつど実測で撤去した。#137 では `WHERE` 句の存在チェックを採らない判断の根拠になった）
+- ACE-86-3: Helpful +1（sql-guard の5機構すべてを変異で検証し、禁止識別子の検査が一度も発火していないこと・縮退先のガードが到達不能になっていることを検出した）
 
 ### [1.33.0] - 2026-08-21
 
