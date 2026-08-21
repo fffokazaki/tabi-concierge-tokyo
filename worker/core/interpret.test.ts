@@ -129,6 +129,66 @@ describe("分解の結果を既存の判定へ渡す", () => {
   });
 });
 
+describe("対象エリア外の地名", () => {
+  it("**目的地として訊かれた対象外エリアを欠損として拾う**", async () => {
+    // `areas` の契約はもともと「代表エリア以外の要素は目的地と明示されたエリア外として扱い、
+    // `out_of_area` の欠損として応答に添える」。対象外かどうかの判定は `resolveArea` が持ち、
+    // LLM の仕事ではない。ここで捨てると「新宿を訊かれた」がどこにも残らず、
+    // DOMAIN.md §7 のデータ公開リクエストへ還元できない
+    const llm = scriptedLlm('{"areas":["上野","新宿"],"interests":["観光"],"rankedDatasetIds":[]}');
+    const recorder = capturingGapRecorder();
+
+    const output = await searchDatasets({ query: "上野と新宿を回りたい" }, recorder, depsWith(llm));
+
+    const answered = expectAnswered(output);
+    expect(answered.gaps?.map((gap) => `${gap.reason}:${gap.area}`)).toContain("out_of_area:新宿");
+    expect(recorder.records.map((record) => `${record.reason}:${record.area}`)).toContain("out_of_area:新宿");
+  });
+
+  it("対象外を落とすと欠損も消える（プロンプトが落とさせてはいけない理由）", async () => {
+    // 上のテストと対で、**何を守っているか**を示す。プロンプトを「対象エリアだけ返せ」に
+    // 戻すとこちらの形になり、訊かれた事実が消える
+    const llm = scriptedLlm('{"areas":["上野"],"interests":["観光"],"rankedDatasetIds":[]}');
+    const recorder = capturingGapRecorder();
+
+    await searchDatasets({ query: "上野と新宿を回りたい" }, recorder, depsWith(llm));
+
+    expect(recorder.records.map((record) => record.area)).not.toContain("新宿");
+  });
+});
+
+describe("出発地の扱い（モデルの追従に依存する既知のリスク）", () => {
+  it("出発地を areas に入れられると、答えられたはずの問いが unanswered になる", async () => {
+    // **これは守れていないことを固定するテストである。** プロンプトで「出発地は入れない」と
+    // 指示し、具体例も添えてあるが、従うかはモデル次第。従わなかったときに何が起きるかを
+    // 見えるようにしておく。
+    //
+    // `resolveArea` は `areas[0]` を主エリアに採るので、出発地が先頭に来ると
+    // そのエリアの判定（渋谷なら観光データ未公開）が働き、**候補がゼロになる**。
+    // 実モデルで一度この形を踏み、プロンプトに例を足して解消した（Issue #120）
+    const query = "渋谷から上野の美術館へ行きたい";
+    const misread = scriptedLlm('{"areas":["渋谷","上野"],"interests":["美術館"],"rankedDatasetIds":[]}');
+    const correct = scriptedLlm('{"areas":["上野"],"interests":["美術館"],"rankedDatasetIds":[]}');
+
+    const withMisread = await search({ query }, depsWith(misread));
+    const withCorrect = await search({ query }, depsWith(correct));
+
+    expect(withMisread.status, "出発地を入れられると候補が消える").toBe("unanswered");
+    expect(expectAnswered(withCorrect).candidates.length).toBeGreaterThan(0);
+  });
+
+  it("目的地が2つある場合は両方を欠損の判定に使う", async () => {
+    // 「AからBへ」ではなく「AとBを回る」なら、両方が目的地。
+    // 対象外が混ざっていても落とさない（上の out_of_area のテストと対）
+    const llm = scriptedLlm('{"areas":["浅草","渋谷"],"interests":["買い物"],"rankedDatasetIds":[]}');
+
+    const output = await search({ query: "浅草から渋谷へ移動して買い物したい" }, depsWith(llm));
+
+    expect(output.status === "answered" || output.status === "unanswered").toBe(true);
+    expect((output.gaps ?? []).length, "2つ目の目的地が欠損として残っていない").toBeGreaterThan(0);
+  });
+});
+
 describe("記録", () => {
   it("gaps の question は利用者の言葉のままにする（LLM の読みを混ぜない）", async () => {
     // 混ぜると `gaps.question` が「訊かれたこと」ではなくなり、後から利用者の言葉と
@@ -158,6 +218,27 @@ describe("縮退", () => {
     }
   };
 
+  it("**縮退時の応答は、分解を持たない実装と完全に一致する**", async () => {
+    // 「Step 5 以前と同じ応答」という縮退の約束を、候補・順序・欠損まで含めて固定する。
+    // `answered` であることとログだけを見ていると、候補や欠損が変わっても通ってしまう
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const query = "上野の美術館とラーメンを楽しみたい";
+      const baseline = await search({ query }, stubDeps());
+
+      for (const broken of [
+        scriptedLlm(new Error("推論サービスが落ちている")),
+        scriptedLlm("申し訳ありませんが、お答えできません。"),
+        scriptedLlm('{"areas":["上野"],"interests":["寺'),
+        scriptedLlm("{}"),
+      ]) {
+        expect(await search({ query }, depsWith(broken))).toEqual(baseline);
+      }
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("LLM の障害では縮退し、握りつぶさず記録する", async () => {
     await expectDegraded(scriptedLlm(new Error("推論サービスが落ちている")));
   });
@@ -168,6 +249,29 @@ describe("縮退", () => {
 
   it("JSON が途中で切れていても縮退する", async () => {
     await expectDegraded(scriptedLlm('{"areas":["上野"],"interests":["寺'));
+  });
+
+  it.each([
+    ["空のオブジェクト", "{}"],
+    ["areas が配列でない", '{"areas":"上野","interests":[],"rankedDatasetIds":[]}'],
+    ["interests が欠けている", '{"areas":[],"rankedDatasetIds":[]}'],
+    ["rankedDatasetIds が null", '{"areas":[],"interests":[],"rankedDatasetIds":null}'],
+  ])("形式違反（%s）も縮退として扱う", async (_label, text) => {
+    // ここを「読めたぶんだけ使う」に緩めると、分解が何も起きていないのに縮退のログも
+    // 残らない。**LLM 経路が壊れていても「キーワード実装と同じ応答が返るだけ」に見える**
+    await expectDegraded(scriptedLlm(text));
+  });
+
+  it("すべて空配列は正常（形式違反と区別する）", async () => {
+    // 「読み取れる地名も興味も無かった」は正しい結果であって、失敗ではない
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const llm = scriptedLlm('{"areas":[],"interests":[],"rankedDatasetIds":[]}');
+      expectAnswered(await search({ query: "上野の寺社をめぐりたい" }, depsWith(llm)));
+      expect(spy, "空配列を失敗として扱っている").not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("ハルシネーションした ID を見えるようにする", async () => {

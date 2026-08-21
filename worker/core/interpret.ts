@@ -24,6 +24,17 @@ import type { CoreDeps } from "./llm";
  * `matchReason`（なぜその候補なのか）は**カタログの実測文字列**を使う。LLM に書かせると、
  * 応答としてユーザーに出る文が実測の裏を持たなくなる（絶対ルール #1・#2）。
  * ここが返すのは「どのデータセットか」までで、「なぜか」はカタログが持つ。
+ *
+ * ## 対象エリア外の地名も落とさない
+ *
+ * `areas` には**目的地として訊かれた地名をすべて**入れさせる。対象外（新宿など）を
+ * ここで捨てると、`outOfAreaAskedGaps` に届かず「新宿を訊かれた」という事実が
+ * どこにも残らない。`SearchDatasetsInput.areas` の契約はもともと「代表エリア以外の要素は
+ * 目的地と明示されたエリア外として扱い、`out_of_area` の欠損として応答に添える」であり、
+ * 対象外かどうかの判定は `resolveArea` が持つ（LLM の仕事ではない）。
+ *
+ * 「どのエリアのデータが足りないか」は DOMAIN.md §7 のデータ公開リクエストへ還元する
+ * 一次情報なので、拾えるものを捨てない。
  */
 
 /** 分解の結果。すべて「LLM がそう読んだ」であって、事実の主張ではない。 */
@@ -81,12 +92,15 @@ const buildPrompt = (query: string): string =>
     buildCatalogSection(),
     "",
     "## 対象エリア",
-    "上野・浅草・渋谷の3つだけ。これ以外の地名が質問に出てきても areas には入れないこと。",
+    "このアプリがデータを持つのは上野・浅草・渋谷の3つだけ。ただし**それ以外の地名も areas に入れること**（対象外であることの判定はこちらで行う）。",
     "",
     "## 出力する JSON",
-    '{"areas": ["訊かれた対象エリア"], "interests": ["訊かれた興味を短い日本語のラベルで"], "rankedDatasetIds": ["関連しそうな順のデータセットID"]}',
+    '{"areas": ["目的地として訊かれた地名"], "interests": ["訊かれた興味を短い日本語のラベルで"], "rankedDatasetIds": ["関連しそうな順のデータセットID"]}',
     "",
-    "- areas は上野・浅草・渋谷のうち、目的地として訊かれたものだけ。出発地は入れない",
+    "- areas は**目的地として**訊かれた地名すべて。上野・浅草・渋谷以外も落とさない",
+    "- **出発地・経由地は areas に入れない。** 「AからBへ行きたい」の A は出発地なので入れず、B だけを入れる",
+    '  例: 「渋谷から上野の美術館へ行きたい」→ areas は ["上野"]（渋谷は出発地なので入れない）',
+    '  例: 「上野と新宿を回りたい」→ areas は ["上野", "新宿"]（どちらも目的地。新宿が対象外かの判定はこちらで行う）',
     "- interests は「寺社」「美術館」「トイレ」のような短いラベル。質問文をそのまま入れない",
     "- rankedDatasetIds は上の一覧にある ID だけ。無いものを作らない",
     "",
@@ -106,9 +120,15 @@ function extractJsonObject(text: string): unknown {
   }
 }
 
-/** 文字列の配列として読めるものだけを、境界の規約（長さ・件数）に収めて返す。 */
-function readStrings(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
+/**
+ * 文字列の配列として読めるものだけを、境界の規約（長さ・件数）に収めて返す。
+ *
+ * **配列でなければ `undefined`**（＝スキーマ違反）。空配列との区別が要る — 空配列は
+ * 「そういう読み取り結果だった」で正常だが、`"上野"` や `null` が来たのは
+ * **LLM が形式を守っていない**という別の事実である（`interpretQuery` の doc を参照）。
+ */
+function readStrings(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
   const seen = new Set<string>();
   for (const item of value) {
     if (typeof item !== "string") continue;
@@ -141,6 +161,20 @@ export async function interpretQuery(query: string, deps: CoreDeps): Promise<Int
   }
   const record = parsed as Record<string, unknown>;
 
+  // **3つのキーが揃って配列であることを求める。** ここを緩めて「読めたぶんだけ使う」に
+  // すると、`{}` や `{"areas":"上野"}` のような形式違反が**成功として通り**、分解が
+  // 何も起きていないのに縮退のログも残らない。LLM 経路が壊れていても
+  // 「キーワード実装と同じ応答が返るだけ」に見えるため、本番で気づけなくなる
+  const areas = readStrings(record["areas"]);
+  const interests = readStrings(record["interests"]);
+  const rankedRaw = readStrings(record["rankedDatasetIds"]);
+  if (areas === undefined || interests === undefined || rankedRaw === undefined) {
+    return {
+      ok: false,
+      cause: `areas / interests / rankedDatasetIds がすべて配列である必要があります: ${completion.text.slice(0, 200)}`,
+    };
+  }
+
   // 実在しない ID を落とす。**ただしこれは安全装置ではない。**
   //
   // 候補は `CATALOG` から作られるので、LLM が作った ID は**そもそも候補になれない**
@@ -152,18 +186,14 @@ export async function interpretQuery(query: string, deps: CoreDeps): Promise<Int
   // 問題なので、**見えるようにしておく**。`ranked` を実在するものだけに保つのは、
   // 将来この配列を選定に使うようになったときへの備えでもある
   const ranked: string[] = [];
-  for (const id of readStrings(record["rankedDatasetIds"])) {
+  for (const id of rankedRaw) {
     if (findEntry(id)) ranked.push(id);
     else console.warn("[interpret] 実在しないデータセットIDを除外しました", { id, query });
   }
 
   return {
     ok: true,
-    interpretation: {
-      areas: readStrings(record["areas"]),
-      interests: readStrings(record["interests"]),
-      rankedDatasetIds: ranked,
-    },
+    interpretation: { areas, interests, rankedDatasetIds: ranked },
   };
 }
 
