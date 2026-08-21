@@ -2,6 +2,7 @@ import { createMcpHandler } from "agents/mcp/server";
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { d1GapRecorder, type GapRecorder } from "./core/gaps";
+import { coreDeps, type CoreDeps } from "./core/llm";
 import { aggregateDataset, getProvenance, searchDatasets } from "./core/operations";
 import {
   parseAggregateDatasetInput,
@@ -135,14 +136,15 @@ const toolFor =
   <T, R>(
     tool: string,
     parse: (body: unknown) => ParseResult<T>,
-    run: (input: T, recorder: GapRecorder) => R | Promise<R>,
+    run: (input: T, recorder: GapRecorder, deps: CoreDeps) => R | Promise<R>,
     recorder: GapRecorder,
+    deps: CoreDeps,
   ) =>
   async (args: unknown): Promise<ToolResult> => {
     const parsed = parse(args);
     if (!parsed.ok) return invalid(parsed.message);
     try {
-      return ok(await run(parsed.value, recorder));
+      return ok(await run(parsed.value, recorder, deps));
     } catch (cause) {
       return internalError(tool, cause);
     }
@@ -159,6 +161,10 @@ const toolFor =
 export function createTabiMcpServer(env: Env): McpServer {
   const server = new McpServer({ name: "tabi-concierge-tokyo", version: "0.1.0" });
   const recorder = d1GapRecorder(env.DB);
+  // `/api/*` と同じ組み立て（`coreDeps`）を使う。ここで別物を組むと、面ごとに
+  // LLM の向き先やゲートウェイが食い違っても気づけない（ADR-008 の「ロジックを二重に書かない」
+  // は判断だけでなく、外部資源への到達手段にも効く）
+  const deps = coreDeps(env);
 
   server.registerTool(
     "search_datasets",
@@ -169,7 +175,7 @@ export function createTabiMcpServer(env: Env): McpServer {
         "答えられない場合は unanswered を理由分類つきで返す（エラーではない）。",
       inputSchema: SEARCH_DATASETS_SCHEMA,
     },
-    toolFor("search_datasets", parseSearchDatasetsInput, searchDatasets, recorder),
+    toolFor("search_datasets", parseSearchDatasetsInput, searchDatasets, recorder, deps),
   );
 
   server.registerTool(
@@ -181,7 +187,7 @@ export function createTabiMcpServer(env: Env): McpServer {
         "実行したクエリを query として必ず添える（出典の再現に要る）。",
       inputSchema: AGGREGATE_DATASET_SCHEMA,
     },
-    toolFor("aggregate_dataset", parseAggregateDatasetInput, aggregateDataset, recorder),
+    toolFor("aggregate_dataset", parseAggregateDatasetInput, aggregateDataset, recorder, deps),
   );
 
   server.registerTool(
@@ -193,7 +199,7 @@ export function createTabiMcpServer(env: Env): McpServer {
         "出典を伴わない回答は仕様違反なので、回答を出す経路は必ずこれを通す。",
       inputSchema: GET_PROVENANCE_SCHEMA,
     },
-    toolFor("get_provenance", parseGetProvenanceInput, getProvenance, recorder),
+    toolFor("get_provenance", parseGetProvenanceInput, getProvenance, recorder, deps),
   );
 
   return server;

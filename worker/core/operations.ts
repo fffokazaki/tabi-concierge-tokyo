@@ -14,6 +14,7 @@ import type {
 import { REPRESENTATIVE_AREAS } from "../../shared/core";
 import { CATALOG, findEntry, RESTAURANT_DATASET_ID, type CatalogEntry, type CatalogSample } from "./catalog";
 import type { GapRecord, GapRecorder } from "./gaps";
+import type { CoreDeps } from "./llm";
 import {
   areaOnlyFallbackUnanswered,
   askedAreas,
@@ -217,7 +218,16 @@ async function recorded<T extends CoreOutput>(output: T, context: GapContext, re
 export async function searchDatasets(
   input: SearchDatasetsInput,
   recorder: GapRecorder,
+  deps: CoreDeps,
 ): Promise<SearchDatasetsOutput> {
+  // `deps` はまだ使っていない（[Issue #118](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/118)
+  // は挙動不変の配線のみ）。LLM による分解・選定を接続するのは
+  // [Issue #120](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/120)。
+  //
+  // 使う前に**必須**引数として置いてあるのは、`GapRecorder` と同じ理由 — optional にすると
+  // `/mcp` を足したときに渡し忘れても型が通り、その経路だけ黙って縮退する。
+  // 先に必須にしておけば、経路を増やす側がコンパイルエラーで気づく
+  void deps;
   // 構造化入力は判定と記録の両方で使うので、1か所で正規化してから両方へ渡す
   const normalized: SearchDatasetsInput = {
     ...input,
@@ -413,7 +423,12 @@ const describeQuery = (entry: CatalogEntry, sample: CatalogSample, selection: st
 export async function aggregateDataset(
   input: AggregateDatasetInput,
   recorder: GapRecorder,
+  deps: CoreDeps,
 ): Promise<AggregateDatasetOutput> {
+  // `deps` はまだ使っていない。D1 実照会（Text-to-SQL）への差し替えは
+  // [Issue #119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119)。
+  // 必須引数にしてある理由は `searchDatasets` の doc を参照
+  void deps;
   return recorded(computeAggregateDataset(input), aggregateGapContext(input), recorder);
 }
 
