@@ -15,6 +15,7 @@ import { REPRESENTATIVE_AREAS } from "../../shared/core";
 import { CATALOG, findEntry, RESTAURANT_DATASET_ID, type CatalogEntry, type CatalogSample } from "./catalog";
 import type { GapRecord, GapRecorder } from "./gaps";
 import type { CoreDeps } from "./llm";
+import { interpretQuery, withInterpretation } from "./interpret";
 import { aggregateViaTextToSql } from "./text-to-sql";
 import {
   areaOnlyFallbackUnanswered,
@@ -75,6 +76,16 @@ export const DEFAULT_SEARCH_LIMIT = 4;
 /** 候補件数の上限。利用データセットが10件しかないため、それ以上は意味を持たない */
 export const MAX_SEARCH_LIMIT = 10;
 
+
+/**
+ * LLM が付けた順位。載っていないものは最後尾（＝順位で差が付かない）扱いにする。
+ *
+ * 「載っていない ＝ 関連が無い」ではないので、**除外はしない**。順位を下げるだけに留める。
+ */
+const rankOf = (datasetId: string, ranked: readonly string[]): number => {
+  const index = ranked.indexOf(datasetId);
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+};
 
 const toCandidate = (entry: CatalogEntry): DatasetCandidate => ({
   datasetId: entry.datasetId,
@@ -228,14 +239,55 @@ export async function searchDatasets(
   // 使う前に**必須**引数として置いてあるのは、`GapRecorder` と同じ理由 — optional にすると
   // `/mcp` を足したときに渡し忘れても型が通り、その経路だけ黙って縮退する。
   // 先に必須にしておけば、経路を増やす側がコンパイルエラーで気づく
-  void deps;
   // 構造化入力は判定と記録の両方で使うので、1か所で正規化してから両方へ渡す
   const normalized: SearchDatasetsInput = {
     ...input,
     areas: normalizedList(input.areas),
     interests: normalizedList(input.interests),
   };
-  return recorded(computeSearchDatasets(normalized), searchGapContext(normalized), recorder);
+
+  const { input: resolved, ranked } = await interpreted(normalized, deps);
+
+  // **記録の `question` は利用者が送った値から作る**（`normalized`。`resolved` ではない）。
+  // LLM が読み取った興味を混ぜると、`gaps.question` が「訊かれたこと」ではなくなり、
+  // 後から利用者の言葉と機械が足した語を区別できない（[Issue #114](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/114)
+  // と同じ性質の問題）。エリアだけは `resolved` の解決結果を使う — どのエリアのデータが
+  // 足りないかを集計するための列で、そこは読み取れているほうが有用（`gaps.ts` の doc 参照）
+  const context = { ...searchGapContext(normalized), area: searchGapContext(resolved).area };
+  return recorded(computeSearchDatasets(resolved, ranked), context, recorder);
+}
+
+/**
+ * 自然文しか無い呼び出しに限り、LLM で構造化入力へ分解する（[Issue #120](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/120)）。
+ *
+ * **構造化入力があれば LLM を呼ばない。** `areas` / `interests` は「呼び出し側がそう言った」
+ * という一次情報で、LLM の読みより強い（ADR-011）。呼ぶ必要が無いのに呼ぶと、
+ * 無料枠とレイテンシを使ったうえで結果を捨てることになる。
+ *
+ * 失敗したら**キーワード実装のまま進む**（分解しないだけで、応答は Step 5 以前と同じ）。
+ * 縮退したことは必ず記録する — 応答は返るので、記録しないと本番で分解が死んでいても
+ * 誰も気づけない。
+ */
+async function interpreted(
+  input: SearchDatasetsInput,
+  deps: CoreDeps,
+): Promise<{ input: SearchDatasetsInput; ranked: readonly string[] }> {
+  const query = input.query?.trim() ?? "";
+  const hasStructuredInput = (input.areas?.length ?? 0) > 0 || (input.interests?.length ?? 0) > 0;
+  if (query === "" || hasStructuredInput) return { input, ranked: [] };
+
+  const outcome = await interpretQuery(query, deps);
+  if (!outcome.ok) {
+    console.error("[search] 質問の分解に失敗したためキーワード実装のまま進みます", {
+      query,
+      cause: outcome.cause,
+    });
+    return { input, ranked: [] };
+  }
+  return {
+    input: withInterpretation(input, outcome.interpretation),
+    ranked: outcome.interpretation.rankedDatasetIds,
+  };
 }
 
 /**
@@ -259,7 +311,15 @@ function searchGapContext(input: SearchDatasetsInput): GapContext {
   };
 }
 
-function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput {
+/**
+ * `ranked` は LLM が付けた関連度順のデータセットID（[Issue #120](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/120)）。
+ * **空のときは従来とビット単位で同じ並びになる**（同点は登録順 `no` で解決される）ため、
+ * 構造化入力を送る呼び出しと縮退経路の挙動は変わらない。
+ */
+function computeSearchDatasets(
+  input: SearchDatasetsInput,
+  ranked: readonly string[] = [],
+): SearchDatasetsOutput {
   // 境界を通らない直接呼び出しでも壊れた値で応答を作らないよう、ここでも範囲に収める
   const limit = Math.min(Math.max(Math.trunc(input.limit ?? DEFAULT_SEARCH_LIMIT), 1), MAX_SEARCH_LIMIT);
   // 構造化入力の興味もマッチの対象に含める。含めないと、興味を畳み込んだ自然文で
@@ -302,7 +362,14 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   const matched = inArea
     .map((entry) => ({ entry, score: scoreEntry(entry, haystack) }))
     .filter((scored) => scored.score > 0)
-    .sort((a, b) => b.score - a.score || a.entry.no - b.entry.no)
+    // 同点の解決順: LLM の関連度 → 登録順。`ranked` が空なら第2項は常に 0 になり、
+    // 従来どおり登録順だけで決まる（CLAUDE.md が「関連度と無関係」と注記していた挙動）
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        rankOf(a.entry.datasetId, ranked) - rankOf(b.entry.datasetId, ranked) ||
+        a.entry.no - b.entry.no,
+    )
     .map((scored) => scored.entry);
 
   // ジャンル指定の飲食は、飲食店データで答えたことにしない（ジャンルの列が無いため）。

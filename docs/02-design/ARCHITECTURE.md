@@ -1,6 +1,6 @@
 ---
 title: "ARCHITECTURE"
-version: "1.4.0"
+version: "1.5.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -191,7 +191,7 @@ graph LR
 | Runtime（ツール） | Node.js | 24（`.nvmrc` / `engines`） | wrangler と Vite を起動するホスト。本番には存在しない | - |
 | Protocol | MCP（`agents@0.21` の `createMcpHandler` ＋ `@modelcontextprotocol/server@2.0`） | **実装済み**（`/mcp`・`worker/mcp.ts`） | `McpAgent` は deprecated。ステートレス実装のため Durable Objects が不要。プロトコル版は modern `2026-07-28` / legacy `2025-11-25` の2本立て（[MCP.md](./MCP.md) §4） | ADR-008 |
 | Database | Cloudflare D1 | **導入済み**（`tabi-concierge-tokyo`・APAC） | Text-to-SQL の実行基盤 ＋ 未回答ログの保持先。スキーマは `migrations/0001_init.sql`（datasets / spots / gaps） | ADR-007 |
-| AI | Cloudflare Workers AI（AI Gateway 経由） | **`aggregate_dataset` で使用中**（Text-to-SQL・Issue #119）。`search_datasets` の LLM 化は Issue #120 | モデルは `@cf/qwen/qwen3-30b-a3b-fp8`（日本語が公式サポート内・単価は当初案とほぼ同額。[LLM-MODEL-CANDIDATES.md](../06-reference/LLM-MODEL-CANDIDATES.md)）。推論は必ず AI Gateway を前段に挟む | ADR-002 / ADR-013 |
+| AI | Cloudflare Workers AI（AI Gateway 経由） | **コア3操作のうち2つで使用中** — `aggregate_dataset` は Text-to-SQL（#119）、`search_datasets` は自然文の分解（メタデータRAG・#120） | モデルは `@cf/qwen/qwen3-30b-a3b-fp8`（日本語が公式サポート内・単価は当初案とほぼ同額。[LLM-MODEL-CANDIDATES.md](../06-reference/LLM-MODEL-CANDIDATES.md)）。推論は必ず AI Gateway を前段に挟む | ADR-002 / ADR-013 |
 | Cloud | Cloudflare Workers | マネージド | 主催者提供スタック | ADR-002 |
 | CI/CD | 未定 | - | 提出期限までのスコープに含めない | - |
 
@@ -332,6 +332,12 @@ Phase 番号は [ROADMAP.md](../07-project-management/ROADMAP.md) に準拠す�
 | Phase 4（Final Stage 準備） | 〜2026-10-17 | 介助者モード・音声対応、都への API 公開提案、動的取り込みの検討 |
 
 ## Changelog
+
+### [1.5.0] - 2026-08-22
+
+#### 変更
+
+- §8 の技術スタック表の AI 行を更新（[Issue #120](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/120)）。メタデータRAG は Vectorize を使わずカタログ10件をプロンプトへ同梱する方式
 
 ### [1.4.0] - 2026-08-22
 
