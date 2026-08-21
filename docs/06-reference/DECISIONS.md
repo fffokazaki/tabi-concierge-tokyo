@@ -1,6 +1,6 @@
 ---
 title: "DECISIONS"
-version: "1.5.0"
+version: "1.5.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -83,6 +83,24 @@ changeImpact: "medium"
 ### 関連
 
 - [ARCHITECTURE.md](../02-design/ARCHITECTURE.md) §8
+- [ADR-013](#adr-013-workers-ai-の呼び出しは-ai-gateway-を前段に挟む)（推論は AI Gateway を前段に挟む。本 ADR の範囲内の追加決定）
+
+### 追記（2026-08-22・[Issue #118](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/118)）: 使用モデルを `@cf/qwen/qwen3-30b-a3b-fp8` に決定した
+
+本 ADR は「Cloudflare Workers AI で完結させる」ことだけを決めており、モデルは決めていなかった。実装着手にあたり以下を確定した。**本 ADR の決定そのものは変わらない**（採用スタックは Workers AI のまま）。
+
+| 項目 | 値 |
+| --- | --- |
+| モデル | **`@cf/qwen/qwen3-30b-a3b-fp8`** |
+| 検討時の当初案 | `@cf/meta/llama-3.1-8b-instruct-fp8-fast` |
+| 変更理由 | Llama 3.1 は**公式サポート8言語に日本語が入っていない**。訪日観光客の質問（日本語・多言語）を分解する用途に合わない。Qwen3 は MoE（総30B・アクティブ3B）のため**単価がほぼ同額のまま日本語力が上がる** |
+| 差し替え箇所 | `worker/core/llm.ts` の `LLM_MODEL` 1定数 |
+
+比較表と価格の裏取りは [LLM-MODEL-CANDIDATES.md](./LLM-MODEL-CANDIDATES.md)。
+
+**実装上の注意（実測・Issue #116）**: このモデルは reasoning（思考）モデルで、素で呼ぶと本文の前に思考トークンを大量に吐き、`max_tokens` を食い尽くして **JSON が途中で切れる**。止められるのは**プロンプト末尾の `/no_think` だけ**で、`enable_thinking: false` も `response_format` も効かない。`workersAiLlm`（`worker/core/llm.ts`）がこの癖を引き受けており、`worker/core/llm.test.ts` が固定している。
+
+**「バージョンを推測で記載しない」という上の指示は、モデル選定にもそのまま効く。** 上表の値はすべて公式ドキュメントと実 API の実測に基づく。
 
 ---
 
@@ -710,6 +728,13 @@ AIツール（Claude Code、GitHub Copilot 等）の知識カットオフによ�
 | ADR-013 | Workers AI の呼び出しは AI Gateway を前段に挟む | 2026-08-21 | 承認済み | チームshiwata |
 
 ## Changelog
+
+### [1.5.1] - 2026-08-22
+
+#### 追加
+
+- ADR-002 に追記: 使用モデルを `@cf/qwen/qwen3-30b-a3b-fp8` に決定（[Issue #118](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/118)）。当初案 `llama-3.1-8b-instruct-fp8-fast` からの変更理由（日本語が公式サポート外・単価はほぼ同額）と、reasoning モデルゆえ `/no_think` が要る実装上の注意を記載。ADR-002 の決定そのもの（Workers AI で完結）は変えていない
+- ADR-002 の「関連」に ADR-013 へのリンクを追加
 
 ### [1.5.0] - 2026-08-21
 

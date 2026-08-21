@@ -1,0 +1,172 @@
+/**
+ * LLM クライアントと D1 読み取りの縫い目（[ADR-002](../../docs/06-reference/DECISIONS.md)・ADR-013）。
+ *
+ * `worker/core/` は `/api/*` と `/mcp` の両方から呼ばれる（ADR-008）。外部資源への到達手段を
+ * ここで interface として切り、実装は殻（`worker/index.ts` / `worker/mcp.ts`）が注入する。
+ * `GapRecorder`（`gaps.ts`）と同じ形で、理由も同じ — **注入を optional にすると、片方の経路で
+ * 渡し忘れても型が通り、その経路だけ黙って縮退する**。縮退しても応答は返るので誰も気づけない。
+ *
+ * ## throw しない
+ *
+ * `complete` も `select` も失敗を `ok: false` で返し、例外を投げない。呼び出し側は
+ * 「失敗したときどうするか」を必ず書くことになり、握りつぶしが `try {} catch {}` の
+ * 省略として紛れ込む余地が無くなる（`d1GapRecorder` と同じ設計）。
+ */
+
+/** LLM に何をさせるための呼び出しか。ログとダッシュボードで用途別に追えるようにする。 */
+export type LlmPurpose = "search_interpret" | "sql_generate";
+
+export type LlmRequest = {
+  purpose: LlmPurpose;
+  system: string;
+  user: string;
+  /** 出力トークンの上限。**出力は入力の約6.4倍の単価**なので、ここを絞ることが予算の主戦場になる */
+  maxTokens: number;
+};
+
+export type LlmResult = { ok: true; text: string } | { ok: false; cause: unknown };
+
+/**
+ * 目的別のメソッドを生やさず、汎用の `complete` 1本にしてある。
+ *
+ * プロンプトの組み立てと出力のパース（一番壊れやすいところ）が `worker/core/` の純関数側に残り、
+ * テストのモックは決め打ちの文字列を返すだけで済む。注入の縫い目が1つで済むのも同じ理由。
+ */
+export interface LlmClient {
+  complete(request: LlmRequest): Promise<LlmResult>;
+}
+
+/**
+ * 使うモデル。差し替えはこの1箇所（[LLM-MODEL-CANDIDATES.md](../../docs/06-reference/LLM-MODEL-CANDIDATES.md)）。
+ *
+ * 当初案の `@cf/meta/llama-3.1-8b-instruct-fp8-fast` から変更した。日本語が公式サポート外で、
+ * 訪日観光客の質問を分解するという用途に合わなかったため（単価はほぼ同額）。
+ */
+export const LLM_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
+
+/**
+ * 思考を止める指示。**プロンプトの末尾に必ず付ける。**
+ *
+ * `qwen3-30b-a3b-fp8` は reasoning モデルで、素で呼ぶと本文の前に思考トークンを大量に吐く。
+ * 実測（2026-08-21・Issue #116）:
+ *
+ * | 条件 | finish_reason | ニューロン | 出力トークン | 本文 |
+ * | --- | --- | --- | --- | --- |
+ * | 素 | stop | 11.70 | 379 | 完全な JSON |
+ * | `/no_think` | stop | **1.79** | **53** | 完全な JSON |
+ * | `enable_thinking: false` | **length** | 15.76 | 512（上限） | **途中で切断** |
+ * | `response_format` | **length** | 15.76 | 512（上限） | **途中で切断** |
+ *
+ * 効くのはこれだけで、`enable_thinking` も `response_format` も Cloudflare のエンドポイントでは
+ * 思考を止めない。止めないと思考が `maxTokens` を食い尽くして **JSON が途中で切れる** —
+ * 閉じ括弧が存在しないので、パーサをいくら寛容にしても復元できない。**入力側で止めるしかない。**
+ *
+ * モデル固有の癖なので、プロンプトを組み立てる `worker/core/` 側ではなく、
+ * Workers AI のアダプタであるこのファイルが面倒をみる。
+ */
+const NO_THINK = "/no_think";
+
+/** `env.AI.run` の応答のうち、ここが読む部分。SDK の型に寄りかからず必要な形だけを書く。 */
+type ChatCompletion = {
+  choices?: {
+    finish_reason?: string;
+    message?: { content?: string | null };
+  }[];
+};
+
+/**
+ * Workers AI の実装。**必ず AI Gateway を経由する**（ADR-013 決定1）。
+ *
+ * `gatewayId` は `env.AI_GATEWAY_ID` から渡すこと（ハードコード禁止・ADR-013 決定2）。
+ * キャッシュキーはリクエストボディ全体なので、`system` / `user` にタイムスタンプ・乱数・
+ * リクエストIDなどの可変要素を入れないこと（入れた瞬間にキャッシュが全件ミスになる）。
+ */
+export function workersAiLlm(ai: Ai, gatewayId: string): LlmClient {
+  return {
+    async complete({ purpose, system, user, maxTokens }) {
+      try {
+        const response = (await ai.run(
+          LLM_MODEL,
+          {
+            messages: [
+              { role: "system", content: system },
+              { role: "user", content: `${user}\n\n${NO_THINK}` },
+            ],
+            max_tokens: maxTokens,
+          } as never,
+          { gateway: { id: gatewayId, cacheTtl: 3600 } },
+        )) as ChatCompletion;
+
+        const choice = response.choices?.[0];
+        const text = choice?.message?.content;
+
+        // 出力が上限に達した ＝ 途中で切れている。JSON なら閉じていないので、
+        // パースが偶然通っても中身は信用できない。**成功として扱わない**
+        if (choice?.finish_reason === "length") {
+          return { ok: false, cause: new Error(`出力が max_tokens (${maxTokens}) で切断されました`) };
+        }
+        // 思考モデルは本文を出さずに `content: null` を返す形を持つ（`reasoning_content` だけ埋まる）
+        if (typeof text !== "string" || text.trim() === "") {
+          return { ok: false, cause: new Error("応答に本文がありません（content が空）") };
+        }
+        return { ok: true, text: text.trim() };
+      } catch (cause) {
+        console.error("[llm] 推論の呼び出しに失敗しました", { purpose, model: LLM_MODEL, cause });
+        return { ok: false, cause };
+      }
+    },
+  };
+}
+
+/**
+ * D1 の**読み取り専用**の縫い目。
+ *
+ * 書き込み（`gaps` への記録）は `GapRecorder` が持つ。読み書きを1つの interface にまとめると、
+ * 生成 SQL を通す経路から書き込みに手が届いてしまう。役割で分けることが封じ込めの一部になる
+ * （Text-to-SQL の静的検証は `sql-guard.ts`・Issue #119）。
+ */
+export type SqlRows = Record<string, unknown>[];
+export type SqlResult = { ok: true; rows: SqlRows } | { ok: false; cause: unknown };
+
+export interface SqlExecutor {
+  /** SELECT を1文だけ実行する。**呼ぶ前に `sql-guard` を通すこと** */
+  select(sql: string): Promise<SqlResult>;
+}
+
+/**
+ * D1 の実装。`prepare().all()` だけを使う。
+ *
+ * `exec()` を使わないのは**複文を受け付けてしまう**ため。`prepare` は1文しか受けないので、
+ * 静的検証をすり抜けた複文があってもここで止まる（封じ込めの2層目・Issue #119）。
+ */
+export function d1SqlExecutor(db: D1Database): SqlExecutor {
+  return {
+    async select(sql) {
+      try {
+        const { results } = await db.prepare(sql).all<Record<string, unknown>>();
+        return { ok: true, rows: results };
+      } catch (cause) {
+        console.error("[sql] 読み取りに失敗しました", { sql, cause });
+        return { ok: false, cause };
+      }
+    },
+  };
+}
+
+/**
+ * コア操作が外部資源へ届くための一式。
+ *
+ * コア操作の**必須**引数として受け取る（optional 禁止）。`getProvenance` だけは LLM も D1 も
+ * 使わないため受け取らない — 使わないものを受け取らせると、「渡してあるから使っているはず」と
+ * 読み違える余地ができる。
+ */
+export type CoreDeps = {
+  llm: LlmClient;
+  sql: SqlExecutor;
+};
+
+/** 殻（`worker/index.ts` / `worker/mcp.ts`）が組み立てる一式。組み立てを1箇所にまとめる。 */
+export const coreDeps = (env: Env): CoreDeps => ({
+  llm: workersAiLlm(env.AI, env.AI_GATEWAY_ID),
+  sql: d1SqlExecutor(env.DB),
+});

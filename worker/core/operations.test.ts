@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AggregateDatasetOutput, GetProvenanceOutput, SearchDatasetsOutput } from "../../shared/core";
-import { capturingGapRecorder, expectAnswered } from "../test-support";
+import { capturingGapRecorder, expectAnswered, stubDeps } from "../test-support";
 import { RESTAURANT_DATASET_ID, STATISTICS_DATASET_ID } from "./catalog";
 import {
   aggregateDataset,
@@ -28,8 +28,8 @@ describe("searchDatasets（直接呼び出し）", () => {
   it("limit が範囲外でも、候補ゼロの answered を作らない", async () => {
     // 以前は limit: 0 が slice(0, 0) となり `{ status: "answered", candidates: [] }` を返せた。
     // 出典ゼロの「回答あり」は DOMAIN.md §8 不変条件1 の違反
-    const zero = await searchDatasets({ query: "上野の寺社", limit: 0 }, capturingGapRecorder());
-    const negative = await searchDatasets({ query: "上野の寺社", limit: -5 }, capturingGapRecorder());
+    const zero = await searchDatasets({ query: "上野の寺社", limit: 0 }, capturingGapRecorder(), stubDeps());
+    const negative = await searchDatasets({ query: "上野の寺社", limit: -5 }, capturingGapRecorder(), stubDeps());
 
     for (const output of [zero, negative]) {
       expect(output.status).toBe("answered");
@@ -39,7 +39,7 @@ describe("searchDatasets（直接呼び出し）", () => {
   });
 
   it("limit が上限を超えても上限までしか返さない", async () => {
-    const output = await searchDatasets({ query: "上野", limit: 999 }, capturingGapRecorder());
+    const output = await searchDatasets({ query: "上野", limit: 999 }, capturingGapRecorder(), stubDeps());
 
     expect(output.status).toBe("answered");
     if (output.status !== "answered") return;
@@ -75,7 +75,7 @@ describe("同点の解決はカタログ登録順（no 昇順）", () => {
   const TIED_QUERY = "文化、家族向け、自然";
 
   it("同点の候補は、関連度ではなく登録順に並ぶ", async () => {
-    const output = await searchDatasets({ query: TIED_QUERY, limit: MAX_SEARCH_LIMIT }, capturingGapRecorder());
+    const output = await searchDatasets({ query: TIED_QUERY, limit: MAX_SEARCH_LIMIT }, capturingGapRecorder(), stubDeps());
 
     expect(expectAnswered(output).candidates.map((candidate) => candidate.title)).toEqual([
       "名所・史跡",
@@ -91,7 +91,7 @@ describe("同点の解決はカタログ登録順（no 昇順）", () => {
     // 「自然」の唯一の一致先（no:10・渋谷区分として最後に足したデータセット）が落ちる。
     // 畳み込まれた自然文からは、どれがどの興味の一致先かを判定できない（分解は Step 5 の
     // LLM 側の仕事。Issue #53 と同じ理由でスタブに形態素解析を持ち込まない）
-    const output = await searchDatasets({ query: TIED_QUERY, limit: 4 }, capturingGapRecorder());
+    const output = await searchDatasets({ query: TIED_QUERY, limit: 4 }, capturingGapRecorder(), stubDeps());
 
     expect(expectAnswered(output).candidates.map((candidate) => candidate.title)).toEqual([
       "名所・史跡",
@@ -123,7 +123,7 @@ describe("同点の解決はカタログ登録順（no 昇順）", () => {
 describe("エリアだけで絞った一覧に添える欠損", () => {
   it("エリア名のほかに訊かれた内容があれば、答えられていないことを gaps に載せて記録する", async () => {
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "ナイトライフ、渋谷で夜遊びしたい" }, recorder);
+    const output = await searchDatasets({ query: "ナイトライフ、渋谷で夜遊びしたい" }, recorder, stubDeps());
 
     const body = expectAnswered(output);
     expect(body.gaps).toHaveLength(1);
@@ -139,7 +139,7 @@ describe("エリアだけで絞った一覧に添える欠損", () => {
     "上野・浅草でも同じように欠損を載せる（渋谷固有の判定に頼らない）: %s",
     async (query) => {
       const recorder = capturingGapRecorder();
-      const output = await searchDatasets({ query }, recorder);
+      const output = await searchDatasets({ query }, recorder, stubDeps());
 
       const body = expectAnswered(output);
       // 以前はここでトイレ情報までが gaps なしの「回答あり」として返っていた
@@ -151,7 +151,7 @@ describe("エリアだけで絞った一覧に添える欠損", () => {
 
   it("エリアだけを訊かれたときは欠損を足さない（ノイズにしない）", async () => {
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "上野" }, recorder);
+    const output = await searchDatasets({ query: "上野" }, recorder, stubDeps());
 
     const body = expectAnswered(output);
     // 「上野」だけの質問には、上野を収録するデータセットの一覧が答えそのもの。
@@ -164,7 +164,7 @@ describe("エリアだけで絞った一覧に添える欠損", () => {
     "区切り記号だけが余っていてもエリアだけの質問として扱う（%s）",
     async (query) => {
       const recorder = capturingGapRecorder();
-      const output = await searchDatasets({ query }, recorder);
+      const output = await searchDatasets({ query }, recorder, stubDeps());
 
       expect(expectAnswered(output).gaps).toBeUndefined();
       expect(recorder.records).toEqual([]);
@@ -174,7 +174,7 @@ describe("エリアだけで絞った一覧に添える欠損", () => {
   it("area の明示指定でも欠損を添える（/mcp・API コンソール経路）", async () => {
     // プラン画面は area を送らないが、`worker/core/` は境界を通らず直接呼ばれうる
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "ナイトライフ", area: "渋谷" }, recorder);
+    const output = await searchDatasets({ query: "ナイトライフ", area: "渋谷" }, recorder, stubDeps());
 
     expect(expectAnswered(output).gaps).toHaveLength(1);
     expect(recorder.records).toEqual([
@@ -183,7 +183,7 @@ describe("エリアだけで絞った一覧に添える欠損", () => {
   });
 
   it("渋谷の観光・文化施設は従来どおり data_not_published のまま（強い分類を薄めない）", async () => {
-    const output = await searchDatasets({ query: "渋谷の美術館", area: "渋谷" }, capturingGapRecorder());
+    const output = await searchDatasets({ query: "渋谷の美術館", area: "渋谷" }, capturingGapRecorder(), stubDeps());
 
     expect(output.status).toBe("unanswered");
     if (output.status !== "unanswered") return;
@@ -194,7 +194,7 @@ describe("エリアだけで絞った一覧に添える欠損", () => {
     // 渋谷の観光語リストに「ナイトライフ」を足せば unanswered にはできるが、
     // 未公開と言い切れる根拠（2026-08-16 の観光・文化施設の実測）が無いカテゴリなので
     // それは推測で埋めることになる（CLAUDE.md 絶対ルール #1）
-    const output = await searchDatasets({ query: "ナイトライフ、渋谷" }, capturingGapRecorder());
+    const output = await searchDatasets({ query: "ナイトライフ、渋谷" }, capturingGapRecorder(), stubDeps());
 
     const body = expectAnswered(output);
     expect(body.gaps?.[0].reason).not.toBe("data_not_published");
@@ -214,7 +214,7 @@ describe("エリアだけで絞った一覧に添える欠損", () => {
 describe("訊かれたエリアのうち、候補が覆っていないもの", () => {
   it("上野・渋谷では、渋谷に答えていないことを gaps に載せる", async () => {
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "上野・渋谷" }, recorder);
+    const output = await searchDatasets({ query: "上野・渋谷" }, recorder, stubDeps());
 
     const body = expectAnswered(output);
     expect(body.gaps).toHaveLength(1);
@@ -226,7 +226,7 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
     // 応答全体の area は解決結果の「上野」。答えなかったエリアを集計するには、
     // この欠損の行だけ area が「渋谷」になっている必要がある
     const recorder = capturingGapRecorder();
-    await searchDatasets({ query: "上野・渋谷" }, recorder);
+    await searchDatasets({ query: "上野・渋谷" }, recorder, stubDeps());
 
     expect(recorder.records).toEqual([
       { question: "上野・渋谷", area: "渋谷", category: undefined, reason: "other" },
@@ -237,7 +237,7 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
     // フォールバック経路だけに付けると、Issue #50 と同じ非対称（実際に旅程が組み上がる
     // ケースほど発火しない）を作り直すことになる
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "上野の美術館と渋谷の公園" }, recorder);
+    const output = await searchDatasets({ query: "上野の美術館と渋谷の公園" }, recorder, stubDeps());
 
     const body = expectAnswered(output);
     expect(body.gaps).toHaveLength(1);
@@ -250,7 +250,7 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
   it("候補が両方のエリアを収録していれば欠損を足さない（上野・浅草）", async () => {
     // 台東区の8件はいずれも上野・浅草の両方を収録しているので、答えていないエリアは無い
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "上野・浅草" }, recorder);
+    const output = await searchDatasets({ query: "上野・浅草" }, recorder, stubDeps());
 
     expect(expectAnswered(output).gaps).toBeUndefined();
     expect(recorder.records).toEqual([]);
@@ -258,7 +258,7 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
 
   it("出発地として書かれた対象エリア外の地名は欠損にしない（Issue #29 の判断を維持）", async () => {
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "新宿から上野へ行きたい" }, recorder);
+    const output = await searchDatasets({ query: "新宿から上野へ行きたい" }, recorder, stubDeps());
 
     expect(expectAnswered(output).gaps).toBeUndefined();
     expect(recorder.records).toEqual([]);
@@ -268,7 +268,7 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
     // 「訊かれたエリア」を代表エリアに限らず地名一般から集めると、この質問で新宿の行が増える。
     // 記録の件数だけでなく area の値まで見ないとその取り違えに気づけない
     const recorder = capturingGapRecorder();
-    await searchDatasets({ query: "新宿から渋谷へ行きたい" }, recorder);
+    await searchDatasets({ query: "新宿から渋谷へ行きたい" }, recorder, stubDeps());
 
     expect(recorder.records).toEqual([
       { question: "新宿から渋谷へ行きたい", area: "渋谷", category: undefined, reason: "other" },
@@ -279,7 +279,7 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
     // 「上野・渋谷の公園」は (1) 質問文の語に当たるデータセットが無い (2) 渋谷を覆えていない
     // の2つが同時に成り立つ。片方だけ消えても件数を見ていないと気づけない
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "上野・渋谷の公園" }, recorder);
+    const output = await searchDatasets({ query: "上野・渋谷の公園" }, recorder, stubDeps());
 
     const body = expectAnswered(output);
     expect(body.gaps).toHaveLength(2);
@@ -296,7 +296,7 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
   it("絞り込みに使うのは質問文の登場順ではなく定義順（上野→浅草→渋谷）", async () => {
     // 「上野・渋谷」では登場順と定義順が一致してしまい、登場順で実装しても通ってしまう
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "渋谷・上野" }, recorder);
+    const output = await searchDatasets({ query: "渋谷・上野" }, recorder, stubDeps());
 
     const body = expectAnswered(output);
     // 先に書かれているのは渋谷だが、絞り込みに使われるのは上野（台東区のデータセット）
@@ -314,7 +314,7 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
     // `areas`（構造化入力）で目的地を明示する（下の「構造化入力: areas」を参照）。
     // 質問文からの抽出は Step 5 の LLM 側の仕事
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "渋谷から上野の美術館へ行きたい" }, recorder);
+    const output = await searchDatasets({ query: "渋谷から上野の美術館へ行きたい" }, recorder, stubDeps());
 
     const body = expectAnswered(output);
     expect(body.gaps).toHaveLength(1);
@@ -325,7 +325,7 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
   it("エリアを持たない従来の部分欠損には area を足さない", async () => {
     // 常に埋めると「応答のエリアと違うから書いてある」という区別が失われる
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "上野の美術館とラーメン", area: "上野" }, recorder);
+    const output = await searchDatasets({ query: "上野の美術館とラーメン", area: "上野" }, recorder, stubDeps());
 
     const body = expectAnswered(output);
     expect(body.gaps?.[0].reason).toBe("insufficient_granularity");
@@ -336,7 +336,7 @@ describe("訊かれたエリアのうち、候補が覆っていないもの", (
     // 明示指定は質問文より優先する（API.md §3.1）。絞り込みの指定を尊重し、
     // 指定によって外れたエリアは「黙って落とした」ではなく呼び出し側の意図として扱う
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "上野の公園", area: "渋谷" }, recorder);
+    const output = await searchDatasets({ query: "上野の公園", area: "渋谷" }, recorder, stubDeps());
 
     expect(expectAnswered(output).gaps).toBeUndefined();
     expect(recorder.records).toEqual([]);
@@ -359,7 +359,7 @@ describe("マナー・作法の問い", () => {
 
   it("マナーだけを訊かれたら、調査済みの data_not_published を返して記録する", async () => {
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "日本のマナーを知りたい" }, recorder);
+    const output = await searchDatasets({ query: "日本のマナーを知りたい" }, recorder, stubDeps());
 
     expect(output.status).toBe("unanswered");
     if (output.status !== "unanswered") return;
@@ -373,7 +373,7 @@ describe("マナー・作法の問い", () => {
   it("エリア付きでもエリアの一覧へ落とさない（ジャンル判定と同じ優先順）", async () => {
     // 後ろに回すと「浅草のマナー」に浅草の一覧を返して欠損が消える
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "浅草のマナー" }, recorder);
+    const output = await searchDatasets({ query: "浅草のマナー" }, recorder, stubDeps());
 
     expect(output.status).toBe("unanswered");
     if (output.status !== "unanswered") return;
@@ -385,7 +385,7 @@ describe("マナー・作法の問い", () => {
 
   it("キーワードが当たる問いに混ざっていたら、answered に欠損として添えて記録する", async () => {
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "上野の美術館と作法" }, recorder);
+    const output = await searchDatasets({ query: "上野の美術館と作法" }, recorder, stubDeps());
 
     expect(output.status).toBe("answered");
     if (output.status !== "answered") return;
@@ -403,7 +403,7 @@ describe("マナー・作法の問い", () => {
 
   it("調査済みの語（エチケット・おもてなし）で発火する", async () => {
     for (const query of ["エチケットを教えて", "おもてなしの情報"]) {
-      const output = await searchDatasets({ query }, capturingGapRecorder());
+      const output = await searchDatasets({ query }, capturingGapRecorder(), stubDeps());
       expect(output.status).toBe("unanswered");
       if (output.status !== "unanswered") continue;
       expect(output.reason).toBe("data_not_published");
@@ -413,7 +413,7 @@ describe("マナー・作法の問い", () => {
   it("調査していない語（礼儀・ピクトグラム）では発火しない（未調査の断定は推測）", async () => {
     for (const query of ["礼儀を知りたい", "ピクトグラムを探したい"]) {
       const recorder = capturingGapRecorder();
-      const output = await searchDatasets({ query }, recorder);
+      const output = await searchDatasets({ query }, recorder, stubDeps());
 
       expect(output.status).toBe("unanswered");
       if (output.status !== "unanswered") continue;
@@ -427,7 +427,7 @@ describe("マナー・作法の問い", () => {
   it("複数の欠損が同時に成立したら、どちらも消えずに gaps と記録へ残る", async () => {
     // ADR-010 の頻度集計は記録の完全性に依存する。some/toContainEqual では片方の消失を検出できない
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "上野の美術館とラーメンと作法", area: "上野" }, recorder);
+    const output = await searchDatasets({ query: "上野の美術館とラーメンと作法", area: "上野" }, recorder, stubDeps());
 
     expect(output.status).toBe("answered");
     if (output.status !== "answered") return;
@@ -448,7 +448,7 @@ describe("マナー・作法の問い", () => {
 
   describe("判定の優先順（分岐の並べ替えで壊れたら気づけるよう固定する）", () => {
     it("対象エリア外が先勝ちする（新宿のマナー）", async () => {
-      const output = await searchDatasets({ query: "新宿のマナー" }, capturingGapRecorder());
+      const output = await searchDatasets({ query: "新宿のマナー" }, capturingGapRecorder(), stubDeps());
 
       expect(output.status).toBe("unanswered");
       if (output.status !== "unanswered") return;
@@ -462,7 +462,7 @@ describe("マナー・作法の問い", () => {
     it("ジャンル指定の飲食が先勝ちし、マナーの記録は残らない（既知の取りこぼし）", async () => {
       // unanswered は理由を1つしか運べない。ADR-010 の頻度集計にとって既知の穴として固定する
       const recorder = capturingGapRecorder();
-      const output = await searchDatasets({ query: "ラーメンのマナー" }, recorder);
+      const output = await searchDatasets({ query: "ラーメンのマナー" }, recorder, stubDeps());
 
       expect(output.status).toBe("unanswered");
       if (output.status !== "unanswered") return;
@@ -471,7 +471,7 @@ describe("マナー・作法の問い", () => {
     });
 
     it("マナーは渋谷の観光データ欠損より先勝ちする（渋谷の神社のマナー）", async () => {
-      const output = await searchDatasets({ query: "渋谷の神社のマナー" }, capturingGapRecorder());
+      const output = await searchDatasets({ query: "渋谷の神社のマナー" }, capturingGapRecorder(), stubDeps());
 
       expect(output.status).toBe("unanswered");
       if (output.status !== "unanswered") return;
@@ -482,7 +482,7 @@ describe("マナー・作法の問い", () => {
       // haystack は query と category を連結するので、分類欄のマナーも語彙判定に入る。
       // 「絞り込んだ候補に当たらなかった」より「カタログに無いことを調査済み」のほうが強い事実
       const recorder = capturingGapRecorder();
-      const output = await searchDatasets({ query: "上野", category: "マナー" }, recorder);
+      const output = await searchDatasets({ query: "上野", category: "マナー" }, recorder, stubDeps());
 
       expect(output.status).toBe("unanswered");
       if (output.status !== "unanswered") return;
@@ -498,7 +498,7 @@ describe("マナー・作法の問い", () => {
     // キーワードには当たらず（catalog の keywords に「参拝」は無い）、上野のエリア・フォールバックで
     // 一覧が返る。マナーの調査済み欠損は応答にも記録にも出ない
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "上野で参拝したい" }, recorder);
+    const output = await searchDatasets({ query: "上野で参拝したい" }, recorder, stubDeps());
 
     expect(output.status).toBe("answered");
     if (output.status !== "answered") return;
@@ -528,7 +528,7 @@ describe("分類指定の空振りの文言", () => {
   // 断定が再混入しても、部分一致のアサートでは素通りするため
   it("エリアで絞り込んでいた場合、絞り込んだ集合で当たらなかったことだけを述べる", async () => {
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "上野", category: "公園" }, recorder);
+    const output = await searchDatasets({ query: "上野", category: "公園" }, recorder, stubDeps());
 
     expect(output.status).toBe("unanswered");
     if (output.status !== "unanswered") return;
@@ -546,7 +546,7 @@ describe("分類指定の空振りの文言", () => {
 
   it("エリア未指定なら、全10件のキーワードを照合して当たらなかったことを述べる", async () => {
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "演劇", category: "劇場" }, recorder);
+    const output = await searchDatasets({ query: "演劇", category: "劇場" }, recorder, stubDeps());
 
     expect(output.status).toBe("unanswered");
     if (output.status !== "unanswered") return;
@@ -563,7 +563,7 @@ describe("分類指定の空振りの文言", () => {
 
   it("最後のフォールバックも「対応するものが無い」と断定しない（同じ判断の姉妹分岐）", async () => {
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "演劇" }, recorder);
+    const output = await searchDatasets({ query: "演劇" }, recorder, stubDeps());
 
     expect(output.status).toBe("unanswered");
     if (output.status !== "unanswered") return;
@@ -582,6 +582,7 @@ describe("aggregateDataset（直接呼び出し）", () => {
     const output = await aggregateDataset(
       { datasetId: "t000000d0000000000", intent: "上野の寺を1件" },
       capturingGapRecorder(),
+      stubDeps(),
     );
 
     expect(output.status).toBe("unanswered");
@@ -597,6 +598,7 @@ describe("aggregateDataset（直接呼び出し）", () => {
     const output = await aggregateDataset(
       { datasetId: "t131130d2025000003", intent: "上野の公園を1件" },
       capturingGapRecorder(),
+      stubDeps(),
     );
 
     expect(output.status).toBe("unanswered");
@@ -633,6 +635,7 @@ describe("aggregateDataset（直接呼び出し）", () => {
     const output = await aggregateDataset(
       { datasetId: MEISHO_ID, intent: "新宿の寺を1件" },
       capturingGapRecorder(),
+      stubDeps(),
     );
 
     expect(output.status).toBe("unanswered");
@@ -645,10 +648,11 @@ describe("aggregateDataset（直接呼び出し）", () => {
     // 名乗りの除去（Issue #107）で検索側・集計側の out_of_area が同文になり、画面側の
     // 重複除去（reason と message の組）が畳み込めるようになった。片側だけ文言を直すと
     // この畳み込みが静かに割れるため、同文であること自体を固定する
-    const searched = await searchDatasets({ query: "新宿の寺を1件" }, capturingGapRecorder());
+    const searched = await searchDatasets({ query: "新宿の寺を1件" }, capturingGapRecorder(), stubDeps());
     const aggregated = await aggregateDataset(
       { datasetId: MEISHO_ID, intent: "新宿の寺を1件" },
       capturingGapRecorder(),
+      stubDeps(),
     );
 
     expect(searched.status).toBe("unanswered");
@@ -658,7 +662,7 @@ describe("aggregateDataset（直接呼び出し）", () => {
   });
 
   it("既知のエリア名が無い answered は、固定サンプル先頭という選定根拠を query に明記する（Issue #78）", async () => {
-    const output = await aggregateDataset({ datasetId: MEISHO_ID, intent: "寺社を1件" }, capturingGapRecorder());
+    const output = await aggregateDataset({ datasetId: MEISHO_ID, intent: "寺社を1件" }, capturingGapRecorder(), stubDeps());
 
     expect(output.status).toBe("answered");
     if (output.status !== "answered") return;
@@ -671,10 +675,11 @@ describe("aggregateDataset（直接呼び出し）", () => {
   it("answered の query は経路によらず、intent の内容と照合していないことを明記する（Issue #78）", async () => {
     // エリアで絞った行も「内容が合うか」は見ていない。無指定経路だけに明記すると、
     // エリア指定ありの応答が対比で「照合済み」に見えてしまう
-    const noArea = await aggregateDataset({ datasetId: MEISHO_ID, intent: "寺社を1件" }, capturingGapRecorder());
+    const noArea = await aggregateDataset({ datasetId: MEISHO_ID, intent: "寺社を1件" }, capturingGapRecorder(), stubDeps());
     const withArea = await aggregateDataset(
       { datasetId: MEISHO_ID, intent: "上野の寺社を1件" },
       capturingGapRecorder(),
+      stubDeps(),
     );
 
     for (const output of [noArea, withArea]) {
@@ -757,7 +762,7 @@ describe("利用者向け文面の語彙", () => {
       { query: "上野の美術館", interests: ["演劇"] },
       { query: "ラーメン", areas: ["上野", "渋谷"] },
     ]) {
-      collect(JSON.stringify(input), await searchDatasets(input, capturingGapRecorder()));
+      collect(JSON.stringify(input), await searchDatasets(input, capturingGapRecorder(), stubDeps()));
     }
 
     // 集計側の分岐: 未知の ID / ジャンル指定の飲食 / 集計表 / 対象エリア外 / 収録なし
@@ -768,7 +773,7 @@ describe("利用者向け文面の語彙", () => {
       { datasetId: MEISHO_ID, intent: "新宿の寺を1件" },
       { datasetId: "t131130d2025000003", intent: "上野の公園を1件" },
     ]) {
-      collect(JSON.stringify(input), await aggregateDataset(input, capturingGapRecorder()));
+      collect(JSON.stringify(input), await aggregateDataset(input, capturingGapRecorder(), stubDeps()));
     }
 
     // 出典側の分岐: 未知の ID（名乗りを持ったことは無いが、両不変条件の傘に入れる。
@@ -835,7 +840,7 @@ describe("未回答の記録", () => {
   it("unanswered には解決後のエリアを添える（入力の area をそのまま入れない）", async () => {
     const recorder = capturingGapRecorder();
     // area は未指定。集計に効くのは質問文から解決した「新宿」のほう
-    await searchDatasets({ query: "新宿の美術館" }, recorder);
+    await searchDatasets({ query: "新宿の美術館" }, recorder, stubDeps());
 
     expect(recorder.records).toEqual([
       { question: "新宿の美術館", area: "新宿", category: undefined, reason: "out_of_area" },
@@ -844,7 +849,7 @@ describe("未回答の記録", () => {
 
   it("answered に載る部分欠損も記録する（Issue #29 の gaps）", async () => {
     const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "上野の美術館とラーメン", area: "上野" }, recorder);
+    const output = await searchDatasets({ query: "上野の美術館とラーメン", area: "上野" }, recorder, stubDeps());
 
     // 応答は answered。それでも欠損は記録に残る
     expect(output.status).toBe("answered");
@@ -860,14 +865,14 @@ describe("未回答の記録", () => {
 
   it("欠損の無い answered では記録しない", async () => {
     const recorder = capturingGapRecorder();
-    await searchDatasets({ query: "上野の美術館", area: "上野" }, recorder);
+    await searchDatasets({ query: "上野の美術館", area: "上野" }, recorder, stubDeps());
 
     expect(recorder.records).toEqual([]);
   });
 
   it("category を指定していれば記録に残す", async () => {
     const recorder = capturingGapRecorder();
-    await searchDatasets({ query: "上野", area: "上野", category: "動物園" }, recorder);
+    await searchDatasets({ query: "上野", area: "上野", category: "動物園" }, recorder, stubDeps());
 
     expect(recorder.records).toEqual([
       { question: "上野", area: "上野", category: "動物園", reason: "other" },
@@ -876,7 +881,7 @@ describe("未回答の記録", () => {
 
   it("aggregate_dataset の未回答も記録する（/api と /mcp で経路が違っても同じ）", async () => {
     const recorder = capturingGapRecorder();
-    await aggregateDataset({ datasetId: MEISHO_ID, intent: "新宿の寺を1件" }, recorder);
+    await aggregateDataset({ datasetId: MEISHO_ID, intent: "新宿の寺を1件" }, recorder, stubDeps());
 
     expect(recorder.records).toEqual([
       { question: "新宿の寺を1件", area: "新宿", category: undefined, reason: "out_of_area" },
@@ -902,8 +907,8 @@ describe("未回答の記録", () => {
 
   it("同じ未回答が複数回起きたら、その回数だけ積む（重複排除しない）", async () => {
     const recorder = capturingGapRecorder();
-    await searchDatasets({ query: "新宿の美術館" }, recorder);
-    await searchDatasets({ query: "新宿の美術館" }, recorder);
+    await searchDatasets({ query: "新宿の美術館" }, recorder, stubDeps());
+    await searchDatasets({ query: "新宿の美術館" }, recorder, stubDeps());
 
     // 頻度を集計できる形にしておく（Issue #27 の AC）
     expect(recorder.records).toHaveLength(2);

@@ -1,6 +1,7 @@
 import { Hono, type Context } from "hono";
 import type { ApiError } from "../shared/core";
 import { d1GapRecorder, type GapRecorder } from "./core/gaps";
+import { coreDeps, type CoreDeps } from "./core/llm";
 import { aggregateDataset, getProvenance, searchDatasets } from "./core/operations";
 import { tabiMcpHandler } from "./mcp";
 import {
@@ -33,7 +34,10 @@ const badRequest = (c: Context<{ Bindings: Env }>, message: string) =>
  * 同じ D1 なので、判断と同じくコア側に置き、ルートは接続だけを担う（ADR-008）。
  */
 const jsonRoute =
-  <T, R>(parse: (body: unknown) => ParseResult<T>, run: (input: T, recorder: GapRecorder) => R | Promise<R>) =>
+  <T, R>(
+    parse: (body: unknown) => ParseResult<T>,
+    run: (input: T, recorder: GapRecorder, deps: CoreDeps) => R | Promise<R>,
+  ) =>
   async (c: Context<{ Bindings: Env }>) => {
     let body: unknown;
     try {
@@ -49,7 +53,12 @@ const jsonRoute =
     if (!parsed.ok) return badRequest(c, parsed.message);
 
     // 「該当データが無い」は unanswered として 200 で返す（HTTP エラーにしない。API.md §4）
-    return c.json(await run(parsed.value, d1GapRecorder(c.env.DB)));
+    //
+    // `deps` は3操作すべてに渡す。`getProvenance` は LLM も D1 も使わないため2引数で宣言されて
+    // いるが、引数の少ない関数は多い関数型に代入できるので、ここで場合分けは要らない。
+    // 場合分けを作ると「どの操作に何を渡すか」がルート側の判断になり、操作が増えるたびに
+    // 渡し忘れの余地が生まれる
+    return c.json(await run(parsed.value, d1GapRecorder(c.env.DB), coreDeps(c.env)));
   };
 
 /**

@@ -4,6 +4,7 @@ import { applyD1Migrations, createExecutionContext, waitOnExecutionContext } fro
 import { env } from "cloudflare:workers";
 import { assert } from "vitest";
 import type { GapRecord, GapRecorder } from "./core/gaps";
+import type { CoreDeps } from "./core/llm";
 import app from "./index";
 
 /** Worker を1回叩いて応答を返す。ExecutionContext の後始末まで面倒をみる。 */
@@ -90,3 +91,31 @@ export function capturingGapRecorder(): GapRecorder & { readonly records: GapRec
     },
   };
 }
+
+/**
+ * 外部資源へ一切出ていかない `CoreDeps`。コア操作を直接呼ぶテストの既定として使う。
+ *
+ * **`ok: false` を返す** — つまり常に「LLM も D1 読み取りも使えなかった」状態を作る。
+ * 実装がこの一式を受け取ったときに通るのは、既存のキーワード実装（縮退経路）であり、
+ * それは**この 592 件のテストが元々確かめてきた挙動そのもの**である。だから
+ * [Issue #118](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/118) の
+ * 引数追加で期待値を1つも変えずに済む。
+ *
+ * LLM 経路そのものを確かめたいテストは、これを使わずに決め打ちの応答を返す
+ * `LlmClient` を渡すこと（Issue #119・#120）。
+ *
+ * `cause` に理由を書いてあるのは、縮退のログを読んだ人が「テストの既定で落ちている」と
+ * 「本当に失敗した」を取り違えないようにするため。
+ */
+export const stubDeps = (): CoreDeps => ({
+  llm: {
+    async complete() {
+      return { ok: false, cause: new Error("stubDeps: テストでは LLM を呼ばない") };
+    },
+  },
+  sql: {
+    async select() {
+      return { ok: false, cause: new Error("stubDeps: テストでは D1 の読み取りを行わない") };
+    },
+  },
+});
