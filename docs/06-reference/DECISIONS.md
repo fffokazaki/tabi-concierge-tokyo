@@ -1,6 +1,6 @@
 ---
 title: "DECISIONS"
-version: "1.4.2"
+version: "1.5.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -556,6 +556,71 @@ ADR-010 は「マナー解説はカタログ内に無いことを確認済みな
 
 ---
 
+## ADR-013: Workers AI の呼び出しは AI Gateway を前段に挟む
+
+### ステータス
+
+承認済み（2026-08-21）。[ADR-002](#adr-002-バックエンドを主催者提供スタックopencode--cloudflareで完結させる)（バックエンドを主催者提供スタックで完結させる）の**範囲内の追加決定**であり、ADR-002 の改定ではない。AI Gateway も Cloudflare のスタック内にある。
+
+### コンテキスト
+
+Step 3〜5（[Issue #121](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/121)）で `worker/core/` のスタブを LLM 実装（メタデータRAG ＋ Text-to-SQL）へ差し替える。推論そのものは Workers AI で足りるが、`env.AI.run()` を素で呼ぶと3つが手当てされないまま残る。
+
+- **消費量が見えない** — Workers AI の無料枠は 10,000 ニューロン/日。提出（2026-08-23 17:00）前後にデモを繰り返して枠を使い切っても、**使い切ったことに気づく手段が無い**。本番で LLM 経路が縮退し続けても、応答は返るので画面からは分からない
+- **同じ質問で毎回消費する** — デモと審査では同じ質問を繰り返し投げる。推論結果のキャッシュが無ければ、そのたびにニューロンを減らす
+- **失敗が追えない** — Workers で観測できるのは `console.*` → wrangler tail / Logpush だけで、推論側のエラー率・レイテンシは残らない
+
+AI Gateway のコア機能（分析・キャッシュ・レート制限）は**全プラン無料**で、`env.AI.run()` の第3引数に `gateway` を渡すだけで前段に入る（2026-08-21 公式ドキュメントで確認）。
+
+### 決定
+
+1. **Workers AI の呼び出しは必ず AI Gateway 経由にする。** `env.AI.run(model, input, { gateway: { id, cacheTtl } })` の形以外で推論を呼ぶコードを書かない
+2. **ゲートウェイ ID は `vars.AI_GATEWAY_ID` から取る。コードにハードコードしない**
+3. **初期値は予約名 `"default"`** とする。`"default"` は**初回の認証済みリクエストでゲートウェイを自動作成する**。名前付きゲートウェイ（例 `tabi-concierge-tokyo`）はダッシュボードか API で**先に作らないと使えず**、未作成のまま指定すると推論そのものが落ちる（2026-08-21 実測: `AiGatewayError: 2001: Please configure AI Gateway in the Cloudflare dashboard`）。作成後は vars の値を差し替えるだけで切り替わる
+4. **キャッシュ TTL は 3600 秒**。キャッシュキーは**リクエストボディ全体**なので、**プロンプトに可変要素（タイムスタンプ・乱数・リクエスト ID・件数カウンタ等）を入れない**。入れた瞬間にキャッシュは全件ミスになる
+5. **テストは AI Gateway にも Workers AI にも到達させない。** `vitest.worker.config.ts` に `remoteBindings: false` を置く（理由は「影響」を参照）
+
+### 理由
+
+- **AI Gateway のコア機能が全プラン無料なので、挟まない理由が無い。** 追加コストはゼロで、消費量の可視化・キャッシュ・エラーログが同時に手に入る
+- **`"default"` を初期値にすると、ダッシュボードでの事前作業なしに今日から動く。** vars 経由にしてあるため、名前付きゲートウェイが要るようになっても変更は1行で済む。「先に運用作業をしないと実装が始められない」という直列の依存を作らない
+- **キャッシュは `AI.run` 単位であり、コア操作の単位ではない。** 推論結果がキャッシュから返っても、その後段にある**出典の組み立て・未回答の分類・`gaps` への記録は毎回走る**。DOMAIN.md §8 の不変条件（とくに不変条件4「未回答は必ず記録される」）はキャッシュの影響を受けない
+
+### 影響
+
+- **ポジティブ**:
+  - 無料枠の消費量・キャッシュ HIT 率・推論エラーがダッシュボードで見えるようになる。提出前に「あと何回デモできるか」を実測で答えられる
+  - 同一質問の再実行が無料になり、審査・リハーサルでの枠消費が読める
+- **ネガティブ**:
+  - **ゲートウェイのログに利用者の質問文がそのまま残る。** POC の公開面は無認証（ADR-004）だが、ゲートウェイのログはアカウント内に閉じている。提出後に運用を続けるならログ保持期間の方針が要る
+  - **`ai` バインディングを足すと、ローカル開発でもテストでも実 API を叩きに行く。** AI はローカル模擬を持たないバインディングで、`remote: false` は設定エラーになる。素のままだと CI（Cloudflare 認証情報を持たない）でテストが**1件も走らずに** `remote dev authentication error` で全滅する（2026-08-21 実測: `Test Files no tests / Errors 6`）。`remoteBindings: false` はこの回避であり、同時に「テストは実推論を必要としない」という注入設計（`CoreDeps`）の裏返しでもある
+  - キャッシュ TTL が効いている間はプロンプトを変えても同じ応答が返るため、プロンプト調整中は `skipCache: true` か文言変更で明示的にキーを変える必要がある
+
+### AIへの指示
+
+- **必須**: 推論は `env.AI.run(model, input, { gateway: { id: env.AI_GATEWAY_ID, cacheTtl: 3600 } })` の形で呼ぶ。ゲートウェイ ID は必ず `env.AI_GATEWAY_ID` から読む
+- **必須**: `wrangler.jsonc` を変更したら `npm run cf-typegen`。`Env` 型を手書きしない
+- **禁止**: `gateway` オプション無しの `env.AI.run()` を書くこと。ゲートウェイ ID をコードに直書きすること。プロンプトにタイムスタンプ・乱数・リクエスト ID などの可変要素を混ぜること
+- **禁止**: `vitest.worker.config.ts` の `remoteBindings: false` を外すこと（外すと CI が落ちる）
+- **参照すべきファイル**: `wrangler.jsonc`（バインディングと vars）／`vitest.worker.config.ts`（テストを外へ出さない設定）／[LLM-MODEL-CANDIDATES.md](./LLM-MODEL-CANDIDATES.md) §4（モデルの実測挙動）
+
+### 代替案比較
+
+| 選択肢 | メリット | デメリット | 却下理由 |
+| --- | --- | --- | --- |
+| AI Gateway を挟まず `env.AI.run()` を素で呼ぶ | 実装が1行短い | 消費量が見えない・キャッシュが効かない・推論エラーが追えない | コアの追加費用がゼロなので、挟まないことに利点が無い |
+| 名前付きゲートウェイ `tabi-concierge-tokyo` を先に作る | ダッシュボードでアプリ単位に分離できる | ダッシュボード/API の事前作業が実装の前提になり、直列の依存が増える。未作成のまま指定すると推論が落ちる | vars 経由にしてあるので後から1行で切り替えられる。着手を遅らせる理由にならない |
+| CI に Cloudflare の認証情報を渡してテストから実 API を叩く | 本番に近い経路で検証できる | CI がネットワークと無料枠に依存し、実行のたびにニューロンを消費する。トークン管理も増える | テストは注入した `LlmClient` で完結する設計。実モデル確認は `npm run dev` の手動経路が担う |
+
+### 関連
+
+- [ADR-002](#adr-002-バックエンドを主催者提供スタックopencode--cloudflareで完結させる)（Workers AI の採用。本 ADR はその範囲内）
+- [ADR-007](#adr-007-cloudflare-d1-を採用しadr-004-のdb-不使用を限定解除する)（subrequest 50/リクエストの制約。Text-to-SQL のリトライ上限の根拠）
+- [LLM-MODEL-CANDIDATES.md](./LLM-MODEL-CANDIDATES.md)（モデル選定と実測挙動）
+- [Issue #116](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/116)（本 ADR を伴う導入 PR）・親 [Issue #121](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/121)
+
+---
+
 ## ADR-XXX: [タイトル]
 
 ### ステータス
@@ -642,8 +707,16 @@ AIツール（Claude Code、GitHub Copilot 等）の知識カットオフによ�
 | ADR-010 | マナー解説はカタログ外から補わず、調査済み欠損としてデータ公開リクエストへ還元 | 2026-08-18 | 承認済み | チームshiwata |
 | ADR-011 | 「何を訊かれたか」は構造化入力で受け、質問文からの推測はフォールバックに留める | 2026-08-18 | 承認済み | チームshiwata |
 | ADR-012 | マナーの「参考情報」としてJNTOを限定的に組み込む（ADR-010の一部改定） | 2026-08-20 | 承認済み | チームshiwata |
+| ADR-013 | Workers AI の呼び出しは AI Gateway を前段に挟む | 2026-08-21 | 承認済み | チームshiwata |
 
 ## Changelog
+
+### [1.5.0] - 2026-08-21
+
+#### 追加
+
+- ADR-013: Workers AI の呼び出しは AI Gateway を前段に挟む（[Issue #116](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/116)・親 [#121](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/121)）。ゲートウェイ ID は `vars.AI_GATEWAY_ID` から取り、初期値は自動作成される予約名 `"default"`。キャッシュ TTL 3600 秒とプロンプトへの可変要素禁止、テストを実 API へ到達させない `remoteBindings: false` を決定に含む
+- 決定ログの表に ADR-013 を追記
 
 ### [1.4.2] - 2026-08-21
 

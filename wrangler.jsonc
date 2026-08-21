@@ -40,8 +40,31 @@
       "database_name": "tabi-concierge-tokyo",
       "database_id": "5086ea0f-1868-476e-86ac-8070d9b353f9"
     }
-  ]
+  ],
 
-  // 以降のステップで追加するバインディング:
-  //   "ai": { "binding": "AI" }   … Workers AI（Step 3）
+  // Workers AI（ADR-002）。推論は AI Gateway を前段に挟んで呼ぶ（ADR-013）。
+  // バインディング経由の呼び出しはアカウント内で事前認証済みのため、
+  // ゲートウェイ側の認証を有効にしても `cf-aig-authorization` ヘッダは要らない。
+  //
+  // 注意: このバインディングはローカル開発でもテストでも**実 API を叩く**
+  // （AI はローカル模擬を持たない。`remote: false` は設定エラーになる）。
+  // テストが外へ出ていかないようにする対処は vitest.worker.config.ts を参照。
+  "ai": {
+    "binding": "AI"
+  },
+
+  // AI Gateway のゲートウェイ ID。秘密情報ではない（アカウント内で付けた名前）。
+  //
+  // `"default"` は**初回の認証済みリクエストでゲートウェイを自動作成する**予約名で、
+  // ダッシュボードでのログ・ニューロン消費・キャッシュ HIT の確認はこれで足りる。
+  // 名前付きゲートウェイ（例: `tabi-concierge-tokyo`）はダッシュボードか API で
+  // 先に作る必要があり、未作成のまま指定すると推論そのものが落ちる
+  // （実測 2026-08-21: `AiGatewayError: 2001: Please configure AI Gateway in the
+  // Cloudflare dashboard`）。作成後にこの値を差し替えれば切り替わる。
+  //
+  // コードにハードコードせず vars に置くのは、この差し替えと、ローカルだけ別ゲートウェイへ
+  // 向けたいとき（`.dev.vars` の `AI_GATEWAY_ID=...`）のため（ADR-013）。
+  "vars": {
+    "AI_GATEWAY_ID": "default"
+  }
 }

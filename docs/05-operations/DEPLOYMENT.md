@@ -1,6 +1,6 @@
 ---
 title: "DEPLOYMENT"
-version: "1.4.16"
+version: "1.5.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -174,6 +174,23 @@ npx wrangler login   # ブラウザで OAuth。opendata アカウントへのア
 npx wrangler whoami  # opendata が一覧に出ることを確認
 ```
 
+#### AI Gateway / Workers AI（[ADR-013](../06-reference/DECISIONS.md)）
+
+推論は Workers AI を **AI Gateway 経由**で呼ぶ。設定は `wrangler.jsonc` に入っており、**ダッシュボードでの事前作業は要らない**。
+
+| 設定 | 値 | 置き場所 |
+| --- | --- | --- |
+| バインディング | `AI` | `wrangler.jsonc` の `"ai"` |
+| ゲートウェイ ID | `default` | `wrangler.jsonc` の `"vars".AI_GATEWAY_ID` |
+| キャッシュ TTL | 3600 秒 | 呼び出し側（`env.AI.run` の第3引数） |
+
+- **`default` は予約名**で、初回の認証済みリクエストでゲートウェイが**自動作成**される。ダッシュボード（AI → AI Gateway）でログ・ニューロン消費・キャッシュ HIT を確認できる
+- **名前付きゲートウェイに変えたい場合**は、先にダッシュボードか API で作成してから `vars.AI_GATEWAY_ID` を差し替える。**作成せずに名前を指定すると推論そのものが落ちる**（`AiGatewayError: 2001: Please configure AI Gateway in the Cloudflare dashboard`）
+- ローカルだけ別ゲートウェイへ向けたいときは `.dev.vars` に `AI_GATEWAY_ID=...` を置く（`.dev.vars` は Git 管理外）
+
+> **AI バインディングはローカルでも実 API を叩く。** `npm run dev` の推論は本物で、無料枠（10,000 ニューロン/日）を消費する。`--remote` は要らない。
+> テストは `vitest.worker.config.ts` の `remoteBindings: false` で外へ出ないようにしてある（外すと Cloudflare 認証情報を持たない CI が全滅する）。
+
 ### デプロイ
 
 ```bash
@@ -192,6 +209,7 @@ npm run deploy  # vite build → wrangler deploy
 | --- | --- |
 | **`worker/` または `shared/` を変更する PR をマージしたとき** | `npm run deploy` |
 | **`migrations/` を変更する PR をマージしたとき** | `npm run db:migrate` → `npm run deploy` |
+| **`wrangler.jsonc` のバインディング・`vars` を変更する PR をマージしたとき** | `npm run cf-typegen` → `npm run deploy`（バインディングは deploy でしか本番へ渡らない） |
 | **`data/` または `scripts/` を変更してデータの中身が変わるとき** | `npm run db:seed` |
 | 提出直前（2026-08-23） | 3つすべて＋下記の確認 |
 
@@ -410,6 +428,13 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.5.0] - 2026-08-21
+
+#### 追加
+
+- §3 に「AI Gateway / Workers AI」小節を追加（[Issue #116](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/116)・ADR-013）。ゲートウェイ ID `default` が自動作成される予約名であること、名前付きへ切り替える手順、未作成の名前を指定すると推論が `AiGatewayError: 2001` で落ちること、ローカル開発でも実 API を叩くこと、テストは `remoteBindings: false` で外へ出さないことを記載
+- §3 のデプロイ契機の表に「`wrangler.jsonc` のバインディング・`vars` を変更したとき」の行を追加。バインディングは `npm run deploy` でしか本番へ渡らない
 
 ### [1.4.16] - 2026-08-21
 
