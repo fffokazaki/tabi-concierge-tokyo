@@ -45,4 +45,16 @@ describe("RecommendationCard", () => {
 
     expect(container.querySelectorAll("img")).toHaveLength(0);
   });
+
+  it("出典（CC BY）とは別に、データセットのカテゴリに応じたJNTOの参考情報を出す（ADR-012）", () => {
+    render(<RecommendationCard recommendation={RECOMMENDATION} />);
+
+    // SOURCE.datasetId は名所・史跡（神社・寺のカテゴリ）
+    expect(screen.getByText("参考: JNTO")).toBeInTheDocument();
+    expect(screen.getByText(/鳥居をくぐる前に一礼し/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /JNTO/ })).toHaveAttribute(
+      "href",
+      "https://www.japan.travel/en/guide/shrine-and-temple-traditions/",
+    );
+  });
 });

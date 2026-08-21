@@ -205,6 +205,14 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .provenance-chip { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-top: 4px; font-size: 10.5px; font-weight: 600; color: var(--accent); }
 .provenance-chip__link { color: inherit; text-decoration: underline; }
 
+/* JNTO の「参考」情報（ADR-012）。.provenance-chip（アクセント色・枠なし）とも
+   .data-gap-card（角丸破線）とも見た目を変える — 出典ではないことが一見して分かるようにする。
+   実線の枠＋中立トーンのバッジにし、リンクもアクセントカラーにしない。 */
+.jnto-reference-note { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-top: 8px; background: var(--surface); }
+.jnto-reference-note__badge { display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: 0.3px; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 2px 7px; margin-bottom: 6px; }
+.jnto-reference-note__summary { font-size: 12px; line-height: 1.6; color: var(--ink); margin: 0 0 6px; }
+.jnto-reference-note__link { font-size: 10.5px; font-weight: 600; color: var(--muted); text-decoration: underline; }
+
 .foryou-chips { display: flex; gap: 8px; padding: 0.875rem 0 1rem; overflow-x: auto; }
 
 /* 写真枠は無い（ForYouScreen.tsx / RecommendationCard.tsx のコメント参照）。stop-card と
