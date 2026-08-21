@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.32.0"
+version: "1.33.0"
 status: "approved"
 created: "2026-08-15"
-updated: "2026-08-20"
+updated: "2026-08-21"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 91
+ace_entry_count: 93
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -322,8 +322,21 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-108-3 | 自分の PR が自分の docstring を偽にする — 対のファイルは両方読み直す | documentation-quality | [playbook/documentation-quality.md#ace-108-3](./playbook/documentation-quality.md#ace-108-3) |
 | ACE-109-1 | 分類の名乗り文は message に埋め込まない — 名乗りは構造化フィールドと表示面の見出しが担う | architecture | [playbook/architecture.md#ace-109-1](./playbook/architecture.md#ace-109-1) |
 | ACE-109-2 | 文面収集型の不変条件テストは、入力→分岐のマッピングまで検証して初めて防御になる | testing | [playbook/testing.md#ace-109-2](./playbook/testing.md#ace-109-2) |
+| ACE-113-1 | 「境界が弾いてくれる」という根拠は、その呼び出しが実際に作る入力の組で発火するかを分岐単位で確かめる | documentation-quality | [playbook/documentation-quality.md#ace-113-1](./playbook/documentation-quality.md#ace-113-1) |
+| ACE-113-2 | 前提を廃止した後の横断 grep は、実装語だけでなく概念の言い換えへ広げ、テストファイルを除外しない | documentation-quality | [playbook/documentation-quality.md#ace-113-2](./playbook/documentation-quality.md#ace-113-2) |
 
 ## Changelog
+
+### [1.33.0] - 2026-08-21
+
+#### 追加
+
+- ACE-113-1: 「境界が弾いてくれる」という根拠は、その呼び出しが実際に作る入力の組で発火するかを分岐単位で確かめる（Issue #53 / PR #113）
+- ACE-113-2: 前提を廃止した後の横断 grep は、実装語だけでなく概念の言い換えへ広げ、テストファイルを除外しない（Issue #53 / PR #113）
+
+#### カウンター更新
+
+- ACE-21-1: Helpful +1（畳み込み送信の廃止に伴う旧前提の横断 grep を初回コミット前に適用し、9ファイルの追随を同一 PR に収めた）
 
 ### [1.32.0] - 2026-08-20
 
