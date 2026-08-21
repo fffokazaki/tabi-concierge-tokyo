@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { env } from "cloudflare:workers";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { applyMigrations, clearGaps } from "../test-support";
 import { coreDeps, d1SqlExecutor, LLM_MODEL, workersAiLlm } from "./llm";
 
 /**
@@ -58,6 +60,35 @@ describe("workersAiLlm", () => {
       ok: true,
       text: '{"areas":["上野"]}',
     });
+  });
+
+  it("finish_reason が stop 以外なら失敗として扱う", async () => {
+    // 許可する値のほうを列挙してある。危険値（length / content_filter …）を列挙する形だと、
+    // モデルや SDK が新しい終了理由を足したとき**黙って成功側に倒れる**
+    for (const reason of ["content_filter", "tool_calls", "error", "unknown_future_reason"]) {
+      const { ai } = fakeAi(completion('{"areas":["上野"]}', reason));
+      const result = await workersAiLlm(ai, "default").complete(REQUEST);
+      expect(result.ok, `finish_reason=${reason} を成功にしてはいけない`).toBe(false);
+    }
+  });
+
+  it("choices が空・欠落でも失敗として扱う（落ちない）", async () => {
+    for (const response of [{ choices: [] }, {}, { choices: [{ finish_reason: "stop" }] }]) {
+      expect((await workersAiLlm(fakeAi(response).ai, "default").complete(REQUEST)).ok).toBe(false);
+    }
+  });
+
+  it("system と user と max_tokens をそのまま渡す", async () => {
+    // `/no_think` の追加以外は改変しないこと。system が落ちると出力の形の指示が消え、
+    // maxTokens が落ちると費用と切断リスクの両方が跳ねる
+    const { ai, calls } = fakeAi(completion("{}"));
+    await workersAiLlm(ai, "default").complete(REQUEST);
+
+    expect(calls[0]!.input["max_tokens"]).toBe(REQUEST.maxTokens);
+    expect(calls[0]!.input["messages"]).toEqual([
+      { role: "system", content: "システム指示" },
+      { role: "user", content: "質問文\n\n/no_think" },
+    ]);
   });
 
   it("finish_reason が length なら失敗として扱う（途中で切れているため）", async () => {
@@ -128,6 +159,56 @@ describe("d1SqlExecutor", () => {
       expect(result.ok).toBe(false);
       // 生成 SQL が原因で落ちるので、SQL 自体がログに無いと原因を再現できない
       expect(spy.mock.calls[0]?.[1]).toMatchObject({ sql: "SELECT 1" });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe("d1SqlExecutor は読み取り専用ではない（実測の固定）", () => {
+  // ここで固定しているのは**守れていないこと**である。名前が `select` でも、渡した SQL は
+  // そのまま実行される。「`prepare` は複文を受けないから安全」という思い込みを潰しておかないと、
+  // sql-guard（Issue #119）を「2層目があるから」と緩める判断が生まれる。
+  // 封じ込めは sql-guard **だけ**が担う。
+  //
+  // 将来 D1 側が本当に拒否するようになったら、このテストが落ちて教えてくれる。
+  beforeAll(applyMigrations);
+  beforeEach(clearGaps);
+
+  const countGaps = async () =>
+    (await env.DB.prepare("SELECT COUNT(*) AS n FROM gaps").first<{ n: number }>())?.n;
+
+  const seedOneGap = () =>
+    env.DB.prepare("INSERT INTO gaps (question, reason) VALUES ('検証用', 'other')").run();
+
+  it("単文の DELETE を実行してしまう", async () => {
+    await seedOneGap();
+    const result = await d1SqlExecutor(env.DB).select("DELETE FROM gaps");
+
+    expect(result.ok).toBe(true);
+    expect(await countGaps(), "行が消えている＝読み取り専用ではない").toBe(0);
+  });
+
+  it("複文の DELETE を実行してしまう（prepare は複文を止めない）", async () => {
+    await seedOneGap();
+    const result = await d1SqlExecutor(env.DB).select("SELECT 1; DELETE FROM gaps");
+
+    expect(result.ok).toBe(true);
+    expect(await countGaps(), "複文の2文目が実行されている").toBe(0);
+  });
+
+  it("PRAGMA と sqlite_master が通る（スキーマが読める）", async () => {
+    const sql = d1SqlExecutor(env.DB);
+    expect((await sql.select("PRAGMA table_list")).ok).toBe(true);
+    expect((await sql.select("SELECT name FROM sqlite_master")).ok).toBe(true);
+  });
+
+  it("DDL は D1 が拒否する（この層で唯一止まるもの）", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await seedOneGap();
+      expect((await d1SqlExecutor(env.DB).select("SELECT question FROM gaps; DROP TABLE gaps")).ok).toBe(false);
+      expect(await countGaps(), "テーブルが残っている").toBe(1);
     } finally {
       spy.mockRestore();
     }

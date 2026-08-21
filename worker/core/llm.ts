@@ -100,10 +100,18 @@ export function workersAiLlm(ai: Ai, gatewayId: string): LlmClient {
         const choice = response.choices?.[0];
         const text = choice?.message?.content;
 
-        // 出力が上限に達した ＝ 途中で切れている。JSON なら閉じていないので、
-        // パースが偶然通っても中身は信用できない。**成功として扱わない**
-        if (choice?.finish_reason === "length") {
-          return { ok: false, cause: new Error(`出力が max_tokens (${maxTokens}) で切断されました`) };
+        // **`stop` 以外はすべて失敗として扱う。** 危ないのは `length`（出力が上限に達して
+        // 途中で切れている。JSON なら閉じていないので、パースが偶然通っても中身は信用できない）
+        // だが、`content_filter` のように本文が非空のまま打ち切られる終了理由も同じ性質を持つ。
+        // 既知の危険値を列挙する形にすると、モデルや SDK が新しい終了理由を足したとき
+        // **黙って成功側に倒れる**ので、許可する値のほうを列挙する
+        if (choice?.finish_reason !== "stop") {
+          return {
+            ok: false,
+            cause: new Error(
+              `正常終了しませんでした（finish_reason=${String(choice?.finish_reason)}・max_tokens=${maxTokens}）`,
+            ),
+          };
         }
         // 思考モデルは本文を出さずに `content: null` を返す形を持つ（`reasoning_content` だけ埋まる）
         if (typeof text !== "string" || text.trim() === "") {
@@ -119,25 +127,54 @@ export function workersAiLlm(ai: Ai, gatewayId: string): LlmClient {
 }
 
 /**
- * D1 の**読み取り専用**の縫い目。
+ * 生成 SQL を D1 へ通す縫い目。
  *
- * 書き込み（`gaps` への記録）は `GapRecorder` が持つ。読み書きを1つの interface にまとめると、
- * 生成 SQL を通す経路から書き込みに手が届いてしまう。役割で分けることが封じ込めの一部になる
- * （Text-to-SQL の静的検証は `sql-guard.ts`・Issue #119）。
+ * ## ⚠️ この層は何も守らない
+ *
+ * 名前が `select` でも、**読み取り専用を強制しない**。渡した SQL はそのまま実行される。
+ * 実測（2026-08-22・vitest-pool-workers の D1）:
+ *
+ * | 渡した SQL | 結果 |
+ * | --- | --- |
+ * | `DELETE FROM gaps` | **成功し、実際に削除された** |
+ * | `SELECT 1; DELETE FROM gaps` | **成功し、複文の DELETE が実行された** |
+ * | `UPDATE gaps SET ...` | 成功し、実行された |
+ * | `PRAGMA table_list` | 成功し、スキーマが読めた |
+ * | `SELECT name FROM sqlite_master` | 成功し、内部テーブル名（`_cf_METADATA` 等）が読めた |
+ * | `SELECT ...; DROP TABLE gaps` | 失敗（DDL は D1 が拒否する） |
+ *
+ * **つまり「`prepare` は複文を受けないから安全」は成り立たない。** 封じ込めは
+ * `sql-guard.ts`（[Issue #119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119)）
+ * の静的検証**だけ**が担う。ここを「2層目」と数えて sql-guard を緩めないこと。
+ *
+ * この層が実際に果たしている役割は2つだけ:
+ *
+ * 1. **読み取りと書き込みの interface を分ける。** 書き込み（`gaps` への記録）は
+ *    `GapRecorder` が持つので、生成 SQL を通す経路のコードから書き込み API が見えない
+ *    （見えないだけで、SQL 文字列としては到達できる — 上表のとおり）
+ * 2. **失敗を `ok: false` に畳んで throw しない。** 呼び出し側に後始末を書かせる
+ *
+ * 挙動は `llm.test.ts` の「読み取り専用ではない」で固定してある。将来 D1 側が変わって
+ * 本当に拒否するようになったら、そのテストが落ちて教えてくれる。
  */
 export type SqlRows = Record<string, unknown>[];
 export type SqlResult = { ok: true; rows: SqlRows } | { ok: false; cause: unknown };
 
 export interface SqlExecutor {
-  /** SELECT を1文だけ実行する。**呼ぶ前に `sql-guard` を通すこと** */
+  /**
+   * SQL を実行して行を返す。
+   *
+   * **呼ぶ前に必ず `sql-guard` を通すこと。** ここは検査をしない（上の doc 参照）。
+   */
   select(sql: string): Promise<SqlResult>;
 }
 
 /**
- * D1 の実装。`prepare().all()` だけを使う。
+ * D1 の実装。`prepare().all()` を使う。
  *
- * `exec()` を使わないのは**複文を受け付けてしまう**ため。`prepare` は1文しか受けないので、
- * 静的検証をすり抜けた複文があってもここで止まる（封じ込めの2層目・Issue #119）。
+ * `exec()` ではなく `prepare()` にしているのは、`exec()` が複数行の SQL をまとめて流す
+ * ための API で用途が違うため。**複文を止める効果は期待できない**（実測で `prepare` も
+ * 複文の DELETE を実行した。上の doc 参照）。
  */
 export function d1SqlExecutor(db: D1Database): SqlExecutor {
   return {

@@ -4,7 +4,7 @@ version: "1.6.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-21"
+updated: "2026-08-22"
 changeImpact: "low"
 ---
 
