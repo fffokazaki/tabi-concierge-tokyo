@@ -1,10 +1,10 @@
 ---
 title: "MASTER"
-version: "1.3.5"
+version: "1.4.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-17"
+updated: "2026-08-21"
 changeImpact: "low"
 ---
 
@@ -184,8 +184,8 @@ AIツールがランタイム・依存のバージョンを選定する際は、
 | Runtime（ツール） | Node.js | 24（`.nvmrc` / `engines`） | 2026-08-15 | wrangler と Vite を起動するホスト。本番には存在しない |
 | Server routing | Hono | 4.13.x | 2026-08-15 / npm | Workers ネイティブ |
 | Protocol | MCP（`createMcpHandler`） | 未着手（Step 5） | - | `McpAgent` は deprecated。ステートレス実装を使い DO は使わない |
-| Database | Cloudflare D1 | 未着手（Step 2） | - | ADR-007 で採用。Text-to-SQL の実行基盤 |
-| AI | Cloudflare Workers AI | 未着手（Step 3） | - | モデルは `@cf/meta/llama-3.1-8b-instruct-fp8-fast`（無料枠のため） |
+| Database | Cloudflare D1 | **導入済み**（`tabi-concierge-tokyo`・APAC） | 2026-08-16 / `wrangler d1` | ADR-007 で採用。Text-to-SQL の実行基盤 ＋ 未回答ログ。スキーマは `migrations/0001_init.sql` |
+| AI | Cloudflare Workers AI（AI Gateway 経由） | **バインディング導入済み**（`AI` ＋ `vars.AI_GATEWAY_ID`）。コアからの呼び出しは未着手（Step 3） | 2026-08-21 / `wrangler types` ＋ 実 API 疎通 | モデルは `@cf/qwen/qwen3-30b-a3b-fp8`。**思考モデルなのでプロンプト末尾に `/no_think` が要る**（[LLM-MODEL-CANDIDATES.md](./06-reference/LLM-MODEL-CANDIDATES.md) §4）。推論は必ず AI Gateway 経由（ADR-013） |
 | Infra | Cloudflare Workers | マネージド | - | サーバーレス。コンテナは使わない |
 
 > **未確認の扱い**: 上表の「未確認」は、推測で埋めずに実装着手時へ持ち越している項目。実バージョンを確認したら本表と [ARCHITECTURE.md](./02-design/ARCHITECTURE.md) §8 を同時に更新すること。
@@ -784,6 +784,16 @@ Changelog エントリには以下のカテゴリを使用する（[Keep a Chang
 - [ ] 定数の配置が層責務に沿っている（Domain/Application/Infrastructure）
 
 ## Changelog
+
+### [1.4.0] - 2026-08-21
+
+#### 変更
+
+- 技術スタック表の AI 行を更新（[Issue #116](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/116)・親 [#121](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/121)）。Workers AI の `AI` バインディングと `vars.AI_GATEWAY_ID` を導入済みにし、コアからの呼び出しはまだ未着手であることを分けて書いた。モデル名を `@cf/qwen/qwen3-30b-a3b-fp8` へ更新し、思考モデルゆえ `/no_think` が要る点を注意として追加（ADR-013・[LLM-MODEL-CANDIDATES.md](./06-reference/LLM-MODEL-CANDIDATES.md) §4）
+
+#### 修正
+
+- 技術スタック表の Database 行が「未着手（Step 2）」のままだったのを「導入済み」へ修正。D1 は 2026-08-16 に作成・取り込み済みで、[ARCHITECTURE.md](./02-design/ARCHITECTURE.md) §8 とは既に食い違っていた
 
 ### [1.3.5] - 2026-08-17
 

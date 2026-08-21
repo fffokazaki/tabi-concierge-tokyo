@@ -21,6 +21,17 @@ export default defineConfig({
   plugins: [
     cloudflareTest({
       wrangler: { configPath: "./wrangler.jsonc" },
+      // テストからリモート資源へ出ていかせない。
+      //
+      // `ai` バインディング（ADR-013）を wrangler.jsonc に足すと、既定ではテスト起動時に
+      // Cloudflare へ実接続しに行く（AI はローカル模擬を持たないバインディングで、
+      // `remote: false` を指定すると設定エラーになる）。CI には認証情報が無いため、
+      // これを許すと **テストが1件も走らないまま "remote dev authentication error" で
+      // 全 PR が赤になる**（実測: `Test Files no tests / Errors 6`）。
+      //
+      // コアは LLM クライアントを注入で受け取る設計なので（`CoreDeps`）、テストは実推論を
+      // 必要としない。実モデルの確認は `npm run dev`（手動）が担う。
+      remoteBindings: false,
       // miniflare 設定は cloudflareTest の引数に直接渡す。
       // 旧 API の test.poolOptions.workers.miniflare は現行版では読まれず、
       // バインディングが undefined のまま起動する（型では気づけない）
