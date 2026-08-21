@@ -69,6 +69,9 @@ describe("buildPlan", () => {
     const { fetchImpl, calls } = happyPath();
     await buildPlan(DEFAULT_TRIP, { fetchImpl });
 
+    // 集計は同時に投げるが、記録の並びは候補順のまま（`callAndRead` は最初の `await` まで
+    // 同期に進むので、fetch 自体は候補順に呼ばれる）。この行が見ているのは**呼ぶ順**であって
+    // 待ち方ではない ―― fetch の手前に `await` が入ると、並列化と無関係にここが落ちる
     expect(calls.map((call) => call.path)).toEqual([SEARCH, AGGREGATE, AGGREGATE, PROVENANCE]);
   });
 
@@ -787,5 +790,53 @@ describe("buildPlan の集計を同時に投げる（Issue #142）", () => {
     const plan = expectPlan(await buildPlan(DEFAULT_TRIP, { fetchImpl }));
     expect(plan.stops.map((s) => s.stop.place)).toEqual(["寛永寺", "絹本著色元三大師画像"]);
     expect(plan.gaps.map((gap) => gap.message)).toEqual(["サンプル行が無いため内容を取り出せません。"]);
+  });
+  it("候補順で最初の障害が確定したら、応答しない候補を待たずに返す", async () => {
+    // 全件の完了を待つ実装（`Promise.all`）だと、ここで永遠に返らずテストがタイムアウトする。
+    // 直列だったころの「1件目の障害で即座に終わる」を、並列にしたまま保てているかを見る
+    const { fetchImpl, calls } = stubFetch({
+      [SEARCH]: () => json({ status: "answered", candidates: THREE_CANDIDATES }),
+      [AGGREGATE]: (body) => {
+        const datasetId = (body as { datasetId: string }).datasetId;
+        if (datasetId === MEISHO_ID) return json({ error: "internal_error", message: "D1 が応答しません" }, 500);
+        return new Promise<Response>(() => {}); // 応答しない候補
+      },
+      [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
+    });
+
+    const outcome = await buildPlan(DEFAULT_TRIP, { fetchImpl });
+    expect(outcome.kind === "failure" && outcome.failure.kind).toBe("http");
+    expect(calls.map((c) => c.path)).not.toContain(PROVENANCE);
+  });
+
+  it("未回答が複数あっても、gaps は［検索側 → 候補順］のまま", async () => {
+    // 1件目の未回答だけ遅らせる。到着順に積むと2件目が先に並び、欠損の並びが実行のたびに変わる
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () =>
+        json({
+          status: "answered",
+          candidates: THREE_CANDIDATES,
+          gaps: [{ status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" }],
+        }),
+      [AGGREGATE]: async (body) => {
+        const datasetId = (body as { datasetId: string }).datasetId;
+        if (datasetId === MEISHO_ID) {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          return json({ status: "unanswered", reason: "insufficient_granularity", message: "1件目の未回答。" });
+        }
+        if (datasetId === BUNKA_ID) {
+          return json({ status: "unanswered", reason: "data_not_published", message: "2件目の未回答。" });
+        }
+        return json({ status: "answered", result: { name: "絹本著色元三大師画像", summary: "…" }, query: "q" });
+      },
+      [PROVENANCE]: () => json({ status: "answered", sources: [source(BUNKAZAI_ID, "文化財一覧")] }),
+    });
+
+    const plan = expectPlan(await buildPlan(DEFAULT_TRIP, { fetchImpl }));
+    expect(plan.gaps.map((gap) => gap.message)).toEqual([
+      "「ショッピング」に当たるものがありませんでした。",
+      "1件目の未回答。",
+      "2件目の未回答。",
+    ]);
   });
 });

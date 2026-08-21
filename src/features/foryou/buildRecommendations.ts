@@ -81,37 +81,31 @@ export async function buildRecommendations(
   // 特定できない。単一チップのときだけ確信を持って理由タグを出す（Recommendation.reason 参照）
   const reason = activeInterest === "all" ? null : RECOMMENDATION_REASON_LABELS[activeInterest];
 
-  // 候補ごとの集計は互いに独立（前の結果を使わない）なので**まとめて投げる**（Issue #142。
-  // プラン画面と同型 ―― `buildPlan.ts` と対で直す）。1件ずつ待つと、1回あたり約1.1秒
-  // （ほぼ全部が推論の待ち時間）が候補数ぶん積み上がる。「すべて」は候補が
+  // 候補ごとの集計は互いに独立（前の結果を使わない）ので、**全件を先に投げてから候補順に
+  // 待つ**（Issue #142。プラン画面と同型 ―― `buildPlan.ts` と対で直す）。1件ずつ投げて待つと、
+  // 1回あたり約1.1秒（ほぼ全部が推論の待ち時間）が候補数ぶん積み上がる。「すべて」は候補が
   // `RECOMMENDATION_LIMIT` 件まで出るので、プラン画面（4件）より積み上がりは大きい。
   //
-  // `Promise.all` は**最初の reject で他の結果を捨てる**。ここはそれで困らない前提に
-  // 乗っている ―― `callCoreOperation` が入力・通信・HTTP・解析の失敗をすべて分類して
-  // **返す**ので、`callAndRead` は通常経路で reject しない（唯一の抜けは `fetchImpl` が
-  // Response 以外を解決したとき。実 fetch では起きず、壊れたテスト用スタブだけの話）。
-  // **reject する経路を足したら `allSettled` へ移すこと** ―― 捨てられた候補の未回答は
-  // gaps に載らず、静かに消える
-  const aggregated = await Promise.all(
-    searched.value.candidates.map(async (candidate) => ({
-      datasetId: candidate.datasetId,
-      outcome: await callAndRead(
-        "aggregate_dataset",
-        { datasetId: candidate.datasetId, intent: interests.join("、") },
-        readAggregateResult,
-        options,
-      ),
-    })),
-  );
+  // `Promise.all` ではなく候補順に個別に待つ理由と、打ち切った promise を捨ててよい理由は
+  // `buildPlan.ts` の同じ箇所に書いてある（対で読むこと）
+  const pendingAggregates = searched.value.candidates.map((candidate) => ({
+    datasetId: candidate.datasetId,
+    pending: callAndRead(
+      "aggregate_dataset",
+      { datasetId: candidate.datasetId, intent: interests.join("、") },
+      readAggregateResult,
+      options,
+    ),
+  }));
 
   const extracted: { datasetId: string; result: AggregateResult }[] = [];
   // 集計できなかった候補の理由。黙って落とすと「最初から候補が無かった」ように見える
   // （Issue #89）ため、search_datasets の gaps と同じ経路で画面に出す
   const aggregateGaps: Unanswered[] = [];
-  // 走査は**候補順**。到着順に積むと、カードの並びと gaps の順序が実行のたびに変わる
-  for (const { datasetId, outcome } of aggregated) {
-    // 障害は候補順で最初のものを採って打ち切る（直列だったときと同じ結果にする）。
-    // **呼び出し自体は打ち切れない** ―― 全件を投げたあとに判定するため（Issue #142）
+  for (const { datasetId, pending } of pendingAggregates) {
+    const outcome = await pending;
+    // 障害は候補順で最初のものを採って打ち切る（直列だったときと同じ結果。到着順にすると、
+    // 同じ入力でも実行のたびに違う障害が画面に出る）
     if (outcome.kind === "failure") return outcome.outcome;
     if (outcome.kind === "unanswered") {
       aggregateGaps.push(outcome.unanswered);
