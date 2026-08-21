@@ -42,7 +42,7 @@ const JNTO_REFERENCES = {
   },
   transitPark: {
     summary:
-      "電車やバスの中では通話を控え、携帯はマナーモードにしましょう。周囲の乗客への配慮を忘れずに、迷ったときは地元の人の行動を参考にしましょう。",
+      "電車やバスの中では通話を控え、携帯はマナーモードにしましょう。周囲の乗客への配慮を忘れずに、分からないことがあれば気軽に尋ねましょう。",
     url: "https://www.japan.travel/en/plan/custom-manners/",
   },
   general: {
