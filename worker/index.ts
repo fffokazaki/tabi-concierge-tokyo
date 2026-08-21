@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import type { ApiError } from "../shared/core";
 import { d1GapRecorder, type GapRecorder } from "./core/gaps";
 import { aggregateDataset, getProvenance, searchDatasets } from "./core/operations";
+import { tabiMcpHandler } from "./mcp";
 import {
   parseAggregateDatasetInput,
   parseGetProvenanceInput,
@@ -84,6 +85,28 @@ app.post("/api/aggregate-dataset", jsonRoute(parseAggregateDatasetInput, aggrega
 
 /** 出典取得（コア操作 `get_provenance`・API.md §3.3）。 */
 app.post("/api/provenance", jsonRoute(parseGetProvenanceInput, getProvenance));
+
+/**
+ * 基盤開放面（[MCP.md](../docs/02-design/MCP.md)・ADR-008）。
+ *
+ * ロジックは持たない。`/api/*` と同じ `worker/core/` の関数を、MCP のツールとして
+ * 露出しているだけ（ツールの登録と入出力の変換は `mcp.ts`）。
+ *
+ * `app.all` にしてあるのは、GET / DELETE も SDK に渡して `405 Method not allowed.` を
+ * **SDK の言葉で**返させるため。Hono 側で GET を弾くと、静的アセット（SPA の index.html）へ
+ * 落ちて MCP クライアントが HTML を受け取る（`wrangler.jsonc` の `run_worker_first` に
+ * `/mcp` があるので Worker には来るが、ルートが無ければ素通りする）。
+ *
+ * ハンドラはリクエストごとに組み立てる。env をクロージャで閉じ込める必要があり、
+ * かつサーバ実体もリクエストごとに作り直す設計（ステートレス）なので、
+ * モジュール読み込み時に1度だけ作る形にはしない。
+ */
+app.all("/mcp", (c) =>
+  // `c.executionCtx` は実行時は workerd の ExecutionContext そのものだが、Hono は
+  // 自前の最小宣言を持っており `tracing` / `abort` を欠く。型宣言だけのずれなのでここで揃える
+  // （実体を作り替えているわけではない）
+  tabiMcpHandler(c.env)(c.req.raw, c.env, c.executionCtx as unknown as ExecutionContext),
+);
 
 /**
  * `/api/*` は run_worker_first で Worker に来る。
