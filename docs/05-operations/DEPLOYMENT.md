@@ -1,6 +1,6 @@
 ---
 title: "DEPLOYMENT"
-version: "1.5.0"
+version: "1.5.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -154,6 +154,7 @@ GitHub Actions/GitLab CI/Jenkinsによる自動化パイプライン。
 
 | 環境 | 用途 | URL | 実行環境 |
 | --- | --- | --- | --- |
+| 2026-08-21 | `01092dd6-b67c-494a-af78-8199369841a9` | Workers AI の `ai` バインディングと AI Gateway 設定（`vars.AI_GATEWAY_ID`）の導入（#116 / PR #123 / ADR-013）。**挙動は変えていない**（コアからの LLM 呼び出しはまだ無い）。`wrangler.jsonc` のバインディング変更のためデプロイ（§3「いつデプロイするか」に本 PR で追加した契機そのもの）。`migrations/` `data/` `scripts/` `src/` は未変更のため、マイグレーション・シード・フロントの再確認は不要 | **バインディングが本番に渡ったことを deploy 出力で確認** — `env.AI`（AI）と `env.AI_GATEWAY_ID ("default")`（Environment Variable）が一覧に並ぶ。チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。コア3操作の挙動が従来と同一であることを実測 — `上野の寺社をめぐりたい` が `answered`（台東区・名所・史跡）、`新宿の美術館に行きたい` が HTTP 200 の `unanswered(out_of_area)` で文言も従来どおり。**本番 D1 への書き込みも従来どおり発生している** — 上記の実測で `gaps` に `新宿の美術館に行きたい / 新宿 / 美術館 / out_of_area` の行が**解決後のエリアつきで**記録された（DOMAIN.md §8 不変条件4 が本番で成立）。**推論の実行は本デプロイでは発生していない**（`env.AI.run()` を呼ぶコードがまだ無いため、AI Gateway のログにも積まれない。ゲートウェイ経由の実測はローカル `npm run dev` で実施済み） |
 | ローカル | 開発 | <http://localhost:5173> | **workerd**（`@cloudflare/vite-plugin` 経由。本番と同じランタイム） |
 | 本番 | 提出・共有 | <https://tabi-concierge-tokyo.opendata-002.workers.dev> | Cloudflare Workers |
 
@@ -452,6 +453,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.5.1] - 2026-08-21
+
+#### 追加
+
+- §3 のデプロイ記録に 2026-08-21 の反映（Version `01092dd6`・#116 / PR #123）を追記。`ai` バインディングと `vars.AI_GATEWAY_ID` の導入で、挙動は不変。推論の実行はまだ発生していない旨も記録
 
 ### [1.5.0] - 2026-08-21
 
