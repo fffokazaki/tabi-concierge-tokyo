@@ -1,10 +1,10 @@
 ---
 title: "TASKS"
-version: "1.2.0"
+version: "1.3.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-19"
+updated: "2026-08-21"
 changeImpact: "medium"
 ---
 
@@ -44,16 +44,18 @@ changeImpact: "medium"
 - [x] **オープンデータを D1 へ取り込む（スキーマ設計 ＋ シード）** — [Issue #24](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/24)。datasets/spots/gaps の3テーブル、1,645 spots を投入済み
 - [x] **プラン画面を `/api/*` のコア3操作へ接続**（Issue #31）。SCENARIOS の静的差し替えではなく、`search_datasets` → `aggregate_dataset` → `get_provenance` を実際に呼ぶ形に置き換え済み。渋谷は観光データが無いため引き続き面のみ（`DATABASE.md`「渋谷エリアの制約」）。ペース別表示件数・ギャップカード（`feat/plan-data-grounding-and-pace`）は develop へマージ済み。マナー情報なしの表示文言修正（Issue #67・PR #77）と、その際 Futoshi から指摘のあった DATABASE.md の実装参照ズレの修正（PR #83）も develop へ反映済み
 - [x] **あなたへ画面を実装し `/api/*` のコア3操作へ接続**（PR #82・develop へマージ済み）。興味チップ（ラーメン・文化・家族向け・自然）→レコメンドカード（出典つき）の縦貫通が成立。ラーメンは意図的に候補ゼロのまま運用し、正直な「答えられない」実演として使う。あなたへのスコーピング中に見つかったバックエンド側の `aggregate_dataset` 出典の選定根拠明記（Issue #78）は Futoshi が修正し、PR #79 で develop へマージ済み
-- [ ] 提出用画面キャプチャ（1600×900px・1〜3点）の切り出し
-- [ ] 提出資料（16:9・必須4項目を含む）の完成
+- [x] **提出資料と First Stage スライドの構成確定**（2026-08-21）。提出資料14枚は [submission-deck.md](../submission-deck.md)、2分版8枚と台本は [first-stage-presentation.md](../first-stage-presentation.md) v2.0。v1.0 台本が実装と乖離していた（#4「MCPでアプリに接続します」が事実でない）ため全面差し替え
+- [ ] 提出用画面キャプチャ（1600×900px・3点）の切り出し — 対象は submission-deck のスライド6/7/8
+- [ ] 提出資料（16:9・必須4項目を含む）の作成 — 構成は [submission-deck.md](../submission-deck.md) に確定済み
+- [ ] `LICENSE`（MIT）をリポジトリへ設置 — スライド11「MIT で OSS 公開予定」の裏付け。現状 private・LICENSE 未設定
 - [ ] 提出フォーム送信（<https://form.jotform.com/261870604352051>）
 - [ ] 提出後ただちに収録枠を予約（30分単位・早い者順）
 
 ### 🟠 優先度: High
 
 - [ ] コンシェルジュを MCP サーバーとして最小実装（データセット検索・集計・出典取得の3ツール）し、フロントから接続
-- [ ] デモ動画45秒の録画（絵コンテ6カット・ナレーション約220字・BGMなし）
-- [ ] ナレーション台本（約620字）の読み上げ練習 — 1分55秒着地の確認
+- [ ] デモ動画の録画（本番アプリの画面収録・BGMなし）— 埋め込み先は2分版の #3（プラン生成）と #4（ラーメンに答えない）
+- [ ] ナレーション台本（503字）の読み上げ練習 — **スライド単位**で尺を実測し 1分55秒着地を確認
 
 ### 🟡 優先度: Medium
 
@@ -125,8 +127,23 @@ MCP 最小実装 ─────────────────────
 - フェーズ全体像: [ROADMAP.md](./ROADMAP.md)
 - リスクと対応: [RISKS.md](./RISKS.md)
 - 制約（締切・提出要件・著作権ルール）: [CONSTRAINTS.md](../01-context/CONSTRAINTS.md)
+- 提出資料の構成（16:9・14枚）: [submission-deck.md](../submission-deck.md)
+- First Stage 2分スライドと台本: [first-stage-presentation.md](../first-stage-presentation.md)
 
 ## Changelog
+
+### [1.3.0] - 2026-08-21
+
+#### 変更
+
+- 提出資料と First Stage スライドの構成確定を Critical に追加。構成の SSOT を [submission-deck.md](../submission-deck.md)（提出資料14枚）と [first-stage-presentation.md](../first-stage-presentation.md) v2.0（2分版8枚）に置いた
+- ナレーション台本の字数を「約620字」から新版の実測値 503字へ更新し、尺の実測を**スライド単位**で行う指示に変えた
+- デモ動画のタスクを「絵コンテ6カット」から本番アプリの画面収録へ変更（埋め込み先は2分版 #3・#4）
+
+#### 追加
+
+- `LICENSE`（MIT）設置タスク。提出資料スライド11「MIT で OSS 公開予定」の裏付けとして提出前に必要（現状 private・LICENSE 未設定）
+- §7 参照に提出資料・First Stage スライドの2文書を追加
 
 ### [1.2.0] - 2026-08-19
 
