@@ -1,10 +1,10 @@
 ---
 title: "API_REQUIREMENTS"
-version: "1.5.2"
+version: "1.6.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-16"
-updated: "2026-08-20"
+updated: "2026-08-21"
 changeImpact: "medium"
 ---
 
@@ -49,24 +49,25 @@ changeImpact: "medium"
 
 > 旧版に書いていた「シナリオチップの切り替え時」は削除した。シナリオチップは `mockScenarios.ts` の仮データを切り替えるための足場で、[Issue #31](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/31) の API 接続とともに画面から消えている。
 
-### 提案する入力
+### 入力（2026-08-21 構造化送信へ切り替え済み・Issue #53）
 
 ```ts
 {
-  query: string;        // trip.interests・trip.notes から組み立てた自然文の質問
+  query?: string;       // trip.notes（その他のご希望）そのまま。空なら**キーごと送らない**
+  interests?: string[]; // trip.interests を INTEREST_LABELS で日本語ラベルに変換した配列。空なら送らない
   area?: string;        // POC対象の代表エリア（例: "上野"、"渋谷"）
   category?: string;    // 例: "神社", "飲食店", "公共交通機関"
   limit?: number;       // 候補件数の上限。既定 4・上限 10（API.md §3.1 で確定）
 }
 ```
 
-> **`trip.interests` は ASCII の識別子**（`"ramen"` / `"culture"` …）になった（[Issue #17](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/17)）。`query` を組み立てるときは `src/features/plan/labels.ts` の `INTEREST_LABELS` で日本語ラベルに変換する。バックエンドのマッチは日本語の部分一致なので、識別子をそのまま繋ぐと1件も当たらない。
+> **`trip.interests` は ASCII の識別子**（`"ramen"` / `"culture"` …）になった（[Issue #17](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/17)）。`interests` へ載せるときは `src/features/plan/labels.ts` の `INTEREST_LABELS` で日本語ラベルに変換する。バックエンドのマッチは日本語の部分一致なので、識別子をそのまま送ると1件も当たらない。
 
-### 🟡 提案: 構造化入力への移行（`interests` / `areas`・ADR-011）
+### ✅ 採用済み（2026-08-21）: 構造化入力への移行（`interests`・ADR-011）
 
-「`trip.interests` を1つの自然文にまとめて送る」という本節の前提には、**答えていない興味が沈黙する**構造上の問題がある（[Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53)。キーワードが1件でも当たると `answered` になり、興味を複数選ぶほど欠損が消える）。
+旧版の「`trip.interests` を1つの自然文にまとめて送る」という前提には、**答えていない興味が沈黙する**構造上の問題があった（[Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53)。キーワードが1件でも当たると `answered` になり、興味を複数選ぶほど欠損が消える）。
 
-バックエンドは `interests?: string[]`（興味の配列・日本語ラベル）と `areas?: string[]`（目的地エリアの配列）を **optional で受け付ける**ようになった（[API.md](./API.md) §3.1・[ADR-011](../06-reference/DECISIONS.md)）。フロントエンドが `buildQuery` で畳み込む代わりに `interests: trip.interests.map(t => INTEREST_LABELS[t])` と `query: trip.notes` を分けて送れば、**答えられなかった興味が興味ごとに `gaps` に載る**。送信側の変更は Okazaki からの提案で、**Sho との合意は未了**（残作業は Issue #53 に記載）。既存の畳み込み送信も従来どおり動く。
+バックエンドは `interests?: string[]`（興味の配列・日本語ラベル）と `areas?: string[]`（目的地エリアの配列）を **optional で受け付ける**（[API.md](./API.md) §3.1・[ADR-011](../06-reference/DECISIONS.md)）。プラン画面は `interests: trip.interests.map(t => INTEREST_LABELS[t])` と `query: trip.notes` を**分けて送る**形へ切り替えた（`src/features/plan/buildPlan.ts` の `buildSearchInput`）。これで**答えられなかった興味が興味ごとに `gaps` に載る**。畳み込んだ全文（`buildQuery`）は `aggregate_dataset` の `intent`・`get_provenance` の `query`・画面表示にのみ残る。`areas` は引き続き送らない（エリアの入力欄が無い — [Issue #42](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/42)）。
 
 ### 提案する出力
 
@@ -98,7 +99,7 @@ changeImpact: "medium"
 
 ### ✅ 解決済み（2026-08-18）: `gaps`（部分欠損）の画面での出し方
 
-本書 §1 の想定どおり、フロントエンドは `trip.interests` を**1つの自然文にまとめて送る**。すると「上野の美術館とラーメン」のように、答えられる興味と答えられない興味が1つの `query` に混ざる。以前はこの場合、答えられる候補だけが返り、**ラーメン側の欠損は応答のどこにも現れなかった**。
+旧実装（Issue #53 の切り替え前）のフロントエンドは `trip.interests` を**1つの自然文にまとめて送っていた**。すると「上野の美術館とラーメン」のように、答えられる興味と答えられない興味が1つの `query` に混ざる。当時はこの場合、答えられる候補だけが返り、**ラーメン側の欠損は応答のどこにも現れなかった**。
 
 [Issue #29](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/29) で、`answered` に `gaps` を載せるようにした（バックエンド実装済み）。画面での出し方は、Okazaki の提案どおりの形で実装済み。
 
@@ -245,6 +246,12 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 | `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物しか返らない。** 無ければ `unanswered`。別エリアの施設で代替されることはないので、画面は返ってきた `name` をそのまま信用してよい |
 
 ## Changelog
+
+### [1.6.0] - 2026-08-21
+
+#### 変更
+
+- §1 を構造化送信への切り替え（[Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53) のフロントエンド側）に合わせて更新: 入力仕様を `query`（`trip.notes` のみ・空なら省略）＋ `interests`（日本語ラベルの配列）へ書き換え、「🟡 提案」を「✅ 採用済み」に変更。`gaps` の節の「1つの自然文にまとめて送る」の記述を旧実装の説明へ改めた
 
 ### [1.5.2] - 2026-08-20
 

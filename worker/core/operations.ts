@@ -331,8 +331,9 @@ function computeSearchDatasets(input: SearchDatasetsInput): SearchDatasetsOutput
   // 落とすと「動物園」の問いに名所・史跡やトイレを返すことになる（指定を黙って捨てない）。
   //
   // なおこのガードは `category` を送る呼び出し（API コンソール・将来の `/mcp`）にしか効かない。
-  // プラン画面は興味も要望も `query` に畳み込むため（`buildPlan.ts` の `buildQuery`）ここを通らず、
-  // 下のエリア・フォールバックへ落ちる。そちら側の手当ては Issue #50 で入れた
+  // プラン画面は `category` を送らない（興味は `interests`、要望は `query` で送る — Issue #53 の
+  // 構造化送信）ためここを通らず、下のエリア・フォールバックへ落ちる。そちら側の手当ては
+  // Issue #50 で入れた
   if (input.category?.trim()) {
     return unansweredWith(categoryMissUnanswered(area, input.category.trim()), unansweredExtras);
   }

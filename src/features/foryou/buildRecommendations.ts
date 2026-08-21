@@ -19,10 +19,10 @@ import type { ActiveInterest, Recommendation } from "./types";
  * `usePlanState` と混ぜず `useForYouState` を独立させたのと同じ理由で、プランの
  * 十分にテスト済みの検証ロジックへ手を入れるリスクを避ける）。
  *
- * プランの `buildQuery`（自然文への畳み込み）とは違い、ADR-011 の構造化入力
- * `interests: string[]` をそのまま使う。あなたへはチップで1興味ずつ（または「すべて」で
- * 複数まとめて）問い合わせる UI なので、畳み込みが引き起こす「キーワードが1件当たると
- * 他の興味の欠損が沈黙する」問題（Issue #53）を最初から踏まない。
+ * ADR-011 の構造化入力 `interests: string[]` をそのまま使う。あなたへはチップで1興味ずつ
+ * （または「すべて」で複数まとめて）問い合わせる UI なので、自然文への畳み込みが引き起こす
+ * 「キーワードが1件当たると他の興味の欠損が沈黙する」問題（Issue #53）を最初から踏まない
+ * （プラン画面も同 Issue で構造化送信へ切り替え済み — `buildSearchInput`）。
  *
  * `gaps` は `search_datasets` が返したものだけではない。`aggregate_dataset` が候補ごとに
  * 返した未回答も同じ配列へ合流させる（Issue #89）。Issue #84 でバックエンドが「その興味の

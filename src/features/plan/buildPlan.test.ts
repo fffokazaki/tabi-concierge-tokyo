@@ -81,6 +81,44 @@ describe("buildPlan", () => {
     expect(ROUTE_STOP_LIMIT).toBe(MAX_STOP_COUNT);
   });
 
+  it("search_datasets へは興味を畳み込まず interests 配列で送る（畳み込むと答えていない興味が沈黙する・Issue #53）", async () => {
+    const { fetchImpl, calls } = happyPath();
+    await buildPlan({ ...DEFAULT_TRIP, interests: ["nightlife"], notes: "上野で夜遊びしたい" }, { fetchImpl });
+
+    // Issue #53 の実測ケース。畳み込んだ「ナイトライフ、上野で夜遊びしたい」は銭湯の
+    // キーワード「夜」が「夜遊び」に部分一致して answered になり、ナイトライフの欠損が沈黙する
+    const searchCall = calls.find((call) => call.path === SEARCH);
+    expect(searchCall?.body).toMatchObject({ interests: ["ナイトライフ"], query: "上野で夜遊びしたい" });
+  });
+
+  it("その他のご希望が空なら query キーごと省く（興味だけの呼び出し。空文字はバックエンドの検査で 400 になる）", async () => {
+    const { fetchImpl, calls } = happyPath();
+    await buildPlan(DEFAULT_TRIP, { fetchImpl });
+
+    const body = calls.find((call) => call.path === SEARCH)?.body as Record<string, unknown>;
+    expect(body.interests).toEqual(["ラーメン", "文化"]);
+    expect(body).not.toHaveProperty("query");
+  });
+
+  it("興味が無ければ interests キーごと省く（従来どおり query だけの呼び出し）", async () => {
+    const { fetchImpl, calls } = happyPath();
+    await buildPlan({ ...DEFAULT_TRIP, interests: [], notes: "浅草を回りたい" }, { fetchImpl });
+
+    const body = calls.find((call) => call.path === SEARCH)?.body as Record<string, unknown>;
+    expect(body.query).toBe("浅草を回りたい");
+    expect(body).not.toHaveProperty("interests");
+  });
+
+  it("aggregate の intent と provenance の query には従来どおり畳み込んだ全文を渡す（意図・根拠の再現用）", async () => {
+    const { fetchImpl, calls } = happyPath();
+    await buildPlan({ ...DEFAULT_TRIP, interests: ["nightlife"], notes: "上野で夜遊びしたい" }, { fetchImpl });
+
+    const aggregateCall = calls.find((call) => call.path === AGGREGATE);
+    const provenanceCall = calls.find((call) => call.path === PROVENANCE);
+    expect((aggregateCall?.body as { intent: string }).intent).toBe("ナイトライフ、上野で夜遊びしたい");
+    expect((provenanceCall?.body as { query: string }).query).toBe("ナイトライフ、上野で夜遊びしたい");
+  });
+
   it("name / summary を Stop.place / Stop.note に写し、出典を対で持つ", async () => {
     const { fetchImpl } = happyPath();
     const plan = expectPlan(await buildPlan(DEFAULT_TRIP, { fetchImpl }));
