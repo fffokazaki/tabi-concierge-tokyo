@@ -1,6 +1,6 @@
 ---
 title: "submission-deck"
-version: "1.0.0"
+version: "1.1.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-21"
@@ -54,7 +54,7 @@ changeImpact: "medium"
 | 8 | ② | **【山】答えられないときは、答えません**：ラーメン → 粒度不足と判定し理由を返す | **キャプチャ候補3**。文言は §3 で固定 |
 | 9 | ② | 仕組み：React → `/api/*` コア3操作（`search_datasets` / `aggregate_dataset` / `get_provenance`）→ D1。出典強制により CC BY 4.0 の表示義務をアーキテクチャで自動達成 | 図中で稼働中／設計済みを区別 |
 | 10 | ② | データが育つループ：未回答を `gaps` に記録（本番D1で実際に動作）→ 分類 → 都への公開リクエスト（提出プロセスは構想） | — |
-| 11 | ② | 基盤の開放：コンシェルジュは MCP サーバーとして開放予定。ソースコードは **MIT ライセンスで OSS 公開予定**。旅行アプリは「最初のクライアント」にすぎない | データ側 CC BY 4.0 とコード側 MIT を**別物として並記** |
+| 11 | ② | 基盤の開放：コンシェルジュは MCP サーバーとして開放予定。**別リポジトリへ切り出し MIT ライセンスで OSS 公開予定**（[Issue #129](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/129)）。旅行アプリは「最初のクライアント」にすぎない | **OSS 化の対象はコンシェルジュのみ**（旅行アプリ `src/` は対象外）。データ側 CC BY 4.0 とコード側 MIT を**別物として並記** |
 | 12 | ③ | 利用オープンデータ10件：タイトル・提供元・役割・ライセンス・カタログURL | [DATABASE.md](02-design/DATABASE.md) §2 の確定表をそのまま |
 | 13 | ① | インパクト／KPI：探索30分→3分（企画時推定）、観光の分散、都政への還元 | 未実測である旨を注記 |
 | 14 | ④ | チーム紹介（チームshiwata・3名） | §4 |
@@ -90,7 +90,7 @@ changeImpact: "medium"
 - [ ] **キャプチャ3点**（1600×900px・スライド6/7/8）を本番URL <https://tabi-concierge-tokyo.opendata-002.workers.dev> から取得。プロフィール入力から実際に操作して撮る
 - [ ] **タブバーの見え方を確認** — スキャン・周辺は `AppTabs.tsx` の `INACTIVE_TABS` で disabled 表示。キャプチャだけを見る審査員はスライド4の凡例を見ないため、「未完成に見える」ならキャプチャ内かキャプション側に「スキャン・周辺はデザイン構想」と明示する
 - [ ] **カタログURL の生存確認** — 確定10件を提出直前に再確認（[DATABASE.md](02-design/DATABASE.md) §3）
-- [ ] **`LICENSE`（MIT）の設置** — スライド11 の「MIT で公開予定」を裏付けるため、提出前にリポジトリへ置く。現状 private・LICENSE 未設定
+- [ ] **スライド11 の OSS 記述の確認** — OSS 化の対象は**コンシェルジュ（`worker/` `shared/` `scripts/` `migrations/`）のみ**で、旅行アプリ `src/` は含まない。切り出しの実施は提出後〜Final Stage（[Issue #129](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/129)）のため、提出資料には「公開予定」と書く
 - [ ] **著作権ルール** — BGM なし／『いらすとや』は1資料20個まで／地図を使う場合は帰属表示を隠さない／引用は出典明記（[CONSTRAINTS.md](01-context/CONSTRAINTS.md) §3）
 - [ ] **提出後ただちに収録枠を予約**（30分単位・早い者順）
 
@@ -103,6 +103,13 @@ changeImpact: "medium"
 - [TASKS.md](07-project-management/TASKS.md) — 提出物タスクの進捗
 
 ## Changelog
+
+### [1.1.0] - 2026-08-21
+
+#### 変更
+
+- スライド11 の OSS 記述を具体化。「ソースコードを MIT で公開予定」から「**コンシェルジュを別リポジトリへ切り出して** MIT で公開予定」へ改め、OSS 化の対象がコンシェルジュのみ（旅行アプリ `src/` は対象外）であることを明記した（[Issue #129](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/129)）
+- §5 チェックリストの「`LICENSE` の設置」を、切り出し時期（提出後〜Final Stage）に合わせて「スライド11 の OSS 記述の確認」へ置き換えた
 
 ### [1.0.0] - 2026-08-21
 

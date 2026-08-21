@@ -1,6 +1,6 @@
 ---
 title: "TASKS"
-version: "1.3.0"
+version: "1.4.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -45,17 +45,16 @@ changeImpact: "medium"
 - [x] **プラン画面を `/api/*` のコア3操作へ接続**（Issue #31）。SCENARIOS の静的差し替えではなく、`search_datasets` → `aggregate_dataset` → `get_provenance` を実際に呼ぶ形に置き換え済み。渋谷は観光データが無いため引き続き面のみ（`DATABASE.md`「渋谷エリアの制約」）。ペース別表示件数・ギャップカード（`feat/plan-data-grounding-and-pace`）は develop へマージ済み。マナー情報なしの表示文言修正（Issue #67・PR #77）と、その際 Futoshi から指摘のあった DATABASE.md の実装参照ズレの修正（PR #83）も develop へ反映済み
 - [x] **あなたへ画面を実装し `/api/*` のコア3操作へ接続**（PR #82・develop へマージ済み）。興味チップ（ラーメン・文化・家族向け・自然）→レコメンドカード（出典つき）の縦貫通が成立。ラーメンは意図的に候補ゼロのまま運用し、正直な「答えられない」実演として使う。あなたへのスコーピング中に見つかったバックエンド側の `aggregate_dataset` 出典の選定根拠明記（Issue #78）は Futoshi が修正し、PR #79 で develop へマージ済み
 - [x] **提出資料と First Stage スライドの構成確定**（2026-08-21）。提出資料14枚は [submission-deck.md](../submission-deck.md)、2分版8枚と台本は [first-stage-presentation.md](../first-stage-presentation.md) v2.0。v1.0 台本が実装と乖離していた（#4「MCPでアプリに接続します」が事実でない）ため全面差し替え
-- [ ] 提出用画面キャプチャ（1600×900px・3点）の切り出し — 対象は submission-deck のスライド6/7/8
-- [ ] 提出資料（16:9・必須4項目を含む）の作成 — 構成は [submission-deck.md](../submission-deck.md) に確定済み
-- [ ] `LICENSE`（MIT）をリポジトリへ設置 — スライド11「MIT で OSS 公開予定」の裏付け。現状 private・LICENSE 未設定
-- [ ] 提出フォーム送信（<https://form.jotform.com/261870604352051>）
-- [ ] 提出後ただちに収録枠を予約（30分単位・早い者順）
+- [ ] 提出用画面キャプチャ（1600×900px・3点）の切り出し — 対象は submission-deck のスライド6/7/8（[Issue #126](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/126)）
+- [ ] 提出資料（16:9・必須4項目を含む）の作成 — 構成は [submission-deck.md](../submission-deck.md) に確定済み（[Issue #127](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/127)）
+- [ ] 「探索30分→3分」を実測するか断定を避けた表現へ直す — 提出資料スライド13 の文言に直結（[Issue #130](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/130)）
+- [ ] 提出フォーム送信（<https://form.jotform.com/261870604352051>）→ 提出後ただちに収録枠を予約（30分単位・早い者順）（[Issue #128](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/128)）
 
 ### 🟠 優先度: High
 
 - [ ] コンシェルジュを MCP サーバーとして最小実装（データセット検索・集計・出典取得の3ツール）し、フロントから接続
-- [ ] デモ動画の録画（本番アプリの画面収録・BGMなし）— 埋め込み先は2分版の #3（プラン生成）と #4（ラーメンに答えない）
-- [ ] ナレーション台本（503字）の読み上げ練習 — **スライド単位**で尺を実測し 1分55秒着地を確認
+- [ ] デモ動画の録画（本番アプリの画面収録・BGMなし）— 埋め込み先は2分版の #3（プラン生成）と #4（ラーメンに答えない）（[Issue #131](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/131)）
+- [ ] ナレーション台本（507字）の読み上げ練習 — **スライド単位**で尺を実測し 1分55秒着地を確認（[Issue #132](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/132)）
 
 ### 🟡 優先度: Medium
 
@@ -69,6 +68,7 @@ changeImpact: "medium"
 - [ ] 介助者モード・音声対応のデモ設計
 - [ ] 都への API 公開提案の資料化
 - [ ] MCP 基盤の外部公開（翌年参加者への開放）方針の決定
+- [ ] コンシェルジュを別リポジトリへ切り出し MIT で OSS 公開する — 対象はバックエンドのみで旅行アプリ `src/` は含まない。Final Stage（2026-10-17）まで（[Issue #129](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/129)）
 - [ ] やさしい日本語対応
 
 ## 3. タスクステータス定義
@@ -131,6 +131,14 @@ MCP 最小実装 ─────────────────────
 - First Stage 2分スライドと台本: [first-stage-presentation.md](../first-stage-presentation.md)
 
 ## Changelog
+
+### [1.4.0] - 2026-08-21
+
+#### 変更
+
+- 残タスクを GitHub Issue 化し、各タスクへ [#126](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/126)〜[#132](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/132) を紐付けた
+- Critical の「`LICENSE`（MIT）をリポジトリへ設置」を削除し、「探索30分→3分の扱い」（[#130](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/130)）へ差し替えた。OSS 化は**このリポジトリを public にすることではなく、コンシェルジュを別リポジトリへ切り出すこと**であり、実施時期も提出後〜Final Stage のため Low へ移した（[#129](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/129)）
+- 台本の実測字数を 503 → 507字へ更新（#7 の OSS 記述を具体化したため）
 
 ### [1.3.0] - 2026-08-21
 
