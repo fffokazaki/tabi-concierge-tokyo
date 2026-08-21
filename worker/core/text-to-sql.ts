@@ -179,6 +179,23 @@ export async function aggregateViaTextToSql(
   entry: CatalogEntry,
   deps: CoreDeps,
 ): Promise<TextToSqlOutcome> {
+  try {
+    return await attemptTextToSql(input, entry, deps);
+  } catch (cause) {
+    // `LlmClient` / `SqlExecutor` は「throw しない」という約束だが、**約束は強制ではない**。
+    // 注入される実装は差し替え可能で、ここで例外が抜けると `app.onError` の 500 になり、
+    // 設計した縮退（キーワード実装へ戻る）が働かないまま利用者にエラーが返る。
+    // 縮退できる場所で 500 を出さない
+    console.error("[text-to-sql] 想定外の例外が発生しました", { datasetId: entry.datasetId, cause });
+    return { kind: "failed", cause: `想定外の例外: ${String(cause)}` };
+  }
+}
+
+async function attemptTextToSql(
+  input: AggregateDatasetInput,
+  entry: CatalogEntry,
+  deps: CoreDeps,
+): Promise<TextToSqlOutcome> {
   let previousError: string | undefined;
   const facets = await readFacets(entry, deps);
 

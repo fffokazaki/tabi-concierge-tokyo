@@ -443,12 +443,14 @@ export async function aggregateDataset(
  *
  * | 何が起きたか | 返すもの | `gaps` |
  * | --- | --- | --- |
- * | (a) LLM / D1 の障害・(b) 出力不正 | キーワード実装の応答へ縮退 ＋ `console.error` | 縮退先が未回答ならそちらの理由で記録される |
- * | (c) SQL は通ったが0行 | `data_not_published` の未回答 | **する** |
+ * | (a) LLM / D1 の障害・(b) 出力不正 | キーワード実装の応答へ縮退 ＋ `console.error` | **Text-to-SQL の失敗そのものは記録しない**。縮退先が未回答ならその理由で記録される（Step 5 以前と同じ扱い） |
+ * | (c) SQL は通ったが0行 | `other` の未回答（`sqlNoRowUnanswered`） | **する** |
  *
  * (c) を記録するのは、それが**障害ではなく答え**だからである。「探したが無かった」は
  * DOMAIN.md §7 のデータ公開リクエストへ還元すべき一次情報で、握りつぶすと
  * このプロジェクトのコアドメインの半分が成立しない。
+ *
+ * (c) が `data_not_published` ではなく `other` である理由は `sqlNoRowUnanswered` の doc を参照。
  */
 async function resolveAggregate(
   input: AggregateDatasetInput,

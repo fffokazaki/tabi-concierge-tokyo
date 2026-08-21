@@ -162,6 +162,41 @@ describe("LIMIT", () => {
     expect(expectAccepted(sql)).toBe(sql);
   });
 
+  it("**検査した文字列と実行する文字列を一致させる**（コメントごしの迂回を塞ぐ）", () => {
+    // 実測（Issue #119）で見つけた迂回。検査は scrub 済みの文字列で行い、実行は元の文字列を
+    // 返していたため、`SELECT * FROM spots; -- comment` が
+    // `SELECT * FROM spots; -- comment LIMIT 50` になっていた
+    // （LIMIT がコメントの中に入って効かず、セミコロンも実行文に残る）
+    const withTrailingComment = expectAccepted("SELECT name FROM spots -- comment");
+    expect(withTrailingComment, "コメントが実行文に残っている").not.toContain("--");
+    expect(withTrailingComment).toBe(`SELECT name FROM spots LIMIT ${MAX_LIMIT}`);
+
+    const withSemicolonAndComment = expectAccepted("SELECT name FROM spots; -- comment");
+    expect(withSemicolonAndComment, "セミコロンが実行文に残っている").not.toContain(";");
+    expect(withSemicolonAndComment).toBe(`SELECT name FROM spots LIMIT ${MAX_LIMIT}`);
+
+    const withBlockComment = expectAccepted("SELECT name /* 途中 */ FROM spots");
+    expect(withBlockComment).toBe(`SELECT name FROM spots LIMIT ${MAX_LIMIT}`);
+  });
+
+  it("カンマ形式・式・OFFSET を含む上限の迂回を拒否する", () => {
+    // `LIMIT 0, 100000` は SQLite では OFFSET 0 / LIMIT 100000。緩い正規表現だと
+    // 先頭の `0` だけが読まれて「上限以下」に見える（実測で通っていた）
+    expectRejected("SELECT name FROM spots LIMIT 0, 100000", "LIMIT は末尾に");
+    expectRejected("SELECT name FROM spots LIMIT 1e9", "LIMIT は末尾に");
+    // LIMIT の後ろに別の句が続く形も認めない（末尾固定にすることで、後から効く指定を防ぐ）
+    expectRejected("SELECT name FROM spots LIMIT 10 UNION SELECT name FROM spots", "LIMIT は末尾に");
+  });
+
+  it("末尾の OFFSET つきの正しい形は通す", () => {
+    // OFFSET が大きくても返る行数は LIMIT が抑えるので、行数の上限としては問題ない
+    expect(expectAccepted("SELECT name FROM spots LIMIT 10 OFFSET 5")).toBe("SELECT name FROM spots LIMIT 10 OFFSET 5");
+    // コメントは実行前に落ちるので、末尾コメント付きも正しい形として通る
+    expect(expectAccepted("SELECT name FROM spots LIMIT 10 OFFSET 5 -- 補足")).toBe(
+      "SELECT name FROM spots LIMIT 10 OFFSET 5",
+    );
+  });
+
   it("上限を超える指定は、書き換えずに拒否する", () => {
     // 黙って書き換えると、生成側は自分の指定が無効になったことに気づけない。
     // 拒否すればリトライで直せる（text-to-sql.ts が理由を添えて再生成する）

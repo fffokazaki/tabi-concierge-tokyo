@@ -234,6 +234,47 @@ describe("縮退（インフラ障害・出力不正）", () => {
     }
   });
 
+  it("依存が例外を投げても縮退する（500 にしない）", async () => {
+    // `LlmClient` / `SqlExecutor` は「throw しない」約束だが、約束は強制ではない。
+    // 例外が抜けると app.onError の 500 になり、設計した縮退が働かないまま利用者に
+    // エラーが返る。**縮退できる場所で 500 を出さない**
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await seed([{ name: "寛永寺", area: "上野" }]);
+      const throwing: LlmClient = {
+        async complete() {
+          throw new Error("注入された実装が例外を投げた");
+        },
+      };
+
+      expectFallback(await aggregate(MEISHO_ID, "上野の寺社を1件", depsWith(throwing)));
+      expect(spy).toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("縮退したこと自体は gaps に記録しない（障害をデータ欠損として集計しない）", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await seed([{ name: "寛永寺", area: "上野" }]);
+      const recorder = capturingGapRecorder();
+
+      const output = await aggregateDataset(
+        { datasetId: MEISHO_ID, intent: "上野の寺社を1件" },
+        recorder,
+        depsWith(scriptedLlm(new Error("推論サービスが落ちている"))),
+      );
+
+      // 縮退先が answered なので記録は0件。インフラ障害が
+      // 「このデータが足りない」として集計へ流れ込まないことの確認
+      expectAnswered(output);
+      expect(recorder.records).toHaveLength(0);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("必須の列が欠けていたら書き直させる", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {

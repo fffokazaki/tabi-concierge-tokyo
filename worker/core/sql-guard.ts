@@ -118,6 +118,66 @@ function scrub(sql: string): string {
   return out.join("");
 }
 
+/**
+ * コメントだけを取り除く（文字列リテラルは残す）。**実行する SQL を作るために使う。**
+ *
+ * `scrub` は検査用で、文字列リテラルまで空白に潰すので実行できない。検査を通った SQL を
+ * そのまま実行すると、**検査した文字列と実行する文字列が食い違う**。実測（Issue #119）で
+ * その隙間から `LIMIT` が迂回できた:
+ *
+ * ```
+ * 入力   SELECT * FROM spots; -- comment
+ * 検査   末尾のセミコロンとコメントを潰した形で通過
+ * 実行   SELECT * FROM spots; -- comment LIMIT 50   ← LIMIT がコメントの中。セミコロンも残る
+ * ```
+ *
+ * 検査した対象をそのまま実行できる形にするのがこの関数の役割である。
+ */
+function stripComments(sql: string): string {
+  const out: string[] = [];
+  let i = 0;
+  while (i < sql.length) {
+    const two = sql.slice(i, i + 2);
+    if (two === "--") {
+      while (i < sql.length && sql[i] !== "\n") i++;
+      out.push(" ");
+      continue;
+    }
+    if (two === "/*") {
+      const end = sql.indexOf("*/", i + 2);
+      i = end === -1 ? sql.length : end + 2;
+      out.push(" ");
+      continue;
+    }
+    if (sql[i] === "'" || sql[i] === '"') {
+      const quote = sql[i]!;
+      out.push(sql[i++]!);
+      while (i < sql.length) {
+        out.push(sql[i]!);
+        if (sql[i++] === quote) {
+          if (sql[i] === quote) {
+            out.push(sql[i++]!);
+            continue;
+          }
+          break;
+        }
+      }
+      continue;
+    }
+    out.push(sql[i++]!);
+  }
+  return out.join("").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * 許す `LIMIT` の形。**末尾に固定**し、整数だけを認める。
+ *
+ * 緩い `\blimit\s+(\d+)` は迂回できる（実測・Issue #119）:
+ * `LIMIT 0, 100000` は先頭の `0` だけが読まれて通り、SQLite では OFFSET 0 / LIMIT 100000 に
+ * なる。`LIMIT 1e9` も `1` として読まれる。**カンマ形式と式は認めない。**
+ */
+const LIMIT_TAIL = /\blimit\s+(\d+)\s*(?:offset\s+\d+\s*)?$/i;
+
 /** `FROM` / `JOIN` が指すテーブル名を集める。カンマ区切りの複数指定も拾う。 */
 function referencedTables(scrubbed: string): string[] {
   const tables: string[] = [];
@@ -171,11 +231,20 @@ export function guardSelect(sql: string): GuardResult {
     }
   }
 
-  const limit = /\blimit\s+(\d+)/i.exec(withoutTrailing);
-  if (limit) {
+  // **ここから先は「実行する文字列」を組み立てる。** 検査した対象と実行する対象を
+  // 一致させるため、コメントを除いた形にしてから末尾のセミコロンを落とす
+  const executable = stripComments(trimmed).replace(/;\s*$/, "").trim();
+  if (executable === "") return reject("SQL が空です");
+
+  if (/\blimit\b/i.test(withoutTrailing)) {
+    const limit = LIMIT_TAIL.exec(executable);
+    if (!limit) {
+      // カンマ形式（`LIMIT 0, 100000`）や式（`LIMIT 1e9`）はここで落ちる
+      return reject("LIMIT は末尾に `LIMIT <整数>`（必要なら `OFFSET <整数>`）の形で書いてください");
+    }
     if (Number(limit[1]) > MAX_LIMIT) return reject(`LIMIT は ${MAX_LIMIT} 以下にしてください`);
-    return { ok: true, sql: trimmed.replace(/;\s*$/, "") };
+    return { ok: true, sql: executable };
   }
   // 無ければ足す。上限を超えた指定は**書き換えずに拒否する**（黙って意図を変えない）
-  return { ok: true, sql: `${trimmed.replace(/;\s*$/, "")} LIMIT ${MAX_LIMIT}` };
+  return { ok: true, sql: `${executable} LIMIT ${MAX_LIMIT}` };
 }
