@@ -53,7 +53,7 @@ changeImpact: "medium"
 
 ```ts
 {
-  query?: string;       // trip.notes（その他のご希望）そのまま。空なら**キーごと送らない**
+  query?: string;       // trip.notes（その他のご希望）を trim して送る。空なら**キーごと送らない**
   interests?: string[]; // trip.interests を INTEREST_LABELS で日本語ラベルに変換した配列。空なら送らない
   area?: string;        // POC対象の代表エリア（例: "上野"、"渋谷"）
   category?: string;    // 例: "神社", "飲食店", "公共交通機関"
@@ -62,6 +62,8 @@ changeImpact: "medium"
 ```
 
 > **`trip.interests` は ASCII の識別子**（`"ramen"` / `"culture"` …）になった（[Issue #17](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/17)）。`interests` へ載せるときは `src/features/plan/labels.ts` の `INTEREST_LABELS` で日本語ラベルに変換する。バックエンドのマッチは日本語の部分一致なので、識別子をそのまま送ると1件も当たらない。
+>
+> `area` / `category` は API 契約として受け付けるキーだが、**プラン画面からは送らない**（エリアの入力欄が無い — Issue #42。分類の入力 UI も無い）。
 
 ### ✅ 採用済み（2026-08-21）: 構造化入力への移行（`interests`・ADR-011）
 
@@ -251,7 +253,7 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 
 #### 変更
 
-- §1 を構造化送信への切り替え（[Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53) のフロントエンド側）に合わせて更新: 入力仕様を `query`（`trip.notes` のみ・空なら省略）＋ `interests`（日本語ラベルの配列）へ書き換え、「🟡 提案」を「✅ 採用済み」に変更。`gaps` の節の「1つの自然文にまとめて送る」の記述を旧実装の説明へ改めた
+- §1 を構造化送信への切り替え（[Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53) のフロントエンド側）に合わせて更新: 入力仕様を `query`（`trip.notes` を trim・空なら省略）＋ `interests`（日本語ラベルの配列）へ書き換え、「🟡 提案」を「✅ 採用済み」に変更。`gaps` の節の「1つの自然文にまとめて送る」の記述を旧実装の説明へ改めた。`area` / `category` はプラン画面からは送らない旨の注記を追加（セルフレビュー指摘）
 
 ### [1.5.2] - 2026-08-20
 

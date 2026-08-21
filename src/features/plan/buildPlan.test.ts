@@ -91,13 +91,29 @@ describe("buildPlan", () => {
     expect(searchCall?.body).toMatchObject({ interests: ["ナイトライフ"], query: "上野で夜遊びしたい" });
   });
 
-  it("その他のご希望が空なら query キーごと省く（興味だけの呼び出し。空文字はバックエンドの検査で 400 になる）", async () => {
+  it("その他のご希望が空なら query キーごと省く（interests 併送時の空文字は境界で省略と同義に受理されるため、省くことだけが「空でも送ってよい」の誤読を防ぐ）", async () => {
     const { fetchImpl, calls } = happyPath();
     await buildPlan(DEFAULT_TRIP, { fetchImpl });
 
     const body = calls.find((call) => call.path === SEARCH)?.body as Record<string, unknown>;
     expect(body.interests).toEqual(["ラーメン", "文化"]);
     expect(body).not.toHaveProperty("query");
+  });
+
+  it("空白だけのご希望も query キーごと省く（trim の退行で「空はキーごと省く」の契約形が崩れたことに気づけるように）", async () => {
+    const { fetchImpl, calls } = happyPath();
+    await buildPlan({ ...DEFAULT_TRIP, interests: ["culture"], notes: "   " }, { fetchImpl });
+
+    const body = calls.find((call) => call.path === SEARCH)?.body as Record<string, unknown>;
+    expect(body).not.toHaveProperty("query");
+  });
+
+  it("ご希望の前後の空白は落として送る（trim 済みの値が query に載る）", async () => {
+    const { fetchImpl, calls } = happyPath();
+    await buildPlan({ ...DEFAULT_TRIP, interests: [], notes: " 浅草を回りたい " }, { fetchImpl });
+
+    const body = calls.find((call) => call.path === SEARCH)?.body as Record<string, unknown>;
+    expect(body.query).toBe("浅草を回りたい");
   });
 
   it("興味が無ければ interests キーごと省く（従来どおり query だけの呼び出し）", async () => {
@@ -161,7 +177,8 @@ describe("buildPlan", () => {
 
     const outcome = await buildPlan(DEFAULT_TRIP, { fetchImpl });
     // 検索そのものが unanswered の経路。サーバーが添える構造化欠損（Issue #70）は `areas` を
-    // 送らないと付かず、プラン画面は自然文に畳み込んで送るので常に空（Issue #94）
+    // 送らないと付かず、プラン画面は `interests` は送るが `areas` は送らないので常に空
+    //（Issue #94。興味の取り落ちは unanswered 側には載らない — API.md §3.1）
     expect(outcome).toEqual({
       kind: "unanswered",
       reason: "out_of_area",

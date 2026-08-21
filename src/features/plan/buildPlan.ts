@@ -104,9 +104,11 @@ export function buildQuery(trip: Trip): string {
  * バックエンドは返した候補が覆っていない興味を1件ずつ `gaps` に載せるが、その判定は
  * `interests` を送った呼び出しでしか働かない（API.md §3.1「部分欠損」）。
  *
- * 空の値は**キーごと省く**。空文字の `query` は境界（worker 側の検査）で 400 になり、
- * 空配列の `interests` は「送らない」と同じ扱いだが、契約の読み手に「空でも送ってよい」と
- * 誤読させないため揃えて省く。
+ * 空の値は**キーごと省く**。境界（`worker/core/parse.ts`）が空文字の `query` を 400 で
+ * 弾くのは `interests` が無い呼び出しだけで、`interests` がある呼び出しでは空文字も
+ * 省略と同義に受理される（parse が `""` へ正規化する）。つまりこの関数が作る形では
+ * 境界は防波堤にならず、**キーごと省くこの実装だけが「空でも送ってよい」という
+ * 誤読を防ぐ**。空配列の `interests` も「送らない」と同じ扱いだが、同じ理由で揃えて省く。
  *
  * エリアの指定はプロフィール画面に入力欄が無いため送らない（`areas` は使わない）。
  * 代表エリア（上野・浅草）を狙うには「その他のご希望」に地名を書く経路しか無く、
@@ -124,7 +126,11 @@ export function buildSearchInput(trip: Trip): { query?: string; interests?: stri
 
 export async function buildPlan(trip: Trip, options: BuildPlanOptions = {}): Promise<PlanOutcome> {
   const query = buildQuery(trip);
-  if (query === "") {
+  const searchInput = buildSearchInput(trip);
+  // ガードは表示用の全文（buildQuery）ではなく**実際に送る値**を見る。全文で判定すると、
+  // 将来 buildQuery に要素が足されたとき「全文は非空なのに検索には何も送らない」ずれが
+  // 黙って入る（ROUTE_STOP_LIMIT を MAX_STOP_COUNT から導出しているのと同じ考え方）
+  if (searchInput.query === undefined && searchInput.interests === undefined) {
     // 呼び出し側（この画面）の入力不足であって、オープンデータの欠損ではない。
     // unanswered として返すと、未回答の集計（DOMAIN.md §7）に自分たちの入力不足が積み上がる
     return {
@@ -133,7 +139,7 @@ export async function buildPlan(trip: Trip, options: BuildPlanOptions = {}): Pro
     };
   }
 
-  const searched = await callAndRead("search_datasets", buildSearchInput(trip), readCandidates, options);
+  const searched = await callAndRead("search_datasets", searchInput, readCandidates, options);
   if (searched.kind !== "answered") return searched.outcome;
 
   const extracted: { datasetId: string; result: AggregateResult }[] = [];
