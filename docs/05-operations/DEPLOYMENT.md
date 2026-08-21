@@ -1,6 +1,6 @@
 ---
 title: "DEPLOYMENT"
-version: "1.5.1"
+version: "1.6.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -223,6 +223,7 @@ npm run deploy  # vite build → wrangler deploy
 
 | 日時 | Version ID | 内容 | 確認 |
 | --- | --- | --- | --- |
+| 2026-08-22 | `5cd0c44f-a4ca-4814-98b7-4d74b32dae30` | `/mcp` 面の公開（#117 / PR #134 / ADR-008・MCP.md）。`worker/mcp.ts` の新規追加と `worker/index.ts` の1ルート追加のためデプロイ。`migrations/` `data/` `scripts/` `src/` は未変更のため、マイグレーション・シード・フロントの再確認は不要。**依存が増えたためバンドルが 131KB → 805KB**（gzip 193.36 KiB。Free の上限3MBに対し約6%）、Worker Startup Time は 4ms → 65ms（上限400ms） | **伝播待ちが要った** — デプロイ直後は `POST /mcp` が旧版に当たって Hono 既定の 404（`text/plain`）を返した。約20秒後に 200。GET だけ先に新版へ切り替わって見えるため、片方だけ見て判断しないこと。伝播後は両 era で確認 — legacy(2025): `tools/list` が3ツール、対象エリア外の `tools/call` が `isError` なしの `unanswered(out_of_area)`、入力の形の違反が `isError: true` ＋ `/api/*` と同一文言。modern(2026-07-28): `Mcp-Method` / `Mcp-Name` ヘッダ ＋ `_meta` エンベロープつきの `tools/call` が `resultType: "complete"` で `answered`。`GET /mcp` は 405（JSON-RPC のエラー本体つき・SPA に落ちない）。`/api/health` の `runtime` = `Cloudflare-Workers` で `/api/*` は従来どおり。**本番 D1 への書き込みが `/mcp` 経由で発生することを確認** — `gaps` に `MCP経由の本番確認・新宿の美術館 / 新宿 / 美術館 / out_of_area` が**解決後のエリアつきで**記録された（DOMAIN.md §8 不変条件4 が `/api/*` と `/mcp` の両経路で成立）。実クライアントの接続も確認 — `claude mcp add --transport http` → `claude mcp list` が `✔ Connected`。**推論の実行はまだ発生していない**（`env.AI.run()` を呼ぶコードが無いため AI Gateway のログにも積まれない） |
 | 2026-08-21 | `01092dd6-b67c-494a-af78-8199369841a9` | Workers AI の `ai` バインディングと AI Gateway 設定（`vars.AI_GATEWAY_ID`）の導入（#116 / PR #123 / ADR-013）。**挙動は変えていない**（コアからの LLM 呼び出しはまだ無い）。`wrangler.jsonc` のバインディング変更のためデプロイ（§3「いつデプロイするか」に本 PR で追加した契機そのもの）。`migrations/` `data/` `scripts/` `src/` は未変更のため、マイグレーション・シード・フロントの再確認は不要 | **バインディングが本番に渡ったことを deploy 出力で確認** — `env.AI`（AI）と `env.AI_GATEWAY_ID ("default")`（Environment Variable）が一覧に並ぶ。チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。コア3操作の挙動が従来と同一であることを実測 — `上野の寺社をめぐりたい` が `answered`（台東区・名所・史跡）、`新宿の美術館に行きたい` が HTTP 200 の `unanswered(out_of_area)` で文言も従来どおり。**本番 D1 への書き込みも従来どおり発生している** — 上記の実測で `gaps` に `新宿の美術館に行きたい / 新宿 / 美術館 / out_of_area` の行が**解決後のエリアつきで**記録された（DOMAIN.md §8 不変条件4 が本番で成立）。**推論の実行は本デプロイでは発生していない**（`env.AI.run()` を呼ぶコードがまだ無いため、AI Gateway のログにも積まれない。ゲートウェイ経由の実測はローカル `npm run dev` で実施済み） |
 | 2026-08-21 | `5aebf720-384e-41e5-a119-30ce85a0c3b8` | プラン画面の `search_datasets` 送信を構造化入力（`interests` + `query` は自由文のみ）へ切り替え（#53 / PR #113）。`src/features/plan/buildPlan.ts` の挙動変更に加え、`worker/core/operations.ts`・`worker/core/search-gaps.ts` はコメントのみの変更だが、`worker/` `src/` の変更のためデプロイ（§3「いつデプロイするか」）。`migrations/` `data/` `scripts/` は未変更のため、マイグレーション・シードは実行していない | チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。`index.html` のバンドル（`assets/index-mRCnRsbT.js`）はローカルビルドとハッシュ一致。Issue #53 の実測ケースを本番で確認 — `{"query":"上野で夜遊びしたい","interests":["ナイトライフ"]}` が `answered`（銭湯）を返しつつ `gaps` に「『ナイトライフ』について訊かれましたが…当たるものがありませんでした」を載せる（切り替え前は gaps 0件で沈黙していた入力）。同じ候補で aggregate（燕湯）→ provenance（銭湯・CC BY 4.0）の一連も `answered`。**本番 D1 への書き込みが発生している** — 上記の実測で `gaps` に `ナイトライフ、上野で夜遊びしたい / 上野 / other` の行（13:40:29）が記録されたことを確認（ADR-010 の想定どおりの通常挙動。構造化入力の興味は `question` 列へ「、」で畳み込まれて残る仕様） |
 | 2026-08-20 | `45f1755e-16ee-4682-8291-90b1c29accfe` | 未回答 `message` から名乗りの一文（「該当するオープンデータが（あり／見つかり）ません。」）を除去し、画面見出しとの重複を解消（#107 / PR #109）。`worker/core/search-gaps.ts`・`worker/core/operations.ts`・`shared/core.ts` の変更のためデプロイ（§3「いつデプロイするか」）。`migrations/` `data/` `scripts/` は未変更のため、マイグレーション・シードは実行していない | チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。`index.html` のバンドル（`assets/index-y-EHawRN.js`）はローカルビルドとハッシュ一致（`src/` は無変更だが、squash 後の develop からビルドして一致を確認）。コア3操作の代表経路を実測 — `上野の寺社をめぐりたい` が `answered`（名所・史跡）、`新宿の美術館に行きたい` が HTTP 200 の `unanswered(out_of_area)` で**新文面（名乗りなし・「「新宿」はこのアプリの対象エリア（上野・浅草・渋谷）の外です。」）**が返ること。**本番 D1 への書き込みが発生している** — 上記の実測で `gaps` に `新宿の美術館に行きたい / 新宿 / out_of_area` の行が記録されたことを確認（ADR-010 の想定どおりの通常挙動） |
@@ -453,6 +454,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.6.0] - 2026-08-22
+
+#### 追加
+
+- §3 のデプロイ記録に 2026-08-22 の反映（Version `5cd0c44f`・#117 / PR #134）を追記。`/mcp` 面の公開。伝播待ちで `POST /mcp` だけ旧版に当たった経緯（GET は先に切り替わって見える）、両 era での確認内容、`/mcp` 経由で本番 D1 に `gaps` が記録されたこと、`claude mcp add` で実クライアントが接続できたことを記録
 
 ### [1.5.1] - 2026-08-21
 
