@@ -81,23 +81,37 @@ export async function buildRecommendations(
   // 特定できない。単一チップのときだけ確信を持って理由タグを出す（Recommendation.reason 参照）
   const reason = activeInterest === "all" ? null : RECOMMENDATION_REASON_LABELS[activeInterest];
 
-  const extracted: { datasetId: string; result: AggregateResult }[] = [];
-  // 集計できなかった候補の理由。黙って落とすと「最初から候補が無かった」ように見える
-  // （Issue #89）ため、search_datasets の gaps と同じ経路で画面に出す
-  const aggregateGaps: Unanswered[] = [];
-  for (const candidate of searched.value.candidates) {
-    const aggregated = await callAndRead(
+  // 候補ごとの集計は互いに独立（前の結果を使わない）ので、**全件を先に投げてから候補順に
+  // 待つ**（Issue #142。プラン画面と同型 ―― `buildPlan.ts` と対で直す）。1件ずつ投げて待つと、
+  // 1回あたり約1.1秒（ほぼ全部が推論の待ち時間）が候補数ぶん積み上がる。「すべて」は候補が
+  // `RECOMMENDATION_LIMIT` 件まで出るので、プラン画面（4件）より積み上がりは大きい。
+  //
+  // `Promise.all` ではなく候補順に個別に待つ理由と、打ち切った promise を捨ててよい理由は
+  // `buildPlan.ts` の同じ箇所に書いてある（対で読むこと）
+  const pendingAggregates = searched.value.candidates.map((candidate) => ({
+    datasetId: candidate.datasetId,
+    pending: callAndRead(
       "aggregate_dataset",
       { datasetId: candidate.datasetId, intent: interests.join("、") },
       readAggregateResult,
       options,
-    );
-    if (aggregated.kind === "failure") return aggregated.outcome;
-    if (aggregated.kind === "unanswered") {
-      aggregateGaps.push(aggregated.unanswered);
+    ),
+  }));
+
+  const extracted: { datasetId: string; result: AggregateResult }[] = [];
+  // 集計できなかった候補の理由。黙って落とすと「最初から候補が無かった」ように見える
+  // （Issue #89）ため、search_datasets の gaps と同じ経路で画面に出す
+  const aggregateGaps: Unanswered[] = [];
+  for (const { datasetId, pending } of pendingAggregates) {
+    const outcome = await pending;
+    // 障害は候補順で最初のものを採って打ち切る（直列だったときと同じ結果。到着順にすると、
+    // 同じ入力でも実行のたびに違う障害が画面に出る）
+    if (outcome.kind === "failure") return outcome.outcome;
+    if (outcome.kind === "unanswered") {
+      aggregateGaps.push(outcome.unanswered);
       continue;
     }
-    extracted.push({ datasetId: candidate.datasetId, result: aggregated.value });
+    extracted.push({ datasetId, result: outcome.value });
   }
 
   if (extracted.length === 0) {

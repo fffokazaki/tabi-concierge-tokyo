@@ -36,8 +36,11 @@ export const jsonResponse = (body: unknown, status = 200): Response =>
  * パスごとに応答を決める fetch。呼ばれたパスとボディを記録する。
  * 応答はリクエストボディから作れるようにしてある（呼ばれた回数で分岐すると、
  * 同じテストで2回ルートを取り直したときに崩れる）。
+ *
+ * ハンドラは `Promise<Response>` を返してもよい。応答を保留できないと
+ * 「候補の集計が同時に投げられているか」を確かめられない（Issue #142）。
  */
-export function stubFetch(byPath: Partial<Record<string, (body: unknown) => Response>>) {
+export function stubFetch(byPath: Partial<Record<string, (body: unknown) => Response | Promise<Response>>>) {
   const calls: { path: string; body: unknown }[] = [];
   const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input);

@@ -69,6 +69,9 @@ describe("buildPlan", () => {
     const { fetchImpl, calls } = happyPath();
     await buildPlan(DEFAULT_TRIP, { fetchImpl });
 
+    // 集計は同時に投げるが、記録の並びは候補順のまま（`callAndRead` は最初の `await` まで
+    // 同期に進むので、fetch 自体は候補順に呼ばれる）。この行が見ているのは**呼ぶ順**であって
+    // 待ち方ではない ―― fetch の手前に `await` が入ると、並列化と無関係にここが落ちる
     expect(calls.map((call) => call.path)).toEqual([SEARCH, AGGREGATE, AGGREGATE, PROVENANCE]);
   });
 

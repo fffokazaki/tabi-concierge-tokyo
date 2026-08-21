@@ -1,10 +1,10 @@
 ---
 title: "API_REQUIREMENTS"
-version: "1.6.0"
+version: "1.7.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-16"
-updated: "2026-08-21"
+updated: "2026-08-22"
 changeImpact: "medium"
 ---
 
@@ -21,6 +21,12 @@ changeImpact: "medium"
 **現状**: プラン画面は **2026-08-17 に3操作へ接続済み**（[Issue #31](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/31)）。`mockScenarios.ts` の静的な仮データは削除し、`search_datasets` → `aggregate_dataset` → `get_provenance` の応答から旅程と出典チップを組み立てています。組み立ては `src/features/plan/buildPlan.ts`、通信と障害分類は `src/api/coreOperations.ts`。
 
 バックエンドは `worker/core/` の固定データによるスタブのままですが、**入出力の形は本実装（Step 5）でも変えません**。
+
+**呼び出しの並びの注記（2026-08-22・[Issue #142](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/142)）**: プラン画面・あなたへ画面とも、**候補ごとの `aggregate_dataset` を同時に投げます**（`search_datasets` の応答を受けたら候補の件数ぶん一斉に送り、結果は候補順に待つ）。Step 5 で1リクエストが約1.1秒（ほぼ全部が推論の待ち時間）になり、1件ずつ待つと旅程が出るまで5〜6秒かかっていたためです。
+
+- **プロトコルは変わりません。** 送る入出力も、呼ぶ順（`search_datasets` → `aggregate_dataset` → `get_provenance`）も従来どおりで、**バックエンドが同一 intent の並行リクエストを受けられること**だけが前提です（本番実測 2026-08-22: 4件同時で合計 1.55 秒・6件同時で合計 2.28 秒、いずれも全件 200 で 429 なし）
+- **同時に飛ぶ最大件数は `search_datasets` の `limit` と同じ** — プラン画面が4件（`ROUTE_STOP_LIMIT`）、あなたへ画面が6件（`RECOMMENDATION_LIMIT`）
+- **候補のどれかが障害を返したときは、候補順で最初のものを採って打ち切ります**（残りの応答は待たない）。未回答（`unanswered`）は従来どおり候補順に `gaps` へ積みます
 
 **この接続で分かったこと2点**:
 
@@ -248,6 +254,12 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 | `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物しか返らない。** 無ければ `unanswered`。別エリアの施設で代替されることはないので、画面は返ってきた `name` をそのまま信用してよい |
 
 ## Changelog
+
+### [1.7.0] - 2026-08-22
+
+#### 追加
+
+- 「現状」に**呼び出しの並びの注記**を追加（[Issue #142](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/142)）。候補ごとの `aggregate_dataset` を同時に投げるようになった。プロトコルは変わらないが、バックエンドが並行リクエストを受ける前提が増えるためインターフェース文書へ明記した（本番実測の裏取りつき）
 
 ### [1.6.0] - 2026-08-21
 
