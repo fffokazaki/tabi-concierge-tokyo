@@ -565,6 +565,12 @@ describe("buildRecommendations の集計を同時に投げる（Issue #142）", 
     candidate(BUNKAZAI_ID, "文化財一覧"),
   ];
 
+  const NAME_BY_ID: Record<string, string> = {
+    [MEISHO_ID]: "寛永寺",
+    [BUNKA_ID]: "国立西洋美術館",
+    [BUNKAZAI_ID]: "絹本著色元三大師画像",
+  };
+
   it("1件目の応答を待たずに残りの候補も投げる（直列だと候補数ぶん待ち時間が積み上がる）", async () => {
     let release!: () => void;
     const held = new Promise<void>((resolve) => {
@@ -575,11 +581,20 @@ describe("buildRecommendations の集計を同時に投げる（Issue #142）", 
     const { fetchImpl } = stubFetch({
       [SEARCH]: () => json({ status: "answered", candidates: THREE_CANDIDATES }),
       [AGGREGATE]: async (body) => {
-        started.push((body as { datasetId: string }).datasetId);
+        const datasetId = (body as { datasetId: string }).datasetId;
+        started.push(datasetId);
         await held; // 応答を止めたまま、後続の候補が投げられるかを見る
-        return json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" });
+        return json({ status: "answered", result: { name: NAME_BY_ID[datasetId], summary: "…" }, query: "q" });
       },
-      [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
+      [PROVENANCE]: () =>
+        json({
+          status: "answered",
+          sources: [
+            source(MEISHO_ID, "名所・史跡"),
+            source(BUNKA_ID, "文化観光施設"),
+            source(BUNKAZAI_ID, "文化財一覧"),
+          ],
+        }),
     });
 
     const pending = buildRecommendations("culture", { fetchImpl });
@@ -588,7 +603,35 @@ describe("buildRecommendations の集計を同時に投げる（Issue #142）", 
     } finally {
       release();
     }
-    await pending;
+    // 保留を解いたあと最後まで組み上がることまで見る（`await pending` だけだと failure でも通る）
+    const outcome = expectRecs(await pending);
+    expect(outcome.recommendations.map((rec) => rec.name)).toEqual([
+      "寛永寺",
+      "国立西洋美術館",
+      "絹本著色元三大師画像",
+    ]);
+  });
+
+  it("障害が複数あっても、候補順で最初のものを返す（到着順ではない）", async () => {
+    // 到着順に採ると、同じ入力でも実行のたびに違う障害（HTTP か通信断か）が画面に出る
+    const { fetchImpl, calls } = stubFetch({
+      [SEARCH]: () => json({ status: "answered", candidates: THREE_CANDIDATES }),
+      [AGGREGATE]: async (body) => {
+        const datasetId = (body as { datasetId: string }).datasetId;
+        if (datasetId === MEISHO_ID) {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          return json({ error: "internal_error", message: "D1 が応答しません" }, 500);
+        }
+        if (datasetId === BUNKA_ID) throw new TypeError("Failed to fetch"); // 即時の通信断
+        return json({ status: "answered", result: { name: "絹本著色元三大師画像", summary: "…" }, query: "q" });
+      },
+      [PROVENANCE]: () => json({ status: "answered", sources: [source(BUNKAZAI_ID, "文化財一覧")] }),
+    });
+
+    const outcome = await buildRecommendations("culture", { fetchImpl });
+    expect(outcome.kind === "failure" && outcome.failure.kind).toBe("http");
+    expect(outcome.kind === "failure" && outcome.failure.status).toBe(500);
+    expect(calls.map((c) => c.path)).not.toContain(PROVENANCE);
   });
 
   it("応答が候補順と違う順に返っても、レコメンドと gaps の並びは候補順のまま", async () => {

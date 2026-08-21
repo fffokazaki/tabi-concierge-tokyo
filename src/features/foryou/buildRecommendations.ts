@@ -86,9 +86,12 @@ export async function buildRecommendations(
   // （ほぼ全部が推論の待ち時間）が候補数ぶん積み上がる。「すべて」は候補が
   // `RECOMMENDATION_LIMIT` 件まで出るので、プラン画面（4件）より積み上がりは大きい。
   //
-  // `callAndRead` は例外を投げない（`callCoreOperation` が全経路を分類して返す）ので、
-  // `Promise.all` が1件の reject で他の結果を捨てることは無い。**そこが崩れたら
-  // `allSettled` へ移すこと** ―― 捨てられた結果は gaps に載らず、静かに消える
+  // `Promise.all` は**最初の reject で他の結果を捨てる**。ここはそれで困らない前提に
+  // 乗っている ―― `callCoreOperation` が入力・通信・HTTP・解析の失敗をすべて分類して
+  // **返す**ので、`callAndRead` は通常経路で reject しない（唯一の抜けは `fetchImpl` が
+  // Response 以外を解決したとき。実 fetch では起きず、壊れたテスト用スタブだけの話）。
+  // **reject する経路を足したら `allSettled` へ移すこと** ―― 捨てられた候補の未回答は
+  // gaps に載らず、静かに消える
   const aggregated = await Promise.all(
     searched.value.candidates.map(async (candidate) => ({
       datasetId: candidate.datasetId,
