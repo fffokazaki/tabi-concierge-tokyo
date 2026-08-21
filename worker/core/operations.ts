@@ -15,6 +15,7 @@ import { REPRESENTATIVE_AREAS } from "../../shared/core";
 import { CATALOG, findEntry, RESTAURANT_DATASET_ID, type CatalogEntry, type CatalogSample } from "./catalog";
 import type { GapRecord, GapRecorder } from "./gaps";
 import type { CoreDeps } from "./llm";
+import { aggregateViaTextToSql } from "./text-to-sql";
 import {
   areaOnlyFallbackUnanswered,
   askedAreas,
@@ -425,11 +426,55 @@ export async function aggregateDataset(
   recorder: GapRecorder,
   deps: CoreDeps,
 ): Promise<AggregateDatasetOutput> {
-  // `deps` はまだ使っていない。D1 実照会（Text-to-SQL）への差し替えは
-  // [Issue #119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119)。
-  // 必須引数にしてある理由は `searchDatasets` の doc を参照
-  void deps;
-  return recorded(computeAggregateDataset(input), aggregateGapContext(input), recorder);
+  return recorded(await resolveAggregate(input, deps), aggregateGapContext(input), recorder);
+}
+
+/**
+ * 前段ガード → D1 実照会 → （失敗したら）キーワード実装への縮退、の順で答えを決める
+ * （[Issue #119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119)）。
+ *
+ * ## 縮退先が「以前の実装そのもの」であること
+ *
+ * `computeAggregateDataset` には**一切手を入れていない**。LLM も D1 も使えないときに
+ * 返るのは、Step 5 以前とビット単位で同じ応答である。「縮退したつもりで別物を返していた」
+ * という壊れ方を、コードの形として起こらなくしてある。
+ *
+ * ## 失敗の分類（何を記録し、何を記録しないか）
+ *
+ * | 何が起きたか | 返すもの | `gaps` |
+ * | --- | --- | --- |
+ * | (a) LLM / D1 の障害・(b) 出力不正 | キーワード実装の応答へ縮退 ＋ `console.error` | 縮退先が未回答ならそちらの理由で記録される |
+ * | (c) SQL は通ったが0行 | `data_not_published` の未回答 | **する** |
+ *
+ * (c) を記録するのは、それが**障害ではなく答え**だからである。「探したが無かった」は
+ * DOMAIN.md §7 のデータ公開リクエストへ還元すべき一次情報で、握りつぶすと
+ * このプロジェクトのコアドメインの半分が成立しない。
+ */
+async function resolveAggregate(
+  input: AggregateDatasetInput,
+  deps: CoreDeps,
+): Promise<AggregateDatasetOutput> {
+  const guard = guardAggregate(input);
+  // 未知 ID・ジャンル×飲食店・統計表・エリア外は D1 を引く前に確定する。
+  // ここを LLM の後ろに回すと、実データで検証済みの誠実な未回答（ラーメン ＝ 粒度不足）が
+  // 「それらしい行」に置き換わる
+  if (guard.kind === "terminal") return guard.output;
+
+  const outcome = await aggregateViaTextToSql(input, guard.entry, deps);
+  if (outcome.kind === "answered") {
+    return { status: "answered", result: outcome.result, query: outcome.query };
+  }
+  if (outcome.kind === "empty") {
+    return sqlNoRowUnanswered(guard.entry.title, input.intent);
+  }
+
+  // Workers で観測できるのは console.* → wrangler tail / Logpush だけ。
+  // 縮退は応答を返すので、記録しないと**本番で LLM 経路が死んでいても誰も気づけない**
+  console.error("[aggregate] Text-to-SQL に失敗したためキーワード実装へ縮退します", {
+    datasetId: input.datasetId,
+    cause: outcome.cause,
+  });
+  return extractFromSamples(input, guard.entry);
 }
 
 /**
@@ -441,30 +486,49 @@ const aggregateGapContext = (input: AggregateDatasetInput): GapContext => ({
   area: findNonTargetArea(input.intent) ?? findRepresentativeArea(input.intent),
 });
 
-function computeAggregateDataset(input: AggregateDatasetInput): AggregateDatasetOutput {
+/**
+ * 前段ガードだけを通した結果。
+ *
+ * `computeAggregateDataset`（＝縮退経路）と `aggregateDataset`（＝D1 実照会）の**両方**が
+ * これを使う。ガードの traversal を2箇所に書くと、片方だけ緩んでも型では気づけない
+ * （「ラーメンは粒度不足」のような、実データで検証済みの誠実な未回答が LLM 経路でだけ
+ * 消える、という形で壊れる）。
+ *
+ * `terminal` はここで答えが確定したもの。`query` は「D1 を引きに行ってよい」という判断。
+ */
+type AggregateGuard =
+  | { kind: "terminal"; output: AggregateDatasetOutput }
+  | { kind: "query"; entry: CatalogEntry };
+
+function guardAggregate(input: AggregateDatasetInput): AggregateGuard {
   const datasetId = input.datasetId.trim();
   const entry = findEntry(datasetId);
+  const terminal = (output: AggregateDatasetOutput): AggregateGuard => ({ kind: "terminal", output });
+
   if (!entry) {
     // オープンデータの欠損ではなく呼び出し側の指定違い。`data_not_published` に混ぜると
     // 未回答の集計（DOMAIN.md §7）が汚れるため `other` に置く
-    return unanswered(
-      "other",
-      `データセットID「${datasetId}」は利用中の10件に含まれていません。`,
+    return terminal(
+      unanswered("other", `データセットID「${datasetId}」は利用中の10件に含まれていません。`),
     );
   }
 
   const genre = findFirstTerm(input.intent, CUISINE_GENRE_TERMS);
   if (genre && entry.datasetId === RESTAURANT_DATASET_ID) {
-    return unanswered(
-      "insufficient_granularity",
-      `「${entry.title}」はジャンルの列を持たないため、「${genre}」の粒度では抽出できません。`,
+    return terminal(
+      unanswered(
+        "insufficient_granularity",
+        `「${entry.title}」はジャンルの列を持たないため、「${genre}」の粒度では抽出できません。`,
+      ),
     );
   }
 
   if (entry.samples.length === 0) {
-    return unanswered(
-      "insufficient_granularity",
-      `「${entry.title}」は施設一覧ではなく集計表のため、個別の地物を抽出できません。`,
+    return terminal(
+      unanswered(
+        "insufficient_granularity",
+        `「${entry.title}」は施設一覧ではなく集計表のため、個別の地物を抽出できません。`,
+      ),
     );
   }
 
@@ -472,12 +536,29 @@ function computeAggregateDataset(input: AggregateDatasetInput): AggregateDataset
   // 検索で弾かれた問いが集計では答えられてしまう
   const nonTarget = findNonTargetArea(input.intent);
   if (nonTarget) {
-    return unanswered(
-      "out_of_area",
-      `「${nonTarget}」はこのアプリの対象エリア（${REPRESENTATIVE_AREAS.join("・")}）の外です。`,
+    return terminal(
+      unanswered(
+        "out_of_area",
+        `「${nonTarget}」はこのアプリの対象エリア（${REPRESENTATIVE_AREAS.join("・")}）の外です。`,
+      ),
     );
   }
 
+  return { kind: "query", entry };
+}
+
+/**
+ * 固定サンプルから1件を取り出す（Step 5 以前の実装そのもの）。
+ *
+ * **前段ガード（未知 ID・ジャンル×飲食店・統計表・エリア外）は `guardAggregate` が
+ * 済ませている前提で呼ぶ。** 以前はこの関数がガードも持っていたが、`resolveAggregate` が
+ * 必ず `guardAggregate` を先に通す構造にしたことで到達不能になった。到達不能なガードは
+ * 編集しても何も起きない一方、「守られている」という誤った安心を与えるので畳んである
+ * （変異テストで、そのコピーを外しても274件すべて緑のままだったことを確認済み）。
+ *
+ * Text-to-SQL が使えないときの**縮退先**であり、返す応答は Step 5 以前と同じ形をしている。
+ */
+function extractFromSamples(input: AggregateDatasetInput, entry: CatalogEntry): AggregateDatasetOutput {
   const extracted = (sample: CatalogSample, selection: string): AggregateDatasetOutput => ({
     status: "answered",
     result: { name: sample.name, summary: sample.summary },
@@ -533,6 +614,34 @@ export const rowMissingUnanswered = (title: string, area: RepresentativeArea): U
  */
 export const areaNotPublishedUnanswered = (title: string, area: RepresentativeArea): Unanswered =>
   unanswered("data_not_published", `「${title}」は「${area}」の地物を収録していません。`);
+
+/**
+ * D1 実照会（Text-to-SQL）が0行を返したときの未回答（[Issue #119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119)）。
+ *
+ * ## なぜ `data_not_published` ではなく `other` なのか
+ *
+ * 0行が意味するのは「**生成された SQL の WHERE 句に当たる行が無かった**」ことであって、
+ * 「そのデータが公開されていない」ことではない。SQL を書いたのは LLM で、意図をうまく
+ * 表現できていなかった可能性が残る。API.md §4 は `data_not_published` を
+ * 「存在しないことを**確かめられた**場合。最も強い主張なので、迷ったら使わない」と定めており、
+ * ここはその条件を満たさない（絶対ルール #1）。
+ *
+ * `other` の定義「利用中の10件では答えられない（カタログ全体に無いとは言えない）」が実態に合う。
+ *
+ * ## 述語
+ *
+ * 断定せず「見つかりませんでした」を使う（[Issue #59](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/59) の使い分け）。
+ * 確かめたのは「実行した照会が当たらなかった」ことだけなので、述語もそこまでに留める。
+ * 名乗りの一文は付けない（[Issue #107](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/107)）。
+ *
+ * **これは障害ではなく答えである。** `gaps` に記録され、DOMAIN.md §7 のデータ公開リクエストへ
+ * 還元される（縮退（インフラ障害・出力不正）とはっきり区別すること）。
+ */
+export const sqlNoRowUnanswered = (title: string, intent: string): Unanswered =>
+  unanswered(
+    "other",
+    `「${title}」の収録行を照会しましたが、「${intent}」に当てはまる行は見つかりませんでした。`,
+  );
 
 /**
  * 出典取得。

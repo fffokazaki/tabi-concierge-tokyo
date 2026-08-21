@@ -1,10 +1,10 @@
 ---
 title: "MASTER"
-version: "1.5.1"
+version: "1.6.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-21"
+updated: "2026-08-22"
 changeImpact: "low"
 ---
 
@@ -185,7 +185,7 @@ AIツールがランタイム・依存のバージョンを選定する際は、
 | Server routing | Hono | 4.13.x | 2026-08-15 / npm | Workers ネイティブ |
 | Protocol | MCP（`agents` 0.21.x ＋ `@modelcontextprotocol/server` 2.0.x） | **実装済み**（`/mcp`・`worker/mcp.ts`） | 2026-08-21 / npm ＋ `worker/mcp.test.ts` の実測 | `McpAgent` は deprecated。ステートレス実装を使い DO は使わない。ツールの `inputSchema` は「広告」で、検査の実体は `parse.ts`（[MCP.md](./02-design/MCP.md) §3） |
 | Database | Cloudflare D1 | **導入済み**（`tabi-concierge-tokyo`・APAC） | 2026-08-16 / `wrangler d1` | ADR-007 で採用。Text-to-SQL の実行基盤 ＋ 未回答ログ。スキーマは `migrations/0001_init.sql` |
-| AI | Cloudflare Workers AI（AI Gateway 経由） | **バインディング導入済み**（`AI` ＋ `vars.AI_GATEWAY_ID`）。コアからの呼び出しは未着手（Step 3） | 2026-08-21 / `wrangler types` ＋ 実 API 疎通 | モデルは `@cf/qwen/qwen3-30b-a3b-fp8`。**思考モデルなのでプロンプト末尾に `/no_think` が要る**（[LLM-MODEL-CANDIDATES.md](./06-reference/LLM-MODEL-CANDIDATES.md) §4）。推論は必ず AI Gateway 経由（ADR-013） |
+| AI | Cloudflare Workers AI（AI Gateway 経由） | **`aggregate_dataset` で使用中**（Text-to-SQL・Issue #119）。`search_datasets` の LLM 化は Issue #120 | 2026-08-21 / `wrangler types` ＋ 実 API 疎通 | モデルは `@cf/qwen/qwen3-30b-a3b-fp8`。**思考モデルなのでプロンプト末尾に `/no_think` が要る**（[LLM-MODEL-CANDIDATES.md](./06-reference/LLM-MODEL-CANDIDATES.md) §4）。推論は必ず AI Gateway 経由（ADR-013） |
 | Infra | Cloudflare Workers | マネージド | - | サーバーレス。コンテナは使わない |
 
 > **未確認の扱い**: 上表の「未確認」は、推測で埋めずに実装着手時へ持ち越している項目。実バージョンを確認したら本表と [ARCHITECTURE.md](./02-design/ARCHITECTURE.md) §8 を同時に更新すること。
@@ -368,7 +368,7 @@ tabi-concierge-tokyo/
 ## セキュリティ要件
 
 - [ ] 入力値のサニタイゼーション
-- [ ] SQLインジェクション対策 — Text-to-SQL で生成したクエリが同梱データ以外へ到達しないことを確認する
+- [x] SQLインジェクション対策 — Text-to-SQL で生成したクエリが同梱データ以外へ到達しないことを確認した（[Issue #119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119)）。静的検証は `worker/core/sql-guard.ts`、攻撃ケースの網羅は `worker/core/sql-guard.test.ts`（35件）。**当初想定した「`db.prepare()` が複文を止める」2層目は実測で成り立たなかった**ため、封じ込めは sql-guard **のみ**が担う（`worker/core/llm.ts` の doc に実測を記録）。加えて実行後に返り行の `dataset_id` を検証し、指定外のデータセットが混ざった場合は縮退する（構文チェックでは偽装できる `WHERE dataset_id = 'X' OR 1=1` を、意味の側で塞ぐ）
 - [ ] XSS対策
 - [ ] CSRF対策
 - [ ] 適切な認証・認可 — POC では認証を伴う機能を実装しない方針（外部公開時に再設計）
@@ -785,6 +785,13 @@ Changelog エントリには以下のカテゴリを使用する（[Keep a Chang
 - [ ] 定数の配置が層責務に沿っている（Domain/Application/Infrastructure）
 
 ## Changelog
+
+### [1.6.0] - 2026-08-22
+
+#### 変更
+
+- セキュリティ要件の「SQLインジェクション対策」を達成済みに更新（[Issue #119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119)）。担保しているファイルとテストを明記し、当初想定した2層目が実測で成り立たなかったこと・実行後の行検証を足したことも記載
+- 技術スタック表の AI 行を「バインディング導入済み」から「`aggregate_dataset` で使用中」へ
 
 ### [1.5.1] - 2026-08-21
 

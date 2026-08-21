@@ -1,10 +1,10 @@
 ---
 title: "API"
-version: "1.8.2"
+version: "1.9.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-21"
+updated: "2026-08-22"
 changeImpact: "low"
 ---
 
@@ -285,6 +285,12 @@ interests=["ラーメン","文化","家族向け","自然"] / limit=4（修正�
 | `out_of_area` | POC の対象エリア（上野・浅草・渋谷）の外 |
 | `other` | 上記のいずれにも当てはまらない。**利用中の10件では答えられない**（カタログ全体に無いとは言えない）場合もここ |
 
+**D1 実照会（Text-to-SQL・[Issue #119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119)）が0行を返した場合も `other` を使う。** `data_not_published` にしないのは、0行が示すのは「**生成された WHERE 句に当たる行が無かった**」ことであって「そのデータが公開されていない」ことではないため。SQL を書いたのは LLM で、意図をうまく表現できていなかった可能性が残る（`data_not_published` は「存在しないことを確かめられた」場合の最も強い主張なので、迷ったら使わない — 上表）。
+
+述語も断定しない（「〜見つかりませんでした」）。確かめたのは実行した照会が当たらなかったことだけである。文言は `sqlNoRowUnanswered`（`worker/core/operations.ts`）が持つ。
+
+> **これは障害と区別される。** LLM やD1 の障害・生成 SQL の出力不正は「答えられなかった」のではなく「答えを取りに行けなかった」ので、キーワード実装へ**縮退**し（応答は従来と同じ形になる）、`gaps` には記録しない。記録されるのは0行のときだけ。縮退したことは `console.error` に残す。
+
 「利用中の10件に無いデータセットID」は `other` に分類する。これはオープンデータの欠損ではなく呼び出し側の指定違いなので、`data_not_published` に混ぜると未回答の集計（[DOMAIN.md](./DOMAIN.md) §7 のデータ公開リクエスト）が汚れる。
 
 「根拠情報」の必須項目は操作の性質で決まる。
@@ -351,6 +357,12 @@ interests=["ラーメン","文化","家族向け","自然"] / limit=4（修正�
 - **サンドボックス環境**: 未定
 
 ## Changelog
+
+### [1.9.0] - 2026-08-22
+
+#### 追加
+
+- §4 に、D1 実照会（Text-to-SQL・[Issue #119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119)）が0行を返したときの分類（`other`）と述語（断定しない）を追記。`data_not_published` を使わない理由（0行は「生成された WHERE 句に当たらなかった」ことしか示さない）と、障害による縮退とは記録の扱いが違うことを明記
 
 ### [1.8.2] - 2026-08-21
 
