@@ -1,10 +1,10 @@
 ---
 title: "ROADMAP"
-version: "1.0.0"
+version: "1.1.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-17"
+updated: "2026-08-21"
 changeImpact: "low"
 ---
 
@@ -82,7 +82,7 @@ changeImpact: "low"
 
 チームshiwata。役割は**提出資料（16:9）のチーム紹介パート**で提示する（必須4項目の④）。
 
-> 提出資料（16:9・8/23 締切）と First Stage スライド（8枚・[first-stage-presentation.md](../first-stage-presentation.md)）は**別のデッキ**。後者の #6 は「独自性」であり、チーム紹介スライドは含まない。スライド番号を書くときはどちらのデッキか明示すること。
+> 提出資料（16:9・14枚・8/23 締切・[submission-deck.md](../submission-deck.md)）と First Stage スライド（8枚・[first-stage-presentation.md](../first-stage-presentation.md)）は**別のデッキ**。後者はチーム紹介スライドを含まない（2分に収めるため）。スライド番号を書くときはどちらのデッキか明示すること。
 
 ### 予算配分
 
@@ -94,7 +94,7 @@ changeImpact: "low"
 
 | 依存元 | 依存先 | 内容 |
 | ------ | ------ | ---- |
-| 画面キャプチャ | 代表エリアの画面イメージ | 切り出し元の候補が2案ある（未確定）: デモ動画の絵コンテ カット2・5・6 ／ First Stage スライド #3・#4・#5（[first-stage-presentation.md](../first-stage-presentation.md)）。提出前に一本化する |
+| 画面キャプチャ | 本番アプリの実画面 | **2026-08-21 に一本化**: 提出資料 [submission-deck.md](../submission-deck.md) のスライド6（プラン生成）・7（あなたへ）・8（ラーメンに答えない）を、本番URLから 1600×900px で切り出す |
 | デモ動画 | 画面イメージ | 画面が固まらないと録画できない |
 | 収録枠予約 | 提出フォーム送信 | 提出しないと予約できず、枠は早い者順 |
 | MCP 接続 POC | オープンデータの同梱 | データがないとツール呼び出しの意味が示せない |
@@ -159,6 +159,13 @@ changeImpact: "low"
 | 2026-08-15 | スコープを POC レベルへ縮小、アーキテクチャを MCP 構成に確定 |
 
 ## Changelog
+
+### [1.1.0] - 2026-08-21
+
+#### 変更
+
+- §5 の画面キャプチャ依存を一本化。切り出し元は本番アプリの実画面（提出資料スライド6/7/8）で確定し、「候補が2案ある（未確定）」を解消した
+- §4 の2デッキ注記に提出資料 [submission-deck.md](../submission-deck.md) へのリンクを追加。First Stage スライドの旧 #6「独自性」への言及は、8枚構成の刷新（first-stage-presentation.md v2.0）に伴い一般的な記述へ改めた
 
 ### [1.0.0] - 2026-08-17
 
