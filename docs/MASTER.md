@@ -1,6 +1,6 @@
 ---
 title: "MASTER"
-version: "1.4.0"
+version: "1.5.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -603,7 +603,8 @@ metrics:
 ### 企画・プレゼン資料（`/init-docs` 以前から存在）
 
 - [proposal-summary.md](./proposal-summary.md) - 企画概要 v1.0
-- [first-stage-presentation.md](./first-stage-presentation.md) - First Stage プレゼン構成・台本
+- [submission-deck.md](./submission-deck.md) - 提出資料（16:9・14枚）の構成と文言。必須4項目・3層区別ルール・提出前チェックリスト。**フルバージョンはこちら**
+- [first-stage-presentation.md](./first-stage-presentation.md) - First Stage 2分スライド（8枚）と台本。submission-deck.md からの切り出し
 
 ### 品質・セキュリティ（推奨拡張・初期セット外）
 
@@ -784,6 +785,12 @@ Changelog エントリには以下のカテゴリを使用する（[Keep a Chang
 - [ ] 定数の配置が層責務に沿っている（Domain/Application/Infrastructure）
 
 ## Changelog
+
+### [1.5.0] - 2026-08-21
+
+#### 追加
+
+- 文書索引の「企画・プレゼン資料」に [submission-deck.md](./submission-deck.md)（提出資料 16:9・14枚の構成 SSOT）を追加。[first-stage-presentation.md](./first-stage-presentation.md) はそこからの切り出しである関係を明記した（[PR #124](https://github.com/fffokazaki/tabi-concierge-tokyo/pull/124)）
 
 ### [1.4.0] - 2026-08-21
 
