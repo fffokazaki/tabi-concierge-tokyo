@@ -1,6 +1,6 @@
 ---
 title: "ARCHITECTURE"
-version: "1.3.0"
+version: "1.3.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -189,7 +189,7 @@ graph LR
 | Server routing | Hono | 4.13.x | Workers ネイティブ。軽量 | - |
 | Runtime（本番） | workerd | `compatibility_date: 2026-08-15` | Node ではない。バージョンは日付で固定する | - |
 | Runtime（ツール） | Node.js | 24（`.nvmrc` / `engines`） | wrangler と Vite を起動するホスト。本番には存在しない | - |
-| Protocol | MCP（`createMcpHandler`） | 未着手（Step 5） | `McpAgent` は deprecated。ステートレス実装のため Durable Objects が不要 | ADR-008 |
+| Protocol | MCP（`agents@0.21` の `createMcpHandler` ＋ `@modelcontextprotocol/server@2.0`） | **実装済み**（`/mcp`・`worker/mcp.ts`） | `McpAgent` は deprecated。ステートレス実装のため Durable Objects が不要。プロトコル版は modern `2026-07-28` / legacy `2025-11-25` の2本立て（[MCP.md](./MCP.md) §4） | ADR-008 |
 | Database | Cloudflare D1 | **導入済み**（`tabi-concierge-tokyo`・APAC） | Text-to-SQL の実行基盤 ＋ 未回答ログの保持先。スキーマは `migrations/0001_init.sql`（datasets / spots / gaps） | ADR-007 |
 | AI | Cloudflare Workers AI（AI Gateway 経由） | **バインディング導入済み**（`AI` ＋ `vars.AI_GATEWAY_ID`）。コアからの呼び出しは未着手（Step 3） | モデルは `@cf/qwen/qwen3-30b-a3b-fp8`（日本語が公式サポート内・単価は当初案とほぼ同額。[LLM-MODEL-CANDIDATES.md](../06-reference/LLM-MODEL-CANDIDATES.md)）。推論は必ず AI Gateway を前段に挟む | ADR-002 / ADR-013 |
 | Cloud | Cloudflare Workers | マネージド | 主催者提供スタック | ADR-002 |
@@ -332,6 +332,12 @@ Phase 番号は [ROADMAP.md](../07-project-management/ROADMAP.md) に準拠す�
 | Phase 4（Final Stage 準備） | 〜2026-10-17 | 介助者モード・音声対応、都への API 公開提案、動的取り込みの検討 |
 
 ## Changelog
+
+### [1.3.1] - 2026-08-21
+
+#### 変更
+
+- §8 の技術スタック表の Protocol 行を「未着手（Step 5）」から「実装済み」へ更新（[Issue #117](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/117)）。依存の実バージョンとプロトコル版の2本立てを明記
 
 ### [1.3.0] - 2026-08-21
 

@@ -1,6 +1,6 @@
 ---
 title: "MASTER"
-version: "1.5.0"
+version: "1.5.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -183,7 +183,7 @@ AIツールがランタイム・依存のバージョンを選定する際は、
 | Runtime（本番） | **workerd** | `compatibility_date: 2026-08-15` で固定 | 2026-08-15 / wrangler types | Node ではない。`fs` / `net` は使えない |
 | Runtime（ツール） | Node.js | 24（`.nvmrc` / `engines`） | 2026-08-15 | wrangler と Vite を起動するホスト。本番には存在しない |
 | Server routing | Hono | 4.13.x | 2026-08-15 / npm | Workers ネイティブ |
-| Protocol | MCP（`createMcpHandler`） | 未着手（Step 5） | - | `McpAgent` は deprecated。ステートレス実装を使い DO は使わない |
+| Protocol | MCP（`agents` 0.21.x ＋ `@modelcontextprotocol/server` 2.0.x） | **実装済み**（`/mcp`・`worker/mcp.ts`） | 2026-08-21 / npm ＋ `worker/mcp.test.ts` の実測 | `McpAgent` は deprecated。ステートレス実装を使い DO は使わない。ツールの `inputSchema` は「広告」で、検査の実体は `parse.ts`（[MCP.md](./02-design/MCP.md) §3） |
 | Database | Cloudflare D1 | **導入済み**（`tabi-concierge-tokyo`・APAC） | 2026-08-16 / `wrangler d1` | ADR-007 で採用。Text-to-SQL の実行基盤 ＋ 未回答ログ。スキーマは `migrations/0001_init.sql` |
 | AI | Cloudflare Workers AI（AI Gateway 経由） | **バインディング導入済み**（`AI` ＋ `vars.AI_GATEWAY_ID`）。コアからの呼び出しは未着手（Step 3） | 2026-08-21 / `wrangler types` ＋ 実 API 疎通 | モデルは `@cf/qwen/qwen3-30b-a3b-fp8`。**思考モデルなのでプロンプト末尾に `/no_think` が要る**（[LLM-MODEL-CANDIDATES.md](./06-reference/LLM-MODEL-CANDIDATES.md) §4）。推論は必ず AI Gateway 経由（ADR-013） |
 | Infra | Cloudflare Workers | マネージド | - | サーバーレス。コンテナは使わない |
@@ -785,6 +785,12 @@ Changelog エントリには以下のカテゴリを使用する（[Keep a Chang
 - [ ] 定数の配置が層責務に沿っている（Domain/Application/Infrastructure）
 
 ## Changelog
+
+### [1.5.1] - 2026-08-21
+
+#### 変更
+
+- 技術スタック表の Protocol 行を「未着手（Step 5）」から「実装済み」へ更新（[Issue #117](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/117)）。依存の実バージョンと、`inputSchema` を「広告」に留める設計を注意として追記
 
 ### [1.5.0] - 2026-08-21
 
