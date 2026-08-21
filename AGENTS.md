@@ -48,12 +48,18 @@ PoC 段階のため軽量な運用を採用している。判断の背景は [AD
 | ビルド | Vite 8 ＋ `@cloudflare/vite-plugin`。ツールチェーンは Node 24（`.nvmrc`） |
 | デプロイ先 | Cloudflare Workers（アカウント `opendata`）。<https://tabi-concierge-tokyo.opendata-002.workers.dev> |
 | デプロイ方法 | **手動**。`npm run deploy`（= `wrangler deploy`）をローカルから実行する。`.github/workflows/ci.yml` は検証（typecheck / test / build）だけを行い、**デプロイはしない**。**いつ実行するかは [DEPLOYMENT.md](docs/05-operations/DEPLOYMENT.md) §3 で契機を定めた**（`worker/` `shared/` を変更したらデプロイ、`migrations/` なら先に `db:migrate`）。契機を決めていなかったため本番が43コミット遅れる事故があった（Issue #46） |
-| 接続（`/api/*`） | **接続済み**。プラン画面（Issue #31・`src/features/plan/buildPlan.ts`）とあなたへ画面（`src/features/foryou/buildRecommendations.ts`）が、それぞれ独立に `search_datasets` → `aggregate_dataset` → `get_provenance` の3操作を呼ぶ。中身は `worker/core/` の固定データによるスタブ（Issue #22）で、D1 を引く本実装（Text-to-SQL）は Step 5 |
-| 接続（`/mcp`） | **未着手**（Step 5）。`createMcpHandler`（ステートレス。**Durable Objects は使わない**）を使う想定 |
+| 接続（`/api/*`） | **接続済み**。プラン画面（Issue #31・`src/features/plan/buildPlan.ts`）とあなたへ画面（`src/features/foryou/buildRecommendations.ts`）が、それぞれ独立に `search_datasets` → `aggregate_dataset` → `get_provenance` の3操作を呼ぶ。**`aggregate_dataset` は D1 を実照会する**（Text-to-SQL・Issue #119）。`search_datasets` はまだ `worker/core/` のキーワード実装（Issue #22 のスタブ）で、LLM による分解・選定は Issue #120 |
+| 接続（`/mcp`） | **実装済み**（Issue #117・`worker/mcp.ts`）。`createMcpHandler`（ステートレス。**Durable Objects は使わない**）でコア3操作をツール公開。ツールの `inputSchema` は「広告」で、検査の実体は `parse.ts`（[MCP.md](docs/02-design/MCP.md) §3） |
 | データベース | Cloudflare D1（`tabi-concierge-tokyo`・導入済み）。スキーマは `migrations/`、取り込みは `scripts/`。開発は `npm run db:reset:local` |
 | Python 実行環境 | **未確認**。「現状の構成では Cloudflare 上で Python が使えない」という報告があるが、本リポジトリ内に検証記録はなく未確認（実装で Python を前提にする前に要確認） |
 | 認証 | **実装しない**（POC 段階） |
 | コンテナ | 使用しない（サーバーレス） |
+
+> **`aggregate_dataset` は LLM が SQL を書き、D1 を実照会する**（Issue #119）。ただし**前段ガードは D1 を引く前に確定する** — 未知の ID・ジャンル×飲食店（ラーメン）・統計表・対象エリア外は、LLM を1度も呼ばずに未回答を返す。ここを LLM の後ろへ回すと、実データで検証済みの誠実な未回答が「それらしい行」に置き換わる。
+>
+> **生成 SQL の封じ込めは `worker/core/sql-guard.ts` だけが担う。** 当初は「`db.prepare()` は複文を受けないので2層目になる」と想定していたが、実測で成り立たないことが分かった（`SELECT 1; DELETE FROM gaps` の2文目が実行された）。詳細は `worker/core/llm.ts` の doc と `llm.test.ts`。**「後段でも見ているから」という理由で sql-guard を緩めないこと。**
+>
+> LLM 障害・出力不正のときは既存のキーワード実装へ縮退する（`extractFromSamples`）。**縮退は応答を返すので、`console.error` を消さないこと** — 消すと本番で LLM 経路が死んでいても誰も気づけない。
 
 > **workerd は Node ではない**。`worker/` のコードで `fs` / `net` を前提にしたライブラリは動かない。ローカル確認は必ず `npm run dev`（workerd 上で動く）で行い、`node` で直接実行しない。テストは `@cloudflare/vitest-pool-workers` を使う。
 
