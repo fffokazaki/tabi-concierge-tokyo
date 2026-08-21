@@ -657,3 +657,93 @@ describe("buildPlan", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * 候補ごとの `aggregate_dataset` を**同時に**投げることの検証（Issue #142）。
+ *
+ * Step 5（Issue #119・#120）で1回の呼び出しが約1.1秒（ほぼ全部が推論の待ち時間）に
+ * なったため、候補4件を1件ずつ待つと旅程が出るまで5〜6秒かかっていた。速さの検証は
+ * 実時間を測らず、「1件目の応答を止めたまま後続が投げられるか」で見る（実時間で
+ * 測るテストは CI の負荷で揺れる）。
+ *
+ * あわせて**並びが到着順に引きずられないこと**も固定する。`Promise.all` の結果を
+ * 到着順に積むと、同じ入力でも実行のたびに停留地の順序が変わる。
+ * 同型の実装が `buildRecommendations.test.ts` にある（ACE-98-1。対で写す）。
+ */
+describe("buildPlan の集計を同時に投げる（Issue #142）", () => {
+  const candidate = (datasetId: string, title: string) => ({
+    datasetId,
+    title,
+    provider: "台東区",
+    url: "u",
+    matchReason: "r",
+  });
+
+  const THREE_CANDIDATES = [
+    candidate(MEISHO_ID, "名所・史跡"),
+    candidate(BUNKA_ID, "文化観光施設"),
+    candidate(BUNKAZAI_ID, "文化財一覧"),
+  ];
+
+  it("1件目の応答を待たずに残りの候補も投げる（直列だと候補数ぶん待ち時間が積み上がる）", async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started: string[] = [];
+
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () => json({ status: "answered", candidates: THREE_CANDIDATES }),
+      [AGGREGATE]: async (body) => {
+        started.push((body as { datasetId: string }).datasetId);
+        // 応答を止めたまま、後続の候補が投げられるかを見る
+        await held;
+        return json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" });
+      },
+      [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
+    });
+
+    const pending = buildPlan(DEFAULT_TRIP, { fetchImpl });
+    try {
+      await vi.waitFor(() => expect(started).toEqual([MEISHO_ID, BUNKA_ID, BUNKAZAI_ID]));
+    } finally {
+      // 直列のままなら waitFor が落ちる。保留したままにすると fetch が返らず後始末が残る
+      release();
+    }
+    await pending;
+  });
+
+  it("応答が候補順と違う順に返っても、停留地と gaps の並びは候補順のまま", async () => {
+    // 到着順に積む実装だと「文化財一覧 → 名所・史跡」になり、同じ入力でも実行のたびに
+    // 旅程の並びが変わる（受け入れ条件「停留地の並び順が変わらない」）。
+    // 1件目だけ実際に遅らせる ―― マイクロタスクの解決順に頼ると、遅れずに返る候補の方が
+    // 先に並んでしまい、到着順に積む実装でもたまたま通ってしまう（実測で確認）
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () => json({ status: "answered", candidates: THREE_CANDIDATES }),
+      [AGGREGATE]: async (body) => {
+        const datasetId = (body as { datasetId: string }).datasetId;
+        if (datasetId === BUNKA_ID) {
+          return json({
+            status: "unanswered",
+            reason: "insufficient_granularity",
+            message: "サンプル行が無いため内容を取り出せません。",
+          });
+        }
+        if (datasetId === BUNKAZAI_ID) {
+          return json({ status: "answered", result: { name: "絹本著色元三大師画像", summary: "台東区指定文化財。" }, query: "q" });
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20)); // 1件目が最後に返る
+        return json({ status: "answered", result: { name: "寛永寺", summary: "上野桜木1丁目14番。" }, query: "q" });
+      },
+      [PROVENANCE]: () =>
+        json({
+          status: "answered",
+          sources: [source(MEISHO_ID, "名所・史跡"), source(BUNKAZAI_ID, "文化財一覧")],
+        }),
+    });
+
+    const plan = expectPlan(await buildPlan(DEFAULT_TRIP, { fetchImpl }));
+    expect(plan.stops.map((s) => s.stop.place)).toEqual(["寛永寺", "絹本著色元三大師画像"]);
+    expect(plan.gaps.map((gap) => gap.message)).toEqual(["サンプル行が無いため内容を取り出せません。"]);
+  });
+});

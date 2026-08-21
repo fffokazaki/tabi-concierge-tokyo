@@ -544,3 +544,82 @@ describe("障害", () => {
     expect(outcome.kind === "failure" && outcome.failure.kind).toBe("parse");
   });
 });
+
+/**
+ * 候補ごとの `aggregate_dataset` を**同時に**投げることの検証（Issue #142）。
+ * プラン画面と同型なので、実装と同じくテストも対で写す（ACE-98-1）。
+ * 「すべて」は候補が6件まで出るぶん、直列だと待ち時間の積み上がりはプランより大きい。
+ */
+describe("buildRecommendations の集計を同時に投げる（Issue #142）", () => {
+  const candidate = (datasetId: string, title: string) => ({
+    datasetId,
+    title,
+    provider: "台東区",
+    url: "u",
+    matchReason: "r",
+  });
+
+  const THREE_CANDIDATES = [
+    candidate(MEISHO_ID, "名所・史跡"),
+    candidate(BUNKA_ID, "文化観光施設"),
+    candidate(BUNKAZAI_ID, "文化財一覧"),
+  ];
+
+  it("1件目の応答を待たずに残りの候補も投げる（直列だと候補数ぶん待ち時間が積み上がる）", async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started: string[] = [];
+
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () => json({ status: "answered", candidates: THREE_CANDIDATES }),
+      [AGGREGATE]: async (body) => {
+        started.push((body as { datasetId: string }).datasetId);
+        await held; // 応答を止めたまま、後続の候補が投げられるかを見る
+        return json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" });
+      },
+      [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
+    });
+
+    const pending = buildRecommendations("culture", { fetchImpl });
+    try {
+      await vi.waitFor(() => expect(started).toEqual([MEISHO_ID, BUNKA_ID, BUNKAZAI_ID]));
+    } finally {
+      release();
+    }
+    await pending;
+  });
+
+  it("応答が候補順と違う順に返っても、レコメンドと gaps の並びは候補順のまま", async () => {
+    // 到着順に積むと、同じ興味チップを押しても実行のたびにカードの並びが変わる。
+    // 1件目だけ実際に遅らせる（マイクロタスクの解決順に頼ると、到着順に積む実装でも通る）
+    const { fetchImpl } = stubFetch({
+      [SEARCH]: () => json({ status: "answered", candidates: THREE_CANDIDATES }),
+      [AGGREGATE]: async (body) => {
+        const datasetId = (body as { datasetId: string }).datasetId;
+        if (datasetId === BUNKA_ID) {
+          return json({
+            status: "unanswered",
+            reason: "insufficient_granularity",
+            message: "サンプル行が無いため内容を取り出せません。",
+          });
+        }
+        if (datasetId === BUNKAZAI_ID) {
+          return json({ status: "answered", result: { name: "絹本著色元三大師画像", summary: "台東区指定文化財。" }, query: "q" });
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20)); // 1件目が最後に返る
+        return json({ status: "answered", result: { name: "寛永寺", summary: "上野桜木1丁目14番。" }, query: "q" });
+      },
+      [PROVENANCE]: () =>
+        json({
+          status: "answered",
+          sources: [source(MEISHO_ID, "名所・史跡"), source(BUNKAZAI_ID, "文化財一覧")],
+        }),
+    });
+
+    const outcome = expectRecs(await buildRecommendations("culture", { fetchImpl }));
+    expect(outcome.recommendations.map((rec) => rec.name)).toEqual(["寛永寺", "絹本著色元三大師画像"]);
+    expect(outcome.gaps.map((gap) => gap.message)).toEqual(["サンプル行が無いため内容を取り出せません。"]);
+  });
+});

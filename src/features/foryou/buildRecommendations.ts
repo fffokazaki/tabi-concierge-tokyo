@@ -81,23 +81,40 @@ export async function buildRecommendations(
   // 特定できない。単一チップのときだけ確信を持って理由タグを出す（Recommendation.reason 参照）
   const reason = activeInterest === "all" ? null : RECOMMENDATION_REASON_LABELS[activeInterest];
 
+  // 候補ごとの集計は互いに独立（前の結果を使わない）なので**まとめて投げる**（Issue #142。
+  // プラン画面と同型 ―― `buildPlan.ts` と対で直す）。1件ずつ待つと、1回あたり約1.1秒
+  // （ほぼ全部が推論の待ち時間）が候補数ぶん積み上がる。「すべて」は候補が
+  // `RECOMMENDATION_LIMIT` 件まで出るので、プラン画面（4件）より積み上がりは大きい。
+  //
+  // `callAndRead` は例外を投げない（`callCoreOperation` が全経路を分類して返す）ので、
+  // `Promise.all` が1件の reject で他の結果を捨てることは無い。**そこが崩れたら
+  // `allSettled` へ移すこと** ―― 捨てられた結果は gaps に載らず、静かに消える
+  const aggregated = await Promise.all(
+    searched.value.candidates.map(async (candidate) => ({
+      datasetId: candidate.datasetId,
+      outcome: await callAndRead(
+        "aggregate_dataset",
+        { datasetId: candidate.datasetId, intent: interests.join("、") },
+        readAggregateResult,
+        options,
+      ),
+    })),
+  );
+
   const extracted: { datasetId: string; result: AggregateResult }[] = [];
   // 集計できなかった候補の理由。黙って落とすと「最初から候補が無かった」ように見える
   // （Issue #89）ため、search_datasets の gaps と同じ経路で画面に出す
   const aggregateGaps: Unanswered[] = [];
-  for (const candidate of searched.value.candidates) {
-    const aggregated = await callAndRead(
-      "aggregate_dataset",
-      { datasetId: candidate.datasetId, intent: interests.join("、") },
-      readAggregateResult,
-      options,
-    );
-    if (aggregated.kind === "failure") return aggregated.outcome;
-    if (aggregated.kind === "unanswered") {
-      aggregateGaps.push(aggregated.unanswered);
+  // 走査は**候補順**。到着順に積むと、カードの並びと gaps の順序が実行のたびに変わる
+  for (const { datasetId, outcome } of aggregated) {
+    // 障害は候補順で最初のものを採って打ち切る（直列だったときと同じ結果にする）。
+    // **呼び出し自体は打ち切れない** ―― 全件を投げたあとに判定するため（Issue #142）
+    if (outcome.kind === "failure") return outcome.outcome;
+    if (outcome.kind === "unanswered") {
+      aggregateGaps.push(outcome.unanswered);
       continue;
     }
-    extracted.push({ datasetId: candidate.datasetId, result: aggregated.value });
+    extracted.push({ datasetId, result: outcome.value });
   }
 
   if (extracted.length === 0) {

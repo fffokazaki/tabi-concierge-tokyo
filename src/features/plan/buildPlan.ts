@@ -142,25 +142,42 @@ export async function buildPlan(trip: Trip, options: BuildPlanOptions = {}): Pro
   const searched = await callAndRead("search_datasets", searchInput, readCandidates, options);
   if (searched.kind !== "answered") return searched.outcome;
 
+  // 候補ごとの集計は互いに独立（前の結果を使わない）なので**まとめて投げる**（Issue #142）。
+  // 1件ずつ待つと、1回あたり約1.1秒（ほぼ全部が推論の待ち時間）が候補数ぶん積み上がり、
+  // 旅程が出るまで5〜6秒かかっていた。
+  //
+  // `callAndRead` は例外を投げない（`callCoreOperation` が全経路を分類して返す）ので、
+  // `Promise.all` が1件の reject で他の結果を捨てることは無い。**そこが崩れたら
+  // `allSettled` へ移すこと** ―― 捨てられた結果は gaps に載らず、静かに消える
+  const aggregated = await Promise.all(
+    searched.value.candidates.map(async (candidate) => ({
+      datasetId: candidate.datasetId,
+      outcome: await callAndRead(
+        "aggregate_dataset",
+        { datasetId: candidate.datasetId, intent: query },
+        readAggregateResult,
+        options,
+      ),
+    })),
+  );
+
   const extracted: { datasetId: string; result: AggregateResult }[] = [];
   // 抽出できなかった候補の理由。黙って落とすと「最初から候補が無かった」ように見える
   // （Issue #95・#89 のプラン版）ため、search_datasets の gaps と同じ経路で画面に出す。
   // サーバー側の記録（Issue #27）に残ることは、画面に出さない理由にならない（DOMAIN.md §7）
   const aggregateGaps: Unanswered[] = [];
-  for (const candidate of searched.value.candidates) {
-    const aggregated = await callAndRead(
-      "aggregate_dataset",
-      { datasetId: candidate.datasetId, intent: query },
-      readAggregateResult,
-      options,
-    );
-    // 障害はここで止める。1件が通信断なら残りも同じ結果になる
-    if (aggregated.kind === "failure") return aggregated.outcome;
-    if (aggregated.kind === "unanswered") {
-      aggregateGaps.push(aggregated.unanswered);
+  // 走査は**候補順**。到着順に積むと、停留地の並びと gaps の順序が実行のたびに変わる
+  for (const { datasetId, outcome } of aggregated) {
+    // 障害は候補順で最初のものを採って打ち切る（直列だったときと同じ結果にする。到着順に
+    // すると、同じ入力でも実行のたびに違う障害が画面に出る）。**呼び出し自体は打ち切れない** ――
+    // 全件を投げたあとに判定するので、直列なら省けていた後続の集計もサーバーへは届く
+    // （1プラン ≒ 20.7 ニューロン／無料枠 10,000 のため許容と判断。Issue #142）
+    if (outcome.kind === "failure") return outcome.outcome;
+    if (outcome.kind === "unanswered") {
+      aggregateGaps.push(outcome.unanswered);
       continue;
     }
-    extracted.push({ datasetId: candidate.datasetId, result: aggregated.value });
+    extracted.push({ datasetId, result: outcome.value });
   }
 
   if (extracted.length === 0) {
