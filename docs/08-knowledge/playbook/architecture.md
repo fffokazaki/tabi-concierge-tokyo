@@ -496,3 +496,30 @@
 到達不能なガードは、次に触る人が編集しても何も起きない一方で「守られている」という誤った安心を与える。**変異で緑のままだった防御的分岐は、削除するか、それだけが発火するケースをテストへ足すか、「これは主たる壁ではない」と doc に明記するかのどれかを選ぶ**（放置しない）。今回は縮退先を「ガードは済んでいる前提で呼ぶ」関数へ改名し、定義を1つに畳んだ。
 
 ---
+
+<a id="ace-145-1"></a>
+
+### ACE-145-1: `Promise.all` は順序は守るが「早期打ち切り」を殺す
+
+| Category | architecture | Origin | PR #145 / Issue #142 |
+| Date | 2026-08-22 |
+| Helpful | 0 | Harmful | 0 |
+| Status | active |
+
+候補ごとの `aggregate_dataset`（1回あたり約1.1秒＝ほぼ推論の待ち時間）を直列に呼んでいた箇所を並列化するとき、素直な `Promise.all` は**受け入れ条件の1つを静かに壊す**。結果配列の順序は保たれるので「並びが変わらない」は満たせるが、`Promise.all` は**全件が解決するまで返らない**ため、候補順で最初の障害が確定していても応答しない候補が1つあれば返せない。直列だったころは1件目の HTTP 500 で即座に終わっていたので、これは退行になる。
+
+**先に全件を投げてから、候補順に個別へ `await` する**と3つを同時に満たせる。
+
+```ts
+const pendingAggregates = candidates.map((c) => ({ datasetId: c.datasetId, pending: callAndRead(...) }));
+for (const { datasetId, pending } of pendingAggregates) {
+  const outcome = await pending;   // 並列・候補順・確定したら即 return
+  if (outcome.kind === "failure") return outcome.outcome;
+}
+```
+
+`map` の時点で全リクエストは出ている（`callAndRead` は最初の `await` まで同期に進む）ので並列性は落ちない。打ち切った後の promise を捨ててよいのは、`callCoreOperation` が失敗を**分類して返す**（reject しない）ためで、reject する経路を足したらこの前提ごと見直す（`allSettled` へ移す）。
+
+**呼び出し自体は打ち切れない**点は残る — 判定より前に全件を投げているので、直列なら省けていた後続の集計もサーバーへ届く（1プラン ≒ 20.7 ニューロン／無料枠 10,000 のため許容と判断）。同型の実装が `buildPlan.ts` / `buildRecommendations.ts` にあるので対で直す（[ACE-98-1](./testing.md#ace-98-1)）。
+
+---

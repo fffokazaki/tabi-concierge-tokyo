@@ -285,7 +285,7 @@ silent-drop を直して未回答を画面へ流すと、これまで誰にも�
 
 | Category | process | Origin | PR #138 / Issue #119・#120 |
 | Date | 2026-08-22 |
-| Helpful | 0 | Harmful | 0 |
+| Helpful | 1 | Harmful | 0 |
 | Status | active |
 
 コア操作をスタブから D1 実照会（Text-to-SQL）へ差し替えた一連の PR で、検証はすべて `curl` によるコア操作の個別呼び出しだった。**個別に叩くとどれも `answered` を返す**ので、全部通っていた。
@@ -295,5 +295,32 @@ silent-drop を直して未回答を画面へ流すと、これまで誰にも�
 **個別呼び出しでは見えない。** 症状は「複数の候補へ同じ intent を投げたとき、何件が `answered` になるか」という**集約**の側にしか現れず、1件ずつでは常に成功か、成功と区別のつかない正当な未回答に見える。
 
 出力の**中身**（型ではなく値）が変わる差し替えでは、確認の単位を呼び出し1回ではなく**画面1枚**にする。デプロイ後の確認も同じで、代表的な intent を全候補へ投げて `answered` の数を数える手順を [DEPLOYMENT.md](../../05-operations/DEPLOYMENT.md) の記録に残した。
+
+---
+
+<a id="ace-145-3"></a>
+
+### ACE-145-3: 「速くなった」は体感でなく、リクエストの開始時刻で示す
+
+| Category | process | Origin | PR #145 / Issue #142 |
+| Date | 2026-08-22 |
+| Helpful | 0 | Harmful | 0 |
+| Status | active |
+
+並列化のような性能変更は「速くなった気がする」で終わりやすい。画面を出して確かめる（[ACE-138-2](#ace-138-2)）だけでは、**本当に同時に飛んでいるのか**は分からない。
+
+`PerformanceResourceTiming` を読むと、その1点を数字で残せる。
+
+```js
+performance.getEntriesByType("resource").filter((e) => e.name.includes("/api/"))
+  .map((e) => ({ n: e.name, start: Math.round(e.startTime), end: Math.round(e.responseEnd) }));
+```
+
+本番実測（2026-08-22・Version `c957fa38`）: `aggregate` 4本の `startTime` が `97442 / 97443 / 97443 / 97443` で、`search` から `provenance` 完了まで 1,786ms。同じ応答時間を直列に積むと約5.9秒。**開始時刻が揃っていること**が並列化の証拠で、合計時間だけではキャッシュが効いただけの可能性を排除できない。
+
+測るときの落とし穴が2つある。
+
+1. **興味チップは実クリックでないと変わらない** — `javascript_tool` の `element.click()` では `aria-pressed` が変わらない（本番ビルドで実測）。`computer` の ref クリックを使う。候補が1件しか出ない入力で測ると `aggregate` も1回しか飛ばず、並列化の検証としては空振りになる
+2. **AI Gateway のキャッシュ** — 同じ入力を2回目に測ると 782〜942ms まで落ちる。未キャッシュの数字が要るなら興味の組み合わせを変える
 
 ---

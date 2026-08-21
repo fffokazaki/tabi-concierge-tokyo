@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.35.0"
+version: "1.36.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 99
+ace_entry_count: 103
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -330,8 +330,26 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-137-4 | 依存ライブラリの「これは◯◯を受け付けない」は、API 名や用途から推し量らず叩いて確かめる | documentation-quality | [playbook/documentation-quality.md#ace-137-4](./playbook/documentation-quality.md#ace-137-4) |
 | ACE-138-1 | 新機能のテストは、その機能を無効化しても通る入力を選んでいないか変異で確かめる | testing | [playbook/testing.md#ace-138-1](./playbook/testing.md#ace-138-1) |
 | ACE-138-2 | API の応答が正しくても画面が壊れていることがある — 画面を出す変更は画面で確かめる | process | [playbook/process.md#ace-138-2](./playbook/process.md#ace-138-2) |
+| ACE-145-1 | `Promise.all` は順序は守るが「早期打ち切り」を殺す | architecture | [playbook/architecture.md#ace-145-1](./playbook/architecture.md#ace-145-1) |
+| ACE-145-2 | 並列化の「順序が変わらない」テストは、マイクロタスクの解決順に頼ると偽陽性で通る | testing | [playbook/testing.md#ace-145-2](./playbook/testing.md#ace-145-2) |
+| ACE-145-3 | 「速くなった」は体感でなく、リクエストの開始時刻で示す | process | [playbook/process.md#ace-145-3](./playbook/process.md#ace-145-3) |
+| ACE-145-4 | cross-model レビューの実行中にワークツリーを触ると、結果ごと破棄される | tooling | [playbook/tooling.md#ace-145-4](./playbook/tooling.md#ace-145-4) |
 
 ## Changelog
+
+### [1.36.0] - 2026-08-22
+
+#### 追加
+
+- ACE-145-1: `Promise.all` は順序は守るが「早期打ち切り」を殺す（Issue #142 / PR #145）
+- ACE-145-2: 並列化の「順序が変わらない」テストは、マイクロタスクの解決順に頼ると偽陽性で通る（Issue #142 / PR #145）
+- ACE-145-3: 「速くなった」は体感でなく、リクエストの開始時刻で示す（Issue #142 / PR #145）
+- ACE-145-4: cross-model レビューの実行中にワークツリーを触ると、結果ごと破棄される（PR #145）
+
+#### カウンター更新
+
+- ACE-98-1: Helpful +1（並列化をプラン画面へ入れる時点で、あなたへ画面へ実装とテストを対で写す判断に使った）
+- ACE-138-2: Helpful +1（本番の実ブラウザでプラン画面を生成して並列化と欠損の並びを確認した。API 単体の curl では「同時に投げているか」が見えない）
 
 ### [1.35.0] - 2026-08-22
 
