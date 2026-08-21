@@ -105,17 +105,47 @@ const invalid = (message: string): ToolResult => ({
 });
 
 /**
+ * 想定外の例外。`/api/*` の 500（`app.onError`）に対応する。
+ *
+ * **SDK に投げ返さない。** 実測（Issue #117・`@modelcontextprotocol/server@2.0.0`）では、
+ * ツールのコールバックが投げた例外は SDK が捕まえて `isError: true` のツール結果へ変換し、
+ * このとき **`createMcpHandler` の `onerror` は呼ばれず、例外の message がそのまま
+ * クライアントへ渡る**（`{"content":[{"type":"text","text":"意図的な例外"}],"isError":true}`）。
+ *
+ * 投げっぱなしにすると2つ困る。
+ *
+ * 1. **どこにも記録が残らない。** Workers で観測できるのは `console.*` → wrangler tail /
+ *    Logpush だけなので、本番でコアが壊れても気づく手段が無くなる（`gaps.ts` が
+ *    「握りつぶさない」と定めているのと同じ理由）
+ * 2. **内部の事情が漏れる。** `/api/*` は内部例外を「サーバー内部でエラーが発生しました」に
+ *    畳んでから返している。`/mcp` だけ生の message を出すと、面によって漏れ方が変わる
+ */
+const internalError = (tool: string, cause: unknown): ToolResult => {
+  console.error("[mcp] ツールの実行中に例外が発生しました", { tool, cause });
+  return { content: [{ type: "text", text: "サーバー内部でエラーが発生しました" }], isError: true };
+};
+
+/**
  * 「形を検査して、コアを呼んで、JSON にする」の1本道。3ツールで同じ順序を踏む。
  *
  * `index.ts` の `jsonRoute` と同じ構造にしてあるのは、片方だけ手順が抜ける
  * （検査を飛ばす・記録器を渡し忘れる）ことを読んで気づけるようにするため。
  */
 const toolFor =
-  <T, R>(parse: (body: unknown) => ParseResult<T>, run: (input: T, recorder: GapRecorder) => R | Promise<R>, recorder: GapRecorder) =>
+  <T, R>(
+    tool: string,
+    parse: (body: unknown) => ParseResult<T>,
+    run: (input: T, recorder: GapRecorder) => R | Promise<R>,
+    recorder: GapRecorder,
+  ) =>
   async (args: unknown): Promise<ToolResult> => {
     const parsed = parse(args);
     if (!parsed.ok) return invalid(parsed.message);
-    return ok(await run(parsed.value, recorder));
+    try {
+      return ok(await run(parsed.value, recorder));
+    } catch (cause) {
+      return internalError(tool, cause);
+    }
   };
 
 /**
@@ -139,7 +169,7 @@ export function createTabiMcpServer(env: Env): McpServer {
         "答えられない場合は unanswered を理由分類つきで返す（エラーではない）。",
       inputSchema: SEARCH_DATASETS_SCHEMA,
     },
-    toolFor(parseSearchDatasetsInput, searchDatasets, recorder),
+    toolFor("search_datasets", parseSearchDatasetsInput, searchDatasets, recorder),
   );
 
   server.registerTool(
@@ -151,7 +181,7 @@ export function createTabiMcpServer(env: Env): McpServer {
         "実行したクエリを query として必ず添える（出典の再現に要る）。",
       inputSchema: AGGREGATE_DATASET_SCHEMA,
     },
-    toolFor(parseAggregateDatasetInput, aggregateDataset, recorder),
+    toolFor("aggregate_dataset", parseAggregateDatasetInput, aggregateDataset, recorder),
   );
 
   server.registerTool(
@@ -163,7 +193,7 @@ export function createTabiMcpServer(env: Env): McpServer {
         "出典を伴わない回答は仕様違反なので、回答を出す経路は必ずこれを通す。",
       inputSchema: GET_PROVENANCE_SCHEMA,
     },
-    toolFor(parseGetProvenanceInput, getProvenance, recorder),
+    toolFor("get_provenance", parseGetProvenanceInput, getProvenance, recorder),
   );
 
   return server;
@@ -178,7 +208,10 @@ export function createTabiMcpServer(env: Env): McpServer {
 export const tabiMcpHandler = (env: Env) =>
   createMcpHandler(() => createTabiMcpServer(env), {
     route: "/mcp",
-    // 想定外の例外は応答を変えない（SDK が JSON-RPC のエラーとして返す）。
-    // 記録だけは必ず残す — Workers で観測できるのは console.* → wrangler tail / Logpush だけ
-    onerror: (error) => console.error("[mcp] ハンドラで例外が発生しました", { error }),
+    // ハンドラ層の異常（プロトコル違反・拒否したリクエストなど）の報告先。応答は変えない。
+    //
+    // **ツール実行中の例外はここに来ない**（SDK が手前で捕まえる。実測済み — `internalError`
+    // の doc 参照）。ツール側の記録は `toolFor` が自分で行う。ここを足したからといって
+    // コア側の例外が記録される、と読まないこと
+    onerror: (error) => console.error("[mcp] ハンドラで異常を検出しました", { error }),
   });

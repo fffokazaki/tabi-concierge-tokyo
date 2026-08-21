@@ -42,7 +42,10 @@ changeImpact: "low"
 | --- | --- | --- |
 | **答えられない**（`unanswered`） | HTTP 200 ＋ `status: "unanswered"` | **正常なツール結果**（`isError` を付けない）。本体は `/api/*` と同じ JSON を `content[0].text` に入れる |
 | **入力の形の違反** | HTTP 400 ＋ `ApiError` | `isError: true` ＋ `content[0].text` に `parse.ts` の message（**`/api/*` と一言一句同じ**） |
-| 想定外の例外 | HTTP 500 ＋ `ApiError` | SDK が JSON-RPC のエラーとして返す。`onerror` で `console.error` に記録する（応答は変えない） |
+| 想定外の例外（ツール実行中） | HTTP 500 ＋ `ApiError` | `isError: true` ＋ `content[0].text` に「サーバー内部でエラーが発生しました」。**`worker/mcp.ts` が自分で捕まえて `console.error` に記録する** |
+| プロトコル違反・拒否されたリクエスト | （該当なし） | SDK が JSON-RPC のエラーで返す。`onerror` が `console.error` に記録する |
+
+> **ツール実行中の例外は `onerror` に来ない。** 実測（Issue #117）: ツールのコールバックが投げた例外は SDK が捕まえて `isError: true` のツール結果へ変換し、このとき `createMcpHandler` の `onerror` は**呼ばれず、例外の message がそのままクライアントへ渡る**。放っておくと (1) 本番でコアが壊れても記録がどこにも残らない（Workers で観測できるのは `console.*` だけ）(2) 内部の事情が漏れる、の2つが同時に起きる。そのため `worker/mcp.ts` の `toolFor` が自分で try/catch し、記録してから `/api/*` と同じ文言に畳んでいる。`worker/mcp-internal-error.test.ts` が両方を固定している。
 
 **`unanswered` を `isError` にしない**のが最も重要な一行である。`isError` はクライアントに「サーバが壊れた」と読ませる合図で、そこに未回答を入れると「答えられないことを answer として届ける」という本プロジェクトの中心設計（DOMAIN.md §8）が `/mcp` 面だけ成立しなくなる。
 
@@ -78,6 +81,19 @@ SDK は **2つの era を同時に喋る**。ここを1つの数字だと思う�
 | legacy(2025) | `2025-11-25` ← `LATEST_PROTOCOL_VERSION` | ほかに `2025-06-18` / `2025-03-26` / `2024-11-05` / `2024-10-07` を受ける（`SUPPORTED_PROTOCOL_VERSIONS`） |
 
 `DEFAULT_NEGOTIATED_PROTOCOL_VERSION` は `2025-03-26`（版を送ってこないクライアント向けの既定）。
+
+**2つの era は線の引き方から違う。** 素の HTTP で叩くときはここを取り違えやすい（実測・Issue #117）。
+
+| | legacy(2025) | modern(2026-07-28) |
+| --- | --- | --- |
+| ハンドシェイク | `initialize` を送る | **送らない**。リクエストごとの `params._meta` エンベロープが運ぶ |
+| 必須ヘッダ | なし | **`Mcp-Method`**（ボディの `method` と一致必須）。`tools/call` はさらに **`Mcp-Name`**（`params.name` と一致必須） |
+| 応答の形 | `text/event-stream`（`event: message` ＋ `data:` 行） | 素の JSON |
+| 応答の判別子 | なし | `resultType`（例: `"complete"`）＋ `_meta` の `io.modelcontextprotocol/serverInfo` |
+
+`_meta` エンベロープのキーは `io.modelcontextprotocol/protocolVersion` / `.../clientInfo` / `.../clientCapabilities`。ヘッダとボディが食い違うと `-32020` で `Bad Request: the request headers and body disagree` が返る（**エラー本文が何が足りないかを名指しするので、そのまま読めばよい**）。
+
+MCP クライアント（`claude mcp add` / MCP Inspector）を使う場合、この差は SDK が吸収するので意識しなくてよい。素の curl で叩くときだけ効く。
 
 > **これらの値は SDK のバージョンとともに動く。** 上記は `@modelcontextprotocol/server@2.0.0` を 2026-08-21 に実測した値であり、SDK を上げたら再確認すること。`initialize` の応答で実際に何が返るかは `worker/mcp.test.ts` が固定している。
 
@@ -121,8 +137,8 @@ curl -s -o /dev/null -w '%{http_code}\n' $U/mcp
 #### 変更
 
 - `/mcp` 面の実装完了にあわせて「未実装」の記述を解消（[Issue #117](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/117)）
-- §3: エラー表現を確定（表を追加）。`unanswered` を `isError` にしない理由と、入力スキーマを「広告」に留める設計判断（`parse.ts` との二重定義回避・文言一致）を実測つきで記載
-- §4: プロトコルバージョンの「未確認」を実測値で解消。modern era `2026-07-28` と legacy(2025) era `2025-11-25` の2本立てであること、`legacy: 'stateless'` が SDK の既定であること、GET/DELETE が 405 になる理由を追記
+- §3: エラー表現を確定（表を追加）。`unanswered` を `isError` にしない理由と、入力スキーマを「広告」に留める設計判断（`parse.ts` との二重定義回避・文言一致）を実測つきで記載。**ツール実行中の例外は `onerror` に来ない**（SDK が手前で捕まえ、message がそのまま漏れる）ことと、その対処も記載
+- §4: プロトコルバージョンの「未確認」を実測値で解消。modern era `2026-07-28` と legacy(2025) era `2025-11-25` の2本立てであること、`legacy: 'stateless'` が SDK の既定であること、GET/DELETE が 405 になる理由を追記。**2つの era の接続方法の違い**（ハンドシェイク・必須ヘッダ・応答の形）を表で追加
 - §5: CORS・Host 検証が SDK 既定で足りることを追記
 
 #### 追加

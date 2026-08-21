@@ -120,6 +120,62 @@ describe("プロトコルの入口", () => {
     expect(body.error?.message).toBe("Method not allowed.");
   });
 
+  /**
+   * modern era（2026-07-28）のリクエスト。legacy(2025) とは**線の引き方から違う**。
+   *
+   * - `initialize` を送らない。ハンドシェイクはリクエストごとの `_meta` エンベロープが運ぶ
+   * - ヘッダとボディの一致を強制される（`Mcp-Method`、`tools/call` なら `Mcp-Name` も必須。
+   *   欠けると 400 `-32020` で「headers and body disagree」と言われる）
+   * - 応答は素の JSON で、`resultType` という 2026-07-28 固有の判別子が付く
+   */
+  const MODERN_META = {
+    "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+    "io.modelcontextprotocol/clientInfo": { name: "vitest", version: "1" },
+    "io.modelcontextprotocol/clientCapabilities": {},
+  };
+
+  const modernRpc = (method: string, params: Record<string, unknown>, extraHeaders: Record<string, string> = {}) =>
+    rpc({ jsonrpc: "2.0", id: nextId++, method, params: { _meta: MODERN_META, ...params } }, {
+      "mcp-method": method,
+      "mcp-protocol-version": "2026-07-28",
+      ...extraHeaders,
+    });
+
+  it("modern era（2026-07-28）でも tools/list がコア3操作を返す", async () => {
+    // SDK は2つの era を同時に喋る（MCP.md §4）。legacy(2025) だけを確かめていると、
+    // modern クライアントだけ繋がらない状態を全テスト緑のまま見逃す
+    const body = await readRpc(await modernRpc("tools/list", {}));
+    expect(body.error).toBeUndefined();
+    expect((body.result?.tools ?? []).map((tool) => tool.name).sort()).toEqual([
+      "aggregate_dataset",
+      "get_provenance",
+      "search_datasets",
+    ]);
+  });
+
+  it("modern era でも unanswered は正常な結果として返る", async () => {
+    // 「答えられない」を届ける設計（DOMAIN.md §8）が era をまたいで成立していること。
+    // 片方の era だけ isError になると、繋いだクライアント次第で見え方が変わる
+    const body = await readRpc(
+      await modernRpc(
+        "tools/call",
+        { name: "search_datasets", arguments: { query: "新宿の美術館に行きたい" } },
+        { "mcp-name": "search_datasets" },
+      ),
+    );
+    expect(body.error).toBeUndefined();
+    expect(body.result?.isError).not.toBe(true);
+    const output = JSON.parse(body.result!.content![0]!.text) as SearchDatasetsOutput;
+    expect(expectUnanswered(output).reason).toBe("out_of_area");
+  });
+
+  it("DELETE も 405 を返す（GET と同じくセッション操作が無いため）", async () => {
+    const response = await request("/mcp", { method: "DELETE" });
+    expect(response.status).toBe(405);
+    const body = (await response.json()) as RpcResponse;
+    expect(body.error?.message).toBe("Method not allowed.");
+  });
+
   it("ステートレス — initialize を送らなくてもツールを呼べる", async () => {
     // セッションを持たない設計（McpAgent / Durable Objects 不使用）の実測。
     // ここが落ちるなら、どこかでセッション状態を持ち始めている
@@ -143,6 +199,26 @@ describe("tools/list", () => {
       "get_provenance",
       "search_datasets",
     ]);
+  });
+
+  it("3ツールとも、全フィールドに説明があり型は主張しない", async () => {
+    // AI クライアントが引数を知る唯一の手がかりが `.describe()` の散文なので、
+    // 説明の欠落は「使えないツール」と同義。1ツール1フィールドだけ見ていると、
+    // 他の2ツールの説明がまるごと落ちても気づけない
+    const expected: Record<string, string[]> = {
+      search_datasets: ["query", "area", "areas", "interests", "category", "limit"],
+      aggregate_dataset: ["datasetId", "intent"],
+      get_provenance: ["datasetIds", "query"],
+    };
+    for (const tool of await listTools()) {
+      const properties = tool.inputSchema?.properties ?? {};
+      expect(Object.keys(properties).sort(), `${tool.name} のフィールド`).toEqual(expected[tool.name]!.slice().sort());
+      for (const [field, schema] of Object.entries(properties)) {
+        expect(schema.description, `${tool.name}.${field} に説明が無い`).toBeTruthy();
+        expect(schema.type, `${tool.name}.${field} に型が書かれている（parse.ts との二重定義になる）`).toBeUndefined();
+      }
+      expect(tool.description, `${tool.name} にツール説明が無い`).toBeTruthy();
+    }
   });
 
   it("入力スキーマは説明を載せるが、型は主張しない", async () => {

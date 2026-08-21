@@ -1,6 +1,6 @@
 ---
 title: "MASTER"
-version: "1.5.0"
+version: "1.5.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -786,17 +786,17 @@ Changelog エントリには以下のカテゴリを使用する（[Keep a Chang
 
 ## Changelog
 
+### [1.5.1] - 2026-08-21
+
+#### 変更
+
+- 技術スタック表の Protocol 行を「未着手（Step 5）」から「実装済み」へ更新（[Issue #117](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/117)）。依存の実バージョンと、`inputSchema` を「広告」に留める設計を注意として追記
+
 ### [1.5.0] - 2026-08-21
 
 #### 追加
 
 - 文書索引の「企画・プレゼン資料」に [submission-deck.md](./submission-deck.md)（提出資料 16:9・14枚の構成 SSOT）を追加。[first-stage-presentation.md](./first-stage-presentation.md) はそこからの切り出しである関係を明記した（[PR #124](https://github.com/fffokazaki/tabi-concierge-tokyo/pull/124)）
-
-### [1.4.1] - 2026-08-21
-
-#### 変更
-
-- 技術スタック表の Protocol 行を「未着手（Step 5）」から「実装済み」へ更新（[Issue #117](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/117)）。依存の実バージョンと、`inputSchema` を「広告」に留める設計を注意として追記
 
 ### [1.4.0] - 2026-08-21
 
