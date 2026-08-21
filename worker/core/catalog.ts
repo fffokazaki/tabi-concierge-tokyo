@@ -20,8 +20,19 @@ import type { RepresentativeArea } from "../../shared/core";
  * **このファイルは Node（scripts プロジェクトのテスト）からも読まれる。**
  * workerd 固有の import（`cloudflare:*` 等）を持ち込まないこと。
  *
- * Step 5 で D1 への実クエリ（メタデータRAG / Text-to-SQL）に置き換える。そのとき
- * `samples` は不要になり、`areas` / `keywords` は検索の実装に吸収される。
+ * ## Step 5 を終えた今の役割（2026-08-22 更新）
+ *
+ * かつてここには「Step 5 で D1 への実クエリに置き換える。そのとき `samples` は不要になり、
+ * `areas` / `keywords` は検索の実装に吸収される」と書いてあったが、**そうはならなかった**。
+ *
+ * | 項目 | 今の役割 |
+ * | --- | --- |
+ * | `samples` | **縮退経路が使い続ける。** LLM や D1 が落ちたとき `extractFromSamples`（`operations.ts`）が返すのはこの固定データで、Step 5 以前と同じ応答になることがその価値である。消すと縮退先が無くなる |
+ * | `keywords` | `search_datasets` のキーワード実装が使う。LLM は自然文を分解するだけで、候補のマッチ自体は今もキーワード表が行う（[Issue #120](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/120)） |
+ * | `areas` | 同上に加え、Text-to-SQL のプロンプトへ「このデータセットに実在するエリア」として渡す |
+ * | `matchReason` | 応答の `matchReason` にそのまま出る。**LLM には書かせない**（実測の裏が無い文をユーザーに出さないため） |
+ *
+ * つまりこのファイルは「Step 5 までの仮置き」ではなく、**LLM 経路の足場と縮退先を兼ねる常設のデータ**である。
  */
 
 /** 固定データとして返せる、実在する1行。 */

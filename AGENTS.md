@@ -48,7 +48,7 @@ PoC 段階のため軽量な運用を採用している。判断の背景は [AD
 | ビルド | Vite 8 ＋ `@cloudflare/vite-plugin`。ツールチェーンは Node 24（`.nvmrc`） |
 | デプロイ先 | Cloudflare Workers（アカウント `opendata`）。<https://tabi-concierge-tokyo.opendata-002.workers.dev> |
 | デプロイ方法 | **手動**。`npm run deploy`（= `wrangler deploy`）をローカルから実行する。`.github/workflows/ci.yml` は検証（typecheck / test / build）だけを行い、**デプロイはしない**。**いつ実行するかは [DEPLOYMENT.md](docs/05-operations/DEPLOYMENT.md) §3 で契機を定めた**（`worker/` `shared/` を変更したらデプロイ、`migrations/` なら先に `db:migrate`）。契機を決めていなかったため本番が43コミット遅れる事故があった（Issue #46） |
-| 接続（`/api/*`） | **接続済み**。プラン画面（Issue #31・`src/features/plan/buildPlan.ts`）とあなたへ画面（`src/features/foryou/buildRecommendations.ts`）が、それぞれ独立に `search_datasets` → `aggregate_dataset` → `get_provenance` の3操作を呼ぶ。**`aggregate_dataset` は D1 を実照会する**（Text-to-SQL・Issue #119）。`search_datasets` はまだ `worker/core/` のキーワード実装（Issue #22 のスタブ）で、LLM による分解・選定は Issue #120 |
+| 接続（`/api/*`） | **接続済み**。プラン画面（Issue #31・`src/features/plan/buildPlan.ts`）とあなたへ画面（`src/features/foryou/buildRecommendations.ts`）が、それぞれ独立に `search_datasets` → `aggregate_dataset` → `get_provenance` の3操作を呼ぶ。**`aggregate_dataset` は D1 を実照会**（Text-to-SQL・Issue #119）、**`search_datasets` は自然文だけの呼び出しを LLM で構造化入力へ分解**してから既存のキーワード判定へ渡す（メタデータRAG・Issue #120）。候補のマッチ自体は今もキーワード表が行う |
 | 接続（`/mcp`） | **実装済み**（Issue #117・`worker/mcp.ts`）。`createMcpHandler`（ステートレス。**Durable Objects は使わない**）でコア3操作をツール公開。ツールの `inputSchema` は「広告」で、検査の実体は `parse.ts`（[MCP.md](docs/02-design/MCP.md) §3） |
 | データベース | Cloudflare D1（`tabi-concierge-tokyo`・導入済み）。スキーマは `migrations/`、取り込みは `scripts/`。開発は `npm run db:reset:local` |
 | Python 実行環境 | **未確認**。「現状の構成では Cloudflare 上で Python が使えない」という報告があるが、本リポジトリ内に検証記録はなく未確認（実装で Python を前提にする前に要確認） |
@@ -71,7 +71,7 @@ PoC 段階のため軽量な運用を採用している。判断の背景は [AD
 >
 > **構造化入力 `interests` を送る呼び出しでは、まだ覆えていない興味を最も多く覆う候補から順に枠を確保し、残り枠をスコア順で埋める**（`selectWithInterestCoverage`・[Issue #84](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/84)）。枠の確保に使う述語は欠損の判定と同一。**ただし「枠に入らなかっただけなのに欠損に見える」を消し切るわけではない** — (1) 報告対象の興味が `limit` を超えた分は枠を取れず従来どおり欠損になる（`interests` は最大20件・`limit` は上限10なので、仕様上ふつうに起きる入力）(2) 述語は部分一致なので、偽陽性の一致先を**探しに行って枠に座らせる**（興味「緑茶」が都市公園のキーワード「緑」に当たる）。**枠を確保できた＝その興味に本当に答えた、ではない**。
 >
-> **`no` 昇順そのものも残っている** — 残り枠を埋める段の同点解決は引き続き登録順。プラン画面も興味チップを選んだ呼び出しでは構造化入力 `interests` を送るようになった（Issue #53・`buildSearchInput`。チップ未選択で自由文だけなら従来どおり）ため、キーワードの一致が `limit: 4` を超えれば枠の確保が働く。**あなたへ画面の現行設定（`limit: 6`）ではそもそも切り捨てが起きず、枠の確保は動かない**（同点6件が枠に収まる。現行の見え方を支えているのは PR #82 の 4→6 のまま）。スタブの既知の限界で、Step 5（Text-to-SQL 化）で見直す対象。詳細は [API.md](docs/02-design/API.md) §3.1「興味カバレッジ優先の選定」。
+> **`no` 昇順そのものも残っている** — 残り枠を埋める段の同点解決は引き続き登録順。プラン画面も興味チップを選んだ呼び出しでは構造化入力 `interests` を送るようになった（Issue #53・`buildSearchInput`。チップ未選択で自由文だけなら従来どおり）ため、キーワードの一致が `limit: 4` を超えれば枠の確保が働く。**あなたへ画面の現行設定（`limit: 6`）ではそもそも切り捨てが起きず、枠の確保は動かない**（同点6件が枠に収まる。現行の見え方を支えているのは PR #82 の 4→6 のまま）。同点の解決には LLM が付けた関連度順が第2キーとして入った（Issue #120。`ranked` が空＝自然文以外の呼び出しと縮退時は従来どおり登録順）。詳細は [API.md](docs/02-design/API.md) §3.1「興味カバレッジ優先の選定」。
 >
 > **あなたへ画面（`src/features/foryou/`）の興味チップはラーメンだけ意図的に候補ゼロのまま残してある。** 実データ検証済みの `insufficient_granularity`（粒度不足）を具体的な理由つきで返す、正直な「答えられない」実演として価値がある（DATABASE.md「既知のデータ欠損」・DOMAIN.md §7）。バグではないので、キーワード表を拡張して「直そう」としないこと（絶対ルール #1）。
 >
