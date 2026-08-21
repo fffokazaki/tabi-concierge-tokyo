@@ -81,6 +81,60 @@ describe("buildPlan", () => {
     expect(ROUTE_STOP_LIMIT).toBe(MAX_STOP_COUNT);
   });
 
+  it("search_datasets へは興味を畳み込まず interests 配列で送る（畳み込むと答えていない興味が沈黙する・Issue #53）", async () => {
+    const { fetchImpl, calls } = happyPath();
+    await buildPlan({ ...DEFAULT_TRIP, interests: ["nightlife"], notes: "上野で夜遊びしたい" }, { fetchImpl });
+
+    // Issue #53 の実測ケース。畳み込んだ「ナイトライフ、上野で夜遊びしたい」は銭湯の
+    // キーワード「夜」が「夜遊び」に部分一致して answered になり、ナイトライフの欠損が沈黙する
+    const searchCall = calls.find((call) => call.path === SEARCH);
+    expect(searchCall?.body).toMatchObject({ interests: ["ナイトライフ"], query: "上野で夜遊びしたい" });
+  });
+
+  it("その他のご希望が空なら query キーごと省く（interests 併送時の空文字は境界で省略と同義に受理されるため、省くことだけが「空でも送ってよい」の誤読を防ぐ）", async () => {
+    const { fetchImpl, calls } = happyPath();
+    await buildPlan(DEFAULT_TRIP, { fetchImpl });
+
+    const body = calls.find((call) => call.path === SEARCH)?.body as Record<string, unknown>;
+    expect(body.interests).toEqual(["ラーメン", "文化"]);
+    expect(body).not.toHaveProperty("query");
+  });
+
+  it("空白だけのご希望も query キーごと省く（trim の退行で「空はキーごと省く」の契約形が崩れたことに気づけるように）", async () => {
+    const { fetchImpl, calls } = happyPath();
+    await buildPlan({ ...DEFAULT_TRIP, interests: ["culture"], notes: "   " }, { fetchImpl });
+
+    const body = calls.find((call) => call.path === SEARCH)?.body as Record<string, unknown>;
+    expect(body).not.toHaveProperty("query");
+  });
+
+  it("ご希望の前後の空白は落として送る（trim 済みの値が query に載る）", async () => {
+    const { fetchImpl, calls } = happyPath();
+    await buildPlan({ ...DEFAULT_TRIP, interests: [], notes: " 浅草を回りたい " }, { fetchImpl });
+
+    const body = calls.find((call) => call.path === SEARCH)?.body as Record<string, unknown>;
+    expect(body.query).toBe("浅草を回りたい");
+  });
+
+  it("興味が無ければ interests キーごと省く（従来どおり query だけの呼び出し）", async () => {
+    const { fetchImpl, calls } = happyPath();
+    await buildPlan({ ...DEFAULT_TRIP, interests: [], notes: "浅草を回りたい" }, { fetchImpl });
+
+    const body = calls.find((call) => call.path === SEARCH)?.body as Record<string, unknown>;
+    expect(body.query).toBe("浅草を回りたい");
+    expect(body).not.toHaveProperty("interests");
+  });
+
+  it("aggregate の intent と provenance の query には従来どおり畳み込んだ全文を渡す（意図・根拠の再現用）", async () => {
+    const { fetchImpl, calls } = happyPath();
+    await buildPlan({ ...DEFAULT_TRIP, interests: ["nightlife"], notes: "上野で夜遊びしたい" }, { fetchImpl });
+
+    const aggregateCall = calls.find((call) => call.path === AGGREGATE);
+    const provenanceCall = calls.find((call) => call.path === PROVENANCE);
+    expect((aggregateCall?.body as { intent: string }).intent).toBe("ナイトライフ、上野で夜遊びしたい");
+    expect((provenanceCall?.body as { query: string }).query).toBe("ナイトライフ、上野で夜遊びしたい");
+  });
+
   it("name / summary を Stop.place / Stop.note に写し、出典を対で持つ", async () => {
     const { fetchImpl } = happyPath();
     const plan = expectPlan(await buildPlan(DEFAULT_TRIP, { fetchImpl }));
@@ -123,7 +177,8 @@ describe("buildPlan", () => {
 
     const outcome = await buildPlan(DEFAULT_TRIP, { fetchImpl });
     // 検索そのものが unanswered の経路。サーバーが添える構造化欠損（Issue #70）は `areas` を
-    // 送らないと付かず、プラン画面は自然文に畳み込んで送るので常に空（Issue #94）
+    // 送らないと付かず、プラン画面は `interests` は送るが `areas` は送らないので常に空
+    //（Issue #94。興味の取り落ちは unanswered 側には載らない — API.md §3.1）
     expect(outcome).toEqual({
       kind: "unanswered",
       reason: "out_of_area",

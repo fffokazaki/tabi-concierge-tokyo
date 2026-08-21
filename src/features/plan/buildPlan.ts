@@ -80,23 +80,57 @@ export type PlanOutcome =
 export type BuildPlanOptions = { fetchImpl?: typeof fetch };
 
 /**
- * 旅のプロフィールから検索クエリを組み立てる。
+ * 旅のプロフィールから、意図・根拠の再現に使う全文を組み立てる。
+ *
+ * **`search_datasets` には使わない。** 興味を「、」で畳み込んだ自然文を検索に送ると、
+ * キーワードが1件でも当たった時点で `answered` になり、答えていない興味が応答のどこにも
+ * 残らない（Issue #53。「ナイトライフ、上野で夜遊びしたい」は銭湯の「夜」が「夜遊び」に
+ * 部分一致する）。検索は `buildSearchInput` の構造化入力で送り、この全文は
+ * `aggregate_dataset` の `intent`・`get_provenance` の `query`（出典に写る「何を訊いたか」）・
+ * 画面表示（`PlanOutcome.query`）にだけ使う。
  *
  * 興味は**表示ラベル（日本語）**に変換する。バックエンドのマッチは日本語の部分一致なので、
  * ドメイン値（`"ramen"`）をそのまま繋ぐと1件も当たらない（API_REQUIREMENTS.md §1）。
- *
- * エリアの指定はプロフィール画面に入力欄が無いため送らない。代表エリア（上野・浅草）を
- * 狙うには「その他のご希望」に地名を書く経路しか無く、そこは質問文としてそのまま渡る。
- * 専用の入力欄は Issue #42。
  */
 export function buildQuery(trip: Trip): string {
   const interests = trip.interests.map((tag) => INTEREST_LABELS[tag]);
   return [...interests, trip.notes.trim()].filter((part) => part !== "").join("、");
 }
 
+/**
+ * `search_datasets` へ送る構造化入力（Issue #53／ADR-011）。
+ *
+ * 興味は畳み込む前の配列（`interests`）で、自由文は `query` で、**分けて**送る。
+ * バックエンドは返した候補が覆っていない興味を1件ずつ `gaps` に載せるが、その判定は
+ * `interests` を送った呼び出しでしか働かない（API.md §3.1「部分欠損」）。
+ *
+ * 空の値は**キーごと省く**。境界（`worker/core/parse.ts`）が空文字の `query` を 400 で
+ * 弾くのは `interests` が無い呼び出しだけで、`interests` がある呼び出しでは空文字も
+ * 省略と同義に受理される（parse が `""` へ正規化する）。つまりこの関数が作る形では
+ * 境界は防波堤にならず、**キーごと省くこの実装だけが「空でも送ってよい」という
+ * 誤読を防ぐ**。空配列の `interests` も「送らない」と同じ扱いだが、同じ理由で揃えて省く。
+ *
+ * エリアの指定はプロフィール画面に入力欄が無いため送らない（`areas` は使わない）。
+ * 代表エリア（上野・浅草）を狙うには「その他のご希望」に地名を書く経路しか無く、
+ * そこは `query` としてそのまま渡る。専用の入力欄は Issue #42。
+ */
+export function buildSearchInput(trip: Trip): { query?: string; interests?: string[]; limit: number } {
+  const notes = trip.notes.trim();
+  const interests = trip.interests.map((tag) => INTEREST_LABELS[tag]);
+  return {
+    ...(notes !== "" ? { query: notes } : {}),
+    ...(interests.length > 0 ? { interests } : {}),
+    limit: ROUTE_STOP_LIMIT,
+  };
+}
+
 export async function buildPlan(trip: Trip, options: BuildPlanOptions = {}): Promise<PlanOutcome> {
   const query = buildQuery(trip);
-  if (query === "") {
+  const searchInput = buildSearchInput(trip);
+  // ガードは表示用の全文（buildQuery）ではなく**実際に送る値**を見る。全文で判定すると、
+  // 将来 buildQuery に要素が足されたとき「全文は非空なのに検索には何も送らない」ずれが
+  // 黙って入る（ROUTE_STOP_LIMIT を MAX_STOP_COUNT から導出しているのと同じ考え方）
+  if (searchInput.query === undefined && searchInput.interests === undefined) {
     // 呼び出し側（この画面）の入力不足であって、オープンデータの欠損ではない。
     // unanswered として返すと、未回答の集計（DOMAIN.md §7）に自分たちの入力不足が積み上がる
     return {
@@ -105,7 +139,7 @@ export async function buildPlan(trip: Trip, options: BuildPlanOptions = {}): Pro
     };
   }
 
-  const searched = await callAndRead("search_datasets", { query, limit: ROUTE_STOP_LIMIT }, readCandidates, options);
+  const searched = await callAndRead("search_datasets", searchInput, readCandidates, options);
   if (searched.kind !== "answered") return searched.outcome;
 
   const extracted: { datasetId: string; result: AggregateResult }[] = [];
@@ -279,8 +313,10 @@ async function callAndRead<T>(
     return {
       kind: "unanswered",
       // 内訳は空。サーバーが `unanswered` に添える構造化欠損（Issue #70）は構造化入力 `areas` を
-      // 要求する（worker/core/operations.ts の `unansweredExtras`）。プラン画面は `buildQuery` で
-      // 自然文に畳み込んで送るため1件も付かない。**`areas` を送るようになったら読み直すこと**
+      // 要求する（worker/core/operations.ts の `unansweredExtras`）。プラン画面は `interests` は
+      // 送るが（Issue #53）、興味の取り落ちは `unanswered` 側には載らない（未回答が「何も
+      // 答えていない」を全体として覆っている — API.md §3.1）。`areas` は送らないため1件も
+      // 付かない。**`areas` を送るようになったら読み直すこと**
       outcome: { kind: "unanswered", reason: unanswered.reason, message: unanswered.message, gaps: [] },
       unanswered,
     };

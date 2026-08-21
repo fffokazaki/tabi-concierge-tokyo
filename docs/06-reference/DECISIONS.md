@@ -1,6 +1,6 @@
 ---
 title: "DECISIONS"
-version: "1.4.1"
+version: "1.4.2"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -493,6 +493,10 @@ Issue #43 は選択肢を4つ挙げていた: A. カタログから探す（→ 
 - **禁止**: `areas` があるのに質問文からエリアを拾うこと。`interests` の要素を分解・正規化すること
 - **参照すべきファイル**: [API.md](../02-design/API.md) §3.1（入出力の SSOT）／`worker/core/operations.ts`
 
+> **追記（2026-08-21）**
+> フロントエンド（プラン画面）の送信側対応は [Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53) の PR #113 で完了した（`interests` + `query`（自由文のみ）の分離送信・`buildSearchInput`）。
+> 「影響（ネガティブ）」1点目（プラン画面経由は従来の精度のまま）は解消済み。`areas` は引き続き送らない（エリアの入力欄が無い — Issue #42）。
+
 ### 関連
 
 - [Issue #53](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/53)（興味の取り落としの沈黙）
@@ -640,6 +644,12 @@ AIツール（Claude Code、GitHub Copilot 等）の知識カットオフによ�
 | ADR-012 | マナーの「参考情報」としてJNTOを限定的に組み込む（ADR-010の一部改定） | 2026-08-20 | 承認済み | チームshiwata |
 
 ## Changelog
+
+### [1.4.2] - 2026-08-21
+
+#### 修正
+
+- ADR-011 の末尾に、フロントエンド（プラン画面）の送信側対応が Issue #53 の PR #113 で完了したことを示す追記を追加（ADR-010 と同じ追記形式。「影響（ネガティブ）」1点目の残作業は解消済み）
 
 ### [1.4.1] - 2026-08-21
 
