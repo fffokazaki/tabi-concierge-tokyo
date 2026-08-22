@@ -75,13 +75,70 @@ type ChatCompletion = {
 };
 
 /**
+ * AI Gateway が受けるキャッシュ TTL の範囲（秒）。
+ * [公式ドキュメント](https://developers.cloudflare.com/ai-gateway/features/caching/)の
+ * 「The minimum TTL is 60 seconds and the maximum TTL is one month」より（2026-08-22 確認）。
+ */
+const MIN_CACHE_TTL_SECONDS = 60;
+const MAX_CACHE_TTL_SECONDS = 2_592_000;
+
+/** 既定の TTL。ADR-013 決定4 の 3600 秒をそのまま既定として持つ。 */
+export const DEFAULT_CACHE_TTL_SECONDS = 3600;
+
+/**
+ * キャッシュをどう扱うか。**数値1本にせず種別を持たせてある。**
+ *
+ * 「0 なら無効」を秒数の中に埋めると、`cacheTtl: 0` を素で渡す実装になりやすい。
+ * AI Gateway でキャッシュを使わない指定は `skipCache` であって TTL 0 ではないので、
+ * 呼び出し側が取り違えた瞬間に**キャッシュが効いたまま「引き直したつもり」になる**。
+ */
+export type GatewayCachePolicy = { kind: "cache"; ttlSeconds: number } | { kind: "skip" };
+
+/**
+ * `vars.AI_GATEWAY_CACHE_TTL` を解釈する（[Issue #143](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/143)）。
+ *
+ * `"0"` はキャッシュを使わない指定、それ以外は秒数。収録リハーサルで同じ質問文を
+ * 引き直すための入口で、既定は現行どおり 3600 秒なので何もしなければ挙動は変わらない。
+ *
+ * **不正値では throw しない。** ここで落とすと収録直前に Worker ごと死ぬ。既定へ倒して
+ * `console.error` に出す — `npx wrangler tail` で拾える形にしておくのが唯一の気づく手段になる
+ * （この判断はファイル冒頭の「縮退は静かに起きる」と同じ理由）。
+ */
+export function resolveCachePolicy(raw: string): GatewayCachePolicy {
+  const trimmed = raw.trim();
+  if (trimmed === "0") return { kind: "skip" };
+
+  const seconds = Number(trimmed);
+  if (
+    trimmed !== "" &&
+    Number.isInteger(seconds) &&
+    seconds >= MIN_CACHE_TTL_SECONDS &&
+    seconds <= MAX_CACHE_TTL_SECONDS
+  ) {
+    return { kind: "cache", ttlSeconds: seconds };
+  }
+
+  console.error(
+    `AI_GATEWAY_CACHE_TTL が不正です（${JSON.stringify(raw)}）。` +
+      `0（キャッシュを使わない）か ${MIN_CACHE_TTL_SECONDS}〜${MAX_CACHE_TTL_SECONDS} の整数を指定してください。` +
+      `既定の ${DEFAULT_CACHE_TTL_SECONDS} 秒で続行します`,
+  );
+  return { kind: "cache", ttlSeconds: DEFAULT_CACHE_TTL_SECONDS };
+}
+
+/**
  * Workers AI の実装。**必ず AI Gateway を経由する**（ADR-013 決定1）。
  *
  * `gatewayId` は `env.AI_GATEWAY_ID` から渡すこと（ハードコード禁止・ADR-013 決定2）。
  * キャッシュキーはリクエストボディ全体なので、`system` / `user` にタイムスタンプ・乱数・
  * リクエストIDなどの可変要素を入れないこと（入れた瞬間にキャッシュが全件ミスになる）。
  */
-export function workersAiLlm(ai: Ai, gatewayId: string): LlmClient {
+export function workersAiLlm(ai: Ai, gatewayId: string, cache: GatewayCachePolicy): LlmClient {
+  const gateway =
+    cache.kind === "skip"
+      ? { id: gatewayId, skipCache: true }
+      : { id: gatewayId, cacheTtl: cache.ttlSeconds };
+
   return {
     async complete({ purpose, system, user, maxTokens }) {
       try {
@@ -94,7 +151,7 @@ export function workersAiLlm(ai: Ai, gatewayId: string): LlmClient {
             ],
             max_tokens: maxTokens,
           } as never,
-          { gateway: { id: gatewayId, cacheTtl: 3600 } },
+          { gateway },
         )) as ChatCompletion;
 
         const choice = response.choices?.[0];
@@ -204,6 +261,6 @@ export type CoreDeps = {
 
 /** 殻（`worker/index.ts` / `worker/mcp.ts`）が組み立てる一式。組み立てを1箇所にまとめる。 */
 export const coreDeps = (env: Env): CoreDeps => ({
-  llm: workersAiLlm(env.AI, env.AI_GATEWAY_ID),
+  llm: workersAiLlm(env.AI, env.AI_GATEWAY_ID, resolveCachePolicy(env.AI_GATEWAY_CACHE_TTL)),
   sql: d1SqlExecutor(env.DB),
 });
