@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.52.0"
+version: "1.53.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 139
+ace_entry_count: 144
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -370,8 +370,23 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-212-1 | 同じ誤りを再発した知見は、「いつ使うか」を危険な文型と結び付けて常時読む指示へ昇格する | process | [playbook/process.md#ace-212-1](./playbook/process.md#ace-212-1) |
 | ACE-209-1 | レビューの `--base <branch>` はローカル ref を見る —— 指摘を読む前に、diff が PR の範囲と一致しているかを確かめる | tooling | [playbook/tooling.md#ace-209-1](./playbook/tooling.md#ace-209-1) |
 | ACE-209-2 | SPA では 200 はデプロイの証拠にならない —— 経路限定の画面は本番バンドルに固有文字列があるかで裏を取る | process | [playbook/process.md#ace-209-2](./playbook/process.md#ace-209-2) |
+| ACE-218-1 | 図に引いた矢印は「常に直列に通る」という主張になる —— 分岐で飛ばす段があるなら図の中に書く | documentation-quality | [playbook/documentation-quality.md#ace-218-1](./playbook/documentation-quality.md#ace-218-1) |
+| ACE-218-2 | 凡例を持つ資料は、凡例の構成員と各ページのバッジを突き合わせる | documentation-quality | [playbook/documentation-quality.md#ace-218-2](./playbook/documentation-quality.md#ace-218-2) |
+| ACE-218-3 | 生成物の過大主張は SSOT も同じ手で直す —— 生成物だけ直すと次の同期で戻ってくる | process | [playbook/process.md#ace-218-3](./playbook/process.md#ace-218-3) |
+| ACE-218-4 | 指定フォントが無い環境の目視QAは代替フォントの結果 —— 枠のぎりぎりは算術で確かめる | tooling | [playbook/tooling.md#ace-218-4](./playbook/tooling.md#ace-218-4) |
+| ACE-218-5 | 同じ語で呼ばれる別成果物をチェックリストの1項目に混ぜると、片方の要件が静かに消える | process | [playbook/process.md#ace-218-5](./playbook/process.md#ace-218-5) |
 
 ## Changelog
+
+### [1.53.0] - 2026-08-22
+
+#### 追加
+
+- ACE-218-1: 図に引いた矢印は「常に直列に通る」という主張になる（PR #218 / Issue #211）
+- ACE-218-2: 凡例を持つ資料は、凡例の構成員と各ページのバッジを突き合わせる（PR #218）
+- ACE-218-3: 生成物の過大主張は SSOT も同じ手で直す（PR #218 / Issue #211）
+- ACE-218-4: 指定フォントが無い環境の目視QAは代替フォントの結果（PR #218）
+- ACE-218-5: 同じ語で呼ばれる別成果物をチェックリストの1項目に混ぜない（PR #218）
 
 ### [1.52.0] - 2026-08-22
 
