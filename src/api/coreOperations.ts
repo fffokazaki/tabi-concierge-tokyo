@@ -62,11 +62,15 @@ export type CoreCallResult =
    */
   | { kind: "parse"; status: number; elapsedMs: number; detail: string; rawText: string }
   /**
-   * `timeoutMs` 以内に応答が無かった（Issue #146）。**`network` に含めない。** 「接続できません」は
-   * 原因を誤誘導する ―― fetch 自体は届いていて、サーバー側の処理待ち（Step 5 の LLM 推論・D1
-   * 混雑等）で止まっているだけかもしれない。並列化（Issue #142・PR #145）で候補順に最初の
-   * 確定した失敗を採るようになったが、そもそも確定しない（応答が永遠に来ない）候補には
-   * 無力だった ―― この分類の追加自体がその無限待ちを解消する
+   * `timeoutMs` 以内に応答を読み終えられず、こちらから打ち切った（Issue #146）。**`network` に
+   * 含めない。** 「接続できません」は原因を誤誘導する ―― fetch 自体は届いていて、サーバー側の
+   * 処理待ち（Step 5 の LLM 推論・D1 混雑等）で止まっているだけかもしれない。並列化
+   * （Issue #142・PR #145）で候補順に最初の確定した失敗を採るようになったが、そもそも確定
+   * しない（応答が永遠に来ない）候補には無力だった ―― この分類の追加自体がその無限待ちを解消する。
+   *
+   * **ヘッダだけ届いて本文が来ない場合もここに入る。** `AbortSignal` は `fetch` が解決した
+   * あとも本文ストリームに効き続けるため、締め切りは本文の読み取り中にも来る。そこを
+   * `parse`（「応答を読み取れませんでした」）に落とすと、壊れていない本文を疑わせる
    */
   | { kind: "timeout"; elapsedMs: number; timeoutMs: number };
 
@@ -96,24 +100,33 @@ export async function callCoreOperation(
     return { kind: "input", elapsedMs: elapsed(), detail: toMessage(cause) };
   }
 
+  // AbortSignal.timeout は workerd・ブラウザどちらも標準実装で追加ライブラリが要らない。
+  // **signal を変数に持つ**のは、締め切りを過ぎたかどうかの判定に signal そのものを使うため
+  // （下の deadlinePassed）。この signal は fetch の解決後も本文ストリームに効き続けるので、
+  // 「打ち切ったか」を見る場所は fetch の catch だけでは足りない
+  const signal = AbortSignal.timeout(timeoutMs);
+
+  /**
+   * この呼び出しを締め切りで打ち切ったか。**reject 理由の name では判定しない。**
+   * `AbortSignal.timeout()` の理由は実測で `DOMException` の "TimeoutError"（Node 24 実行・
+   * Chrome 実行の両方で確認）だが、名前を見に行くと「どのエンジンがどの名前で reject するか」
+   * を追い続けることになる。`signal.aborted` は締め切りが来たときにだけ true になり、
+   * abort アルゴリズムの順序（aborted を立てる → イベント → reject）により、catch に
+   * 入った時点では必ず反映されている。判定したいのは「こちらが打ち切ったか」であって
+   * 「例外の名前が何か」ではない
+   */
+  const deadlinePassed = () => signal.aborted;
+
   let response: Response;
   try {
-    // AbortSignal.timeout は workerd・ブラウザどちらも標準実装で追加ライブラリが要らない。
-    // 発火時の reject 理由の name は実測で確認済み（Node 24 実行・Chrome 実行の両方で
-    // "TimeoutError"、DOMException）。ユーザー操作による中断（新規実装済みではないが、将来
-    // 足す場合は "AbortError" になる）と区別できるよう、下の catch では両方を timeout として
-    // 扱う ―― どちらであっても「応答を待っていた側が打ち切った」という意味は同じで、
-    // 「サーバーに接続できません」（network）に分類する方が原因を誤誘導する
     response = await fetchImpl(CORE_ENDPOINTS[operation], {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: serialized,
-      signal: AbortSignal.timeout(timeoutMs),
+      signal,
     });
   } catch (cause) {
-    if (cause instanceof DOMException && (cause.name === "TimeoutError" || cause.name === "AbortError")) {
-      return { kind: "timeout", elapsedMs: elapsed(), timeoutMs };
-    }
+    if (deadlinePassed()) return { kind: "timeout", elapsedMs: elapsed(), timeoutMs };
     return { kind: "network", elapsedMs: elapsed(), detail: toMessage(cause) };
   }
 
@@ -123,6 +136,9 @@ export async function callCoreOperation(
   try {
     text = await response.text();
   } catch (cause) {
+    // ヘッダは返ったが本文が来ないまま締め切りが来た場合。parse に落とすと、壊れていない
+    // 本文を疑わせる（実際に起きたのは「こちらが打ち切った」）
+    if (deadlinePassed()) return { kind: "timeout", elapsedMs: elapsed(), timeoutMs };
     // 応答は届いている。network（未接続）に分類すると原因と逆方向へ誘導する
     return {
       kind: "parse",

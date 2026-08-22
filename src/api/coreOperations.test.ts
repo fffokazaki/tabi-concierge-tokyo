@@ -32,6 +32,27 @@ const hangingFetch = (): typeof fetch =>
     });
   }) as unknown as typeof fetch;
 
+/**
+ * ヘッダだけ返して本文が来ない fetch のスタブ（Issue #146）。`AbortSignal.timeout()` は
+ * `fetch` が解決したあとも走り続けるため、**本文の読み取り中にも発火しうる**。
+ * その経路が `parse`（「応答を読み取れませんでした」）ではなく `timeout` に分類されることを固定する。
+ */
+const headersOnlyFetch = (): typeof fetch =>
+  vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        // 本文の先頭だけ流して、あとは来ない
+        controller.enqueue(new TextEncoder().encode('{"status":'));
+        init?.signal?.addEventListener("abort", () => {
+          controller.error(new DOMException("The operation was aborted due to timeout", "TimeoutError"));
+        });
+      },
+    });
+    return Promise.resolve(
+      new Response(body, { status: 200, headers: { "content-type": "application/json" } }),
+    );
+  }) as unknown as typeof fetch;
+
 describe("callCoreOperation", () => {
   it("POST・JSON ボディ・確定パスで呼び出す", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { status: "answered", candidates: [] }));
@@ -136,6 +157,20 @@ describe("callCoreOperation", () => {
     // 打ち切られていること自体を実時間で確認する（実装が signal を渡し忘れていると、
     // このスタブは永遠に解決せずテストがタイムアウトで落ちる ―― それ自体が退行の検出）
     expect(Date.now() - startedAt).toBeLessThan(2000);
+    expect(result).toMatchObject({ kind: "timeout", timeoutMs: 20 });
+  });
+
+  it("ヘッダは返ったが本文が来ないまま打ち切られた場合も timeout として返す（parse に落とさない）", async () => {
+    const fetchImpl = headersOnlyFetch();
+
+    const result = await callCoreOperation(
+      "aggregate_dataset",
+      { datasetId: "t1", intent: "上野" },
+      { fetchImpl, timeoutMs: 20 },
+    );
+
+    // parse（「応答を読み取れませんでした」）に落とすと、原因を本文の不正へ誤誘導する。
+    // 実際に起きたのは「締め切りを過ぎたのでこちらが打ち切った」であって、本文は壊れていない
     expect(result).toMatchObject({ kind: "timeout", timeoutMs: 20 });
   });
 
