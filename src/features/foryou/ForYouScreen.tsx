@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { DataGapCard } from "../plan/components/DataGapCard";
+import { GapEscalationNote } from "../plan/components/GapEscalationNote";
 import { FORYOU_INTEREST_TAGS } from "./constants";
 import { InterestFilterChips } from "./components/InterestFilterChips";
 import { RecommendationCard } from "./components/RecommendationCard";
@@ -52,6 +53,10 @@ export function ForYouScreen({ state }: { state: ForYouState }) {
                 data-gap-card__title（15px）が親の route-empty__title（12.5px）より大きく、
                 見出しの階層が逆転する */}
             {request.gaps.length > 0 && <DataGapCard gaps={request.gaps} />}
+            {/* 内訳（gaps）が空でも出す。ラーメン単独は応答全体が unanswered で gaps が空になり、
+                この注記が最も要る画面がまさにその形。reason で出し分けない理由は
+                GapEscalationNote の doc（サーバーの `other` も記録されている） */}
+            <GapEscalationNote />
           </>
         )}
 
@@ -60,6 +65,7 @@ export function ForYouScreen({ state }: { state: ForYouState }) {
         {request.status === "ready" && (
           <>
             {request.gaps.length > 0 && <DataGapCard gaps={request.gaps} />}
+            {request.gaps.length > 0 && <GapEscalationNote />}
             {request.recommendations.map((recommendation) => (
               <RecommendationCard key={recommendation.source.datasetId} recommendation={recommendation} />
             ))}

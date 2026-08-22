@@ -1,6 +1,7 @@
 import type { DragEvent } from "react";
 import { DataGapCard } from "./components/DataGapCard";
 import { EtiquetteList } from "./components/EtiquetteList";
+import { GapEscalationNote } from "./components/GapEscalationNote";
 import { JntoReferenceNote } from "./components/JntoReferenceNote";
 import { ProvenanceChip } from "./components/ProvenanceChip";
 import { RouteStopCard } from "./components/RouteStopCard";
@@ -105,6 +106,9 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
                 data-gap-card__title（15px）が親の route-empty__title（12.5px）より大きく、
                 見出しの階層が逆転する */}
             {request.gaps.length > 0 && <DataGapCard gaps={request.gaps} />}
+            {/* 内訳（gaps）が空でも出す（応答全体が unanswered のとき gaps は常に空）。
+                reason で出し分けない理由は GapEscalationNote の doc */}
+            <GapEscalationNote />
           </>
         )}
 
@@ -113,6 +117,7 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
         {request.status === "ready" && (
           <>
             {request.gaps.length > 0 && <DataGapCard gaps={request.gaps} />}
+            {request.gaps.length > 0 && <GapEscalationNote />}
 
             {orderedStops.map(({ origIdx, pos, stop, source, positionLabel, selected, isDragOver }) => (
               <div key={origIdx} className="route-stop">

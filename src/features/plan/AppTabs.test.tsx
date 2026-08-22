@@ -469,3 +469,75 @@ describe("障害 — unanswered と区別して表示する", () => {
     expect(screen.queryByText("該当するオープンデータがありません")).not.toBeInTheDocument();
   });
 });
+
+/**
+ * 未回答の還元（エスカレーション）の注記（Issue #192）。
+ *
+ * `GapEscalationNote.test.tsx` はコンポーネント単体を見ている。ここで確かめるのは
+ * **どの画面状態で出るか** —— とくに「内訳（`gaps`）が空の未回答」で出ること。
+ * 指摘の元になったラーメン単独がまさにその形で、`gaps.length > 0` を条件にすると
+ * この画面にだけ注記が出ない、という取り落としを固定する。
+ */
+describe("未回答の還元の注記（Issue #192）", () => {
+  const NOTE = /答えられなかった問いは記録されます/;
+
+  /** ラーメン単独。応答全体が unanswered（粒度不足）で、内訳は空で返る（本番実測 2026-08-22） */
+  const ramenOnlyStub = () =>
+    stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "unanswered",
+          reason: "insufficient_granularity",
+          message:
+            "飲食店の店舗データは「東京都内の飲食店のバリアフリー情報」（210件・バリアフリー対応店に限定）のみで、ジャンルの列を持たないため「ラーメン」の粒度では答えられません。",
+        }),
+    });
+
+  it("内訳が空の未回答でも出る（あなたへ画面・ラーメン単独）", async () => {
+    const { fetchImpl } = ramenOnlyStub();
+    render(<AppTabs options={{ fetchImpl }} />);
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+    fireEvent.click(screen.getByRole("button", { name: "あなたへ" }));
+
+    await waitFor(() => expect(screen.getByText("分類: insufficient_granularity")).toBeInTheDocument());
+    expect(screen.getByText(NOTE)).toBeInTheDocument();
+    // 内訳が無いので DataGapCard は出ない。注記はそれとは独立に出る
+    expect(screen.queryByText("答えられなかった点があります")).not.toBeInTheDocument();
+  });
+
+  it("内訳が空の未回答でも出る（プラン画面）", async () => {
+    const { fetchImpl } = ramenOnlyStub();
+    await createBriefing(fetchImpl);
+
+    await waitFor(() => expect(screen.getByText("分類: insufficient_granularity")).toBeInTheDocument());
+    expect(screen.getByText(NOTE)).toBeInTheDocument();
+  });
+
+  it("route-empty と DataGapCard が両方出ている画面でも、注記は1つだけ", async () => {
+    // 二重に出すと、同じ主張が画面に2回並ぶ（Issue #107 で message の名乗りを外したのと同じ問題）
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
+          gaps: [{ status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" }],
+        }),
+      [AGGREGATE_PATH]: () =>
+        jsonResponse({ status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" }),
+    });
+    const { container } = render(<AppTabs options={{ fetchImpl }} />);
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+
+    await waitFor(() => expect(screen.getByText("答えられなかった点があります")).toBeInTheDocument());
+    expect(screen.getByText("該当するオープンデータがありません")).toBeInTheDocument();
+    expect(container.querySelectorAll(".gap-escalation-note")).toHaveLength(1);
+  });
+
+  it("すべて答えられた画面には出さない（還元する欠損が無いため）", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    await createBriefing(fetchImpl);
+
+    await waitFor(() => expect(screen.getByText("寛永寺")).toBeInTheDocument());
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  });
+});
