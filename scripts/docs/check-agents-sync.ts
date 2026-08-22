@@ -49,7 +49,9 @@ interface SharedSection {
 
 /** 1 ファイルから共有本文を取り出す。取り出せない形なら理由を返す。 */
 function extractSharedSection(doc: AgentDoc): SharedSection | { problem: string } {
-  const lines = doc.content.split("\n");
+  // CRLF は LF と同じに扱う。片方を Windows で編集しただけで落とすのは、指示内容の
+  // ドリフトではないため（Issue #136 の cross-model レビュー指摘）。
+  const lines = doc.content.split(/\r?\n/);
   const markerIndexes = lines
     .map((line, index) => (line.trim() === SHARED_MARKER ? index : -1))
     .filter((index) => index >= 0);
