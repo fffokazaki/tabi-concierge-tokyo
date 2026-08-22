@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.42.0"
+version: "1.43.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 118
+ace_entry_count: 121
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -349,8 +349,23 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-175-3 | AI Gateway のキャッシュは「引き直して良い結果を固定する」運用を許さない ―― skipCache は書き込みもしない | architecture | [playbook/architecture.md#ace-175-3](./playbook/architecture.md#ace-175-3) |
 | ACE-173-1 | URL・名称の一括置換は「過去の事実の記録」まで書き換える ―― 置換後に記録行だけ手で戻す | documentation-quality | [playbook/documentation-quality.md#ace-173-1](./playbook/documentation-quality.md#ace-173-1) |
 | ACE-177-1 | 「実測か推定明記か」の二択には、出所つきの実体験を根拠へ格上げする第三の道がある | documentation-quality | [playbook/documentation-quality.md#ace-177-1](./playbook/documentation-quality.md#ace-177-1) |
+| ACE-178-1 | 「内容は同一」と宣言した写しファイルは、マーカー以降を CI で一字一句照合しないと必ずずれる ―― マーカーの不在も違反にする | documentation-quality | [playbook/documentation-quality.md#ace-178-1](./playbook/documentation-quality.md#ace-178-1) |
+| ACE-178-2 | PR の CI が赤いときは「落ちたステップが自分の差分より前か」を先に見る ―― 直 push で入った赤は次の PR が継承する | process | [playbook/process.md#ace-178-2](./playbook/process.md#ace-178-2) |
+| ACE-178-3 | CLI の終了コードはプロセス起動でテストする ―― 比較関数が正しくてもエントリーポイントの配線が壊れれば CI は緑で素通りする | testing | [playbook/testing.md#ace-178-3](./playbook/testing.md#ace-178-3) |
 
 ## Changelog
+
+### [1.43.0] - 2026-08-22
+
+#### 追加
+
+- ACE-178-1: 「内容は同一」と宣言した写しファイルは、マーカー以降を CI で一字一句照合しないと必ずずれる（Issue #136 / PR #178）
+- ACE-178-2: PR の CI が赤いときは「落ちたステップが自分の差分より前か」を先に見る（Issue #179 / PR #178）
+- ACE-178-3: CLI の終了コードはプロセス起動でテストする（Issue #136 / PR #178）
+
+#### カウンター更新
+
+- ACE-51-5: Helpful +1（「grep で機械的に潰す」という指針を CI ゲート `docs:check-agents-sync` として実装した）
 
 ### [1.42.0] - 2026-08-22
 
