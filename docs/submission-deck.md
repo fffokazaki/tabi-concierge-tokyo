@@ -1,6 +1,6 @@
 ---
 title: "submission-deck"
-version: "1.7.0"
+version: "1.8.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-21"
@@ -18,6 +18,8 @@ changeImpact: "medium"
 - 登録: 利用オープンデータ 最低1件〜最大10件（データURL＋タイトル）
 - 必須4項目: ①課題及び解決策 ②プロダクト ③利用オープンデータ ④チーム紹介
 
+> **この原稿から PPTX を生成するビルダーは [`deck/`](../deck/) にある**（`cd deck && npm run build`）。本書を直したら `deck/build.js` 側も同期すること。`build.js` は冒頭コメントで参照している本書のバージョンを持っており、そこがズレていたら未同期のサインである。
+>
 > **First Stage の2分スライドとは別のデッキ**（[ROADMAP.md](07-project-management/ROADMAP.md) §4）。本書がフルバージョンで、[first-stage-presentation.md](first-stage-presentation.md) の8枚はここからの切り出し。スライド番号を書くときはどちらのデッキか明示すること。
 >
 > スライドの実体（PPTX / PDF）と動画は本リポジトリの管理外。本書は構成と文言の SSOT。
@@ -106,6 +108,16 @@ changeImpact: "medium"
 - [TASKS.md](07-project-management/TASKS.md) — 提出物タスクの進捗
 
 ## Changelog
+
+### [1.8.0] - 2026-08-22
+
+#### 追加
+
+- 冒頭に PPTX ビルダー [`deck/`](../deck/) への参照を追加（[PR #202](https://github.com/fffokazaki/tabi-concierge-tokyo/pull/202)）。ビルダーはセッション固有の一時領域にしか無く、原稿から辿れなかった。併せて `deck/build.js` 側を本書へ同期した:
+  - スライド13の「30分→3分」を v1.6.0 の確定文言（体験・操作一巡に基づく目安）へ差し替え。v1.3.0 当時の「企画時の推定値・未実測」が残っていた
+  - スライド12にデータセットIDの列を追加し、カタログURL をテンプレートから解決可能な形へ。件数の説明を実データに合わせて修正（列の合計 1,667 と注記の「合計 1,645」が 22 件ズレていた。差は No.9 の統計表で、`spots` へは取り込んでいない）
+  - スライド14の URL を移設前の `opendata-002` から現行の `tokyo-odh-091` へ差し替え（旧アカウントのデプロイは提出までのロールバック先・[DEPLOYMENT.md](05-operations/DEPLOYMENT.md)）
+- **`deck/img/deck-plan.png` は Issue #188 の反映後の画面ではない。** 直上の 1.7.0 が定めたスライド6の撮り直しは、本書のチェックリストだけでなく `deck/img/deck-plan.png` の差し替えも意味する（`build.js` はこのファイル名を固定参照しているため、同じ名前で上書きすれば足りる）
 
 ### [1.7.0] - 2026-08-22
 
