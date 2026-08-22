@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.41.0"
+version: "1.42.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 117
+ace_entry_count: 118
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -348,8 +348,20 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-175-2 | name 単独の対応付けは同名レコードの実データで壊れる ―― 複合キー化し、曖昧なら「主張しない」へ倒す | data-processing | [playbook/data-processing.md#ace-175-2](./playbook/data-processing.md#ace-175-2) |
 | ACE-175-3 | AI Gateway のキャッシュは「引き直して良い結果を固定する」運用を許さない ―― skipCache は書き込みもしない | architecture | [playbook/architecture.md#ace-175-3](./playbook/architecture.md#ace-175-3) |
 | ACE-173-1 | URL・名称の一括置換は「過去の事実の記録」まで書き換える ―― 置換後に記録行だけ手で戻す | documentation-quality | [playbook/documentation-quality.md#ace-173-1](./playbook/documentation-quality.md#ace-173-1) |
+| ACE-177-1 | 「実測か推定明記か」の二択には、出所つきの実体験を根拠へ格上げする第三の道がある | documentation-quality | [playbook/documentation-quality.md#ace-177-1](./playbook/documentation-quality.md#ace-177-1) |
 
 ## Changelog
+
+### [1.42.0] - 2026-08-22
+
+#### 追加
+
+- ACE-177-1: 「実測か推定明記か」の二択には、出所つきの実体験を根拠へ格上げする第三の道がある（Issue #130 / PR #177）
+
+#### カウンター更新
+
+- ACE-21-1: Helpful +1（DoD 対象外の MASTER.md に「提出までに実測で更新」が残存 — 消しに行った文言そのものを docs/ 全体へ grep する場面で再確認）
+- ACE-66-2: Helpful +1（生成区間のみの1回計測を「根拠を確定」と書き、断定が計測範囲を超えているとクロスモデルレビューに指摘された — 同じ教訓の再発）
 
 ### [1.41.0] - 2026-08-22
 
