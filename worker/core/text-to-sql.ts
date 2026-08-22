@@ -198,7 +198,10 @@ function findFilterProblems(sql: string, entry: CatalogEntry, facets: Facets): s
   for (const use of literalUses(sql)) {
     if (use.value === "") continue; // 空文字との比較は値を作り出していない
     if (use.column === "dataset_id") {
-      if (use.value !== entry.datasetId) add(`dataset_id は '${entry.datasetId}' に限定してください。`);
+      // `!=` は対象外のデータセット全部を指す。値が正しくても演算子が逆なら限定にならない
+      if (use.op !== "=" || use.value !== entry.datasetId) {
+        add(`dataset_id は = で '${entry.datasetId}' に限定してください（否定や部分一致は使わない）。`);
+      }
       continue;
     }
     if (use.column === "category" || use.column === "area") {
@@ -220,19 +223,50 @@ function findFilterProblems(sql: string, entry: CatalogEntry, facets: Facets): s
   return problems;
 }
 
-/** 列の実在値と突き合わせる。完全一致は `=` / `IN`、部分一致は `LIKE` のときだけ許す。 */
+/**
+ * 列の実在値と突き合わせる。完全一致は `=` / `IN`、パターン一致は `LIKE` のときだけ許す。
+ *
+ * **否定は許さない。** `category NOT IN ('公園')` は実在値を使っていても「全部除外して0行」に
+ * なりうる ―― 実在値かどうかだけを見ると素通りする（レビュー指摘・信頼度98）。
+ *
+ * **`LIKE` はワイルドカードの位置まで見る。** `LIKE '文化'` はワイルドカードが無いので
+ * SQLite では完全一致であり、実値が「区民文化財」なら0行になる。`includes` で判定すると
+ * これが通ってしまう（同・信頼度97）。SQL と同じ意味で照合する。
+ */
 function judgeAgainstActual(use: LiteralUse, actual: string[]): string | undefined {
   const listed = actual.length > 0 ? `「${actual.join("」「")}」` : "（1件もありません）";
   if (use.op === "LIKE") {
-    const needle = use.value.replace(/^%+/, "").replace(/%+$/, "");
-    if (needle === "" || actual.some((value) => value.includes(needle))) return undefined;
-    return `${use.column} に「${needle}」を含む値はありません。実際に入っているのは ${listed} です。`;
+    if (actual.some((value) => likeMatches(use.value, value))) return undefined;
+    return (
+      `${use.column} に「${use.value}」に当たる値はありません（LIKE はワイルドカードの位置まで効きます）。` +
+      `実際に入っているのは ${listed} です。`
+    );
+  }
+  if (use.op !== "=" && use.op !== "IN") {
+    return (
+      `${use.column} を「${use.op}」で絞らないでください。除外の条件は全行を落として0行になりえます。` +
+      "使ってよいのは =、IN、LIKE です。"
+    );
   }
   if (actual.includes(use.value)) return undefined;
   return (
     `${use.column} の値は ${listed} です。「${use.value}」は完全一致しないので0行になります。` +
     "一覧の値をそのまま書くか、部分一致させたいなら LIKE を使ってください。"
   );
+}
+
+/**
+ * SQLite の `LIKE` と同じ意味で照合する（`%` は0文字以上・`_` は1文字）。
+ *
+ * 位置を無視して「含むかどうか」で見ると、`LIKE '文化%'`（前方一致）が「区民文化財」に
+ * 当たると誤判定する。**検査は実行される意味と同じでなければ、検査したことにならない**
+ * （[ACE-137-1](../../docs/08-knowledge/playbook/architecture.md#ace-137-1) と同じ筋）。
+ */
+function likeMatches(pattern: string, value: string): boolean {
+  const source = [...pattern]
+    .map((char) => (char === "%" ? "[\\s\\S]*" : char === "_" ? "[\\s\\S]" : char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+    .join("");
+  return new RegExp(`^${source}$`).test(value);
 }
 
 /** 文字列リテラルと、その直前に現れる「列 演算子」。 */
@@ -294,8 +328,10 @@ const LITERAL_CONTEXT =
 function contextOf(before: string): { column?: string; op?: string } {
   const matched = LITERAL_CONTEXT.exec(before);
   if (!matched) return {};
+  // **`NOT` を潰さない。** `NOT LIKE` を `LIKE` に正規化すると、除外の条件が
+  // 「当たる LIKE」として通ってしまう（レビュー指摘）
   const op = matched[2]!.toUpperCase().replace(/\s+/g, " ");
-  return { column: matched[1]!.toLowerCase(), op: op.endsWith("LIKE") ? "LIKE" : op };
+  return { column: matched[1]!.toLowerCase(), op };
 }
 
 /**

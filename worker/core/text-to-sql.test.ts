@@ -487,4 +487,57 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
       warn.mockRestore();
     }
   });
+  it("否定の演算子は拒否する（全行を除外して0行になる）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await seed(BOTH_AREAS);
+      // 実在値を使っていても、否定なら「全部除外して0行」になりうる
+      const negated = `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category NOT IN ('名所・史跡') LIMIT 50`;
+      const llm = scriptedLlm(negated, SELECT_ALL);
+
+      expect(expectAnswered(await aggregate(MEISHO_ID, "寺社を1件", depsWith(llm))).result.name).toBe("寛永寺");
+      expect(llm.asked).toHaveLength(2);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("dataset_id は `=` だけ（`!=` は別データセットへ広がる）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await seed(BOTH_AREAS);
+      const negatedId = `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id != '${MEISHO_ID}' LIMIT 50`;
+      const llm = scriptedLlm(negatedId, SELECT_ALL);
+
+      expect(expectAnswered(await aggregate(MEISHO_ID, "寺社を1件", depsWith(llm))).result.name).toBe("寛永寺");
+      expect(llm.asked).toHaveLength(2);
+      expect(llm.asked[1]!.user).toContain("dataset_id");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("LIKE はワイルドカードの位置まで見る（`'文化'` と `'文化%'` は「区民文化財」に当たらない）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await seed([{ name: "旧朝倉家住宅", area: "渋谷", category: "区民文化財" }]);
+      const prefixOnly = `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category LIKE '文化%' LIMIT 50`;
+      const ok = `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category LIKE '区民%' LIMIT 50`;
+      const llm = scriptedLlm(prefixOnly, ok);
+
+      expect(expectAnswered(await aggregate(MEISHO_ID, "文化財を1件", depsWith(llm))).result.name).toBe("旧朝倉家住宅");
+      expect(llm.asked, "前方一致は当たらないので書き直させる").toHaveLength(2);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("当たる LIKE は素通しする（`'%文化財'` は「区民文化財」に当たる）", async () => {
+    await seed([{ name: "旧朝倉家住宅", area: "渋谷", category: "区民文化財" }]);
+    const suffix = `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category LIKE '%文化財' LIMIT 50`;
+    const llm = scriptedLlm(suffix);
+
+    expect(expectAnswered(await aggregate(MEISHO_ID, "文化財を1件", depsWith(llm))).result.name).toBe("旧朝倉家住宅");
+    expect(llm.asked).toHaveLength(1);
+  });
 });
