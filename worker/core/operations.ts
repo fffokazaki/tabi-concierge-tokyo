@@ -457,7 +457,10 @@ function computeSearchDatasets(
   // `categoryMissUnanswered` と同じ判断（Issue #59）で、「対応するものが無い」とは断定しない。
   // 興味だけの呼び出し（query 省略）に「質問文の語」と書くと、存在しないものを照合したと
   // 読めてしまうので、照合に使った入力に合わせて言い分ける（実際に行ったことだけを書く）
-  const askedLabel = input.interests?.length ? "質問文・興味の語" : "質問文の語";
+  const hasQuery = Boolean(input.query?.trim());
+  const hasInterests = Boolean(input.interests?.length);
+  const askedLabel =
+    hasQuery && hasInterests ? "質問文・興味の語" : hasInterests ? "興味の語" : "質問文の語";
   return unansweredWith(
     unanswered(
       "other",
