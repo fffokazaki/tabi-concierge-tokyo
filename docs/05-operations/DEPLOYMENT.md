@@ -1,6 +1,6 @@
 ---
 title: "DEPLOYMENT"
-version: "1.13.0"
+version: "1.13.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -203,6 +203,8 @@ npm run dev                                  # AI バインディングはロー
 ```
 
 **2. 引き直す（本番）** — `wrangler.jsonc` の `vars.AI_GATEWAY_CACHE_TTL` を `"0"` にして `npm run deploy`。**収録が終わったら `"3600"` へ戻して deploy し直すこと**（戻し忘れると毎回推論が走り、無料枠の消費が読めなくなる）。
+
+> **この書き換えをコミットする必要はない。** `npm run deploy` はワークツリーの `wrangler.jsonc` を読むので、**編集して deploy し、終わったら `git checkout -- wrangler.jsonc` で戻して deploy し直す**だけでよい（絶対ルール #5「`develop` に直接コミットしない」に触れない）。戻し忘れは `git status` に未コミット変更として残るため、次の作業で必ず気づく。
 
 | 値 | 意味 |
 | --- | --- |
@@ -498,6 +500,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.13.1] - 2026-08-22
+
+#### 変更
+
+- §3「収録前の手順」の本番での引き直しに、**書き換えをコミットする必要がない**ことを追記（[Issue #143](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/143)）。`npm run deploy` はワークツリーを読むため、絶対ルール #5（`develop` 直コミット禁止）と衝突しない。戻し忘れは `git status` に残ることも明記した
 
 ### [1.13.0] - 2026-08-22
 
