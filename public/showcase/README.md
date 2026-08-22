@@ -20,10 +20,19 @@ Claude の宣言的コンポーネント runtime（`<x-dc>` / `<sc-if>` / `{{ }}
 | `Japanese version-print.dc.html` | 印刷・資料貼り込み用 |
 | `support.js` / `doc-page.js` / `image-slot.js` | runtime。これが無いと表示できない |
 | `ios-frame.jsx` | iOS デバイスフレーム |
-| `.image-slots.state.json` / `.thumbnail` | 画像スロットの状態とサムネイル |
+| `.image-slots.state.json` | 画像スロットの状態。**`{}` で固定する**（下記） |
+| `.thumbnail` | 一覧用サムネイル。プロトタイプ自身（旅のプロフィール画面）のスクリーンショットで、第三者の素材は含まない |
 | `uploads/Tourism.docx` | 元になった資料 |
 
 **ファイル構成を崩さないこと。** HTML が `./support.js` のように相対参照している。
+
+## 画像スロットは意図的に空にしている
+
+`.image-slots.state.json` は `{}` で固定する。**ここに写真を入れないこと。**
+
+2026-08-23 まで、プラン画面の3枠と「あなたへ」画面の1枠に写真4点が data URI で埋め込まれていた（浅草寺／上野公園の桜／ラーメン二郎 上野店の店舗外観。最後の1点は 720×540）。**撮影者・取得元・利用許諾の記録がリポジトリに無く**、かつ本番の `/showcase/` で実際に画面へ表示されていた（2026-08-23 実測）。主催者規定の「引用は出典を明記する」（[CONSTRAINTS.md](../../docs/01-context/CONSTRAINTS.md) §3）と、本プロダクトが掲げる「根拠がなければ答えない」の両方に反する状態だったため、[Issue #222](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/222) で4点すべてを取り除いた。
+
+スロットへ画像を足すときは、**先に撮影者・撮影日・利用許諾をこの README へ記録する**。記録できない画像は入れない。空のままでもプロトタイプは壊れず、枠がプレースホルダ表示になるだけである。
 
 ## 収録画面
 
