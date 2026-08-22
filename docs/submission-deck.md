@@ -1,10 +1,10 @@
 ---
 title: "submission-deck"
-version: "1.1.0"
+version: "1.2.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-21"
-updated: "2026-08-21"
+updated: "2026-08-22"
 changeImpact: "medium"
 ---
 
@@ -87,8 +87,8 @@ changeImpact: "medium"
 ## 5. 提出前チェックリスト
 
 - [ ] **必須4項目の充足** — ①②③④が全て資料内に存在することを指差し確認
-- [ ] **キャプチャ3点**（1600×900px・スライド6/7/8）を本番URL <https://tabi-concierge-tokyo.opendata-002.workers.dev> から取得。プロフィール入力から実際に操作して撮る
-- [ ] **タブバーの見え方を確認** — スキャン・周辺は `AppTabs.tsx` の `INACTIVE_TABS` で disabled 表示。キャプチャだけを見る審査員はスライド4の凡例を見ないため、「未完成に見える」ならキャプチャ内かキャプション側に「スキャン・周辺はデザイン構想」と明示する
+- [x] **キャプチャ3点**（1600×900px・スライド6/7/8）を本番URL <https://tabi-concierge-tokyo.opendata-002.workers.dev> から取得。プロフィール入力から実際に操作して撮る — 2026-08-22 取得済み（Version `712c2277`・[Issue #126](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/126) にコメント）。**操作条件は「興味チップのみ・自由文は空」**（[Issue #143](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/143) の決定。自由文が空だと `search_datasets` が LLM 分解を通らず候補選定が決定的になる）。スライド6は**ラーメンを外した「文化・家族向け・自然」**で撮る — 入れたままだと未回答バナーが出て、スライド8の山を先に撃つ
+- [ ] **タブバーの見え方を確認** — スキャン・周辺は `AppTabs.tsx` の `INACTIVE_TABS` で disabled 表示。キャプチャだけを見る審査員はスライド4の凡例を見ないため、「未完成に見える」ならキャプチャ内かキャプション側に「スキャン・周辺はデザイン構想」と明示する。**見え方の確認は済み**（2026-08-22・薄いグレーのラベルで「壊れている」ようには見えないが、キャプチャ単体では「まだ作っていない」と読める）。**キャプション側に置く方針**で、記載は資料作成（[Issue #127](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/127)）で行うため未チェックのまま残す
 - [ ] **カタログURL の生存確認** — 確定10件を提出直前に再確認（[DATABASE.md](02-design/DATABASE.md) §3）
 - [ ] **スライド11 の OSS 記述の確認** — OSS 化の対象は**コンシェルジュ（`worker/` `shared/` `scripts/` `migrations/`）のみ**で、旅行アプリ `src/` は含まない。切り出しの実施は提出後〜Final Stage（[Issue #129](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/129)）のため、提出資料には「公開予定」と書く
 - [ ] **著作権ルール** — BGM なし／『いらすとや』は1資料20個まで／地図を使う場合は帰属表示を隠さない／引用は出典明記（[CONSTRAINTS.md](01-context/CONSTRAINTS.md) §3）
@@ -103,6 +103,13 @@ changeImpact: "medium"
 - [TASKS.md](07-project-management/TASKS.md) — 提出物タスクの進捗
 
 ## Changelog
+
+### [1.2.0] - 2026-08-22
+
+#### 変更
+
+- §5 チェックリストの「キャプチャ3点」を取得済みに更新（[Issue #126](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/126)）。**撮るときの操作条件**（興味チップのみ・自由文は空／スライド6はラーメンを外す）を根拠つきで明記した。ラーメンを入れたままだとスライド6に未回答バナーが出て、§2 が定めた「出典を見せてから答えられないへ落とす」順序が崩れる
+- §5「タブバーの見え方を確認」に、確認の結果（薄いグレーのラベルで壊れて見えはしないが、キャプチャ単体では未完成と読める）と、キャプション側に明示する方針を追記した。記載自体は [Issue #127](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/127) で行うため未チェックのまま残している
 
 ### [1.1.0] - 2026-08-21
 
