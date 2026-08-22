@@ -162,3 +162,18 @@ worktree で作業中に dev サーバーを立てたら、**メインリポジ�
 取り込みの diff で `require`・ファイルパス・出力先を見て、**cwd を仮定している箇所を `__dirname` 基準へ移す**。成果物の落ちる場所が1つに固定され、gitignore の穴も構造的に閉じる。cwd を見るのが外部コマンド（`soffice` / `pdftoppm`）側なら直せないので、実行ディレクトリを手順書に明記する。
 
 ---
+
+<a id="ace-209-1"></a>
+
+### ACE-209-1: レビューの `--base <branch>` はローカル ref を見る —— 指摘を読む前に、diff が PR の範囲と一致しているかを確かめる
+
+| Category | tooling | Origin | PR #209 |
+| Date | 2026-08-22 |
+| Helpful | 0 | Harmful | 0 |
+| Status | active |
+
+`multi-agent.sh --task review --base develop` は **ローカルの** `develop` を基準にする。ブランチは `origin/develop` から切っていたのにローカルは2コミット古く、他人のマージ済みコミット（`docs/submission-deck.md` ほか7ファイル）が diff に混ざった。実測では Codex の指摘 2/2 が自分の差分と無関係なファイルの話で、そのままなら「レビュー通過」の範囲を PR の中身と取り違えていた（今回は混ざったおかげで提出資料の実害2件を拾えたが、それは偶然の側）。
+
+レビューを回す前に `git log --oneline develop -1` と `origin/develop -1` を並べる、または `--base origin/develop` を渡す。指摘を読むときは**まず対象ファイルが自分の差分かを見る** —— 範囲外の指摘は捨てず、別 Issue へ回す（実測: #211）。
+
+---

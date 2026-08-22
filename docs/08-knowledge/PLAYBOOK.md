@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.51.0"
+version: "1.52.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 137
+ace_entry_count: 139
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -368,8 +368,22 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-202-4 | 「検証」欄に、その差分を1行も通っていないゲートを並べない | process | [playbook/process.md#ace-202-4](./playbook/process.md#ace-202-4) |
 | ACE-205-1 | best-effort 記録の成否を応答に載せないなら、UI は個別の受領証を名乗らない | architecture | [playbook/architecture.md#ace-205-1](./playbook/architecture.md#ace-205-1) |
 | ACE-212-1 | 同じ誤りを再発した知見は、「いつ使うか」を危険な文型と結び付けて常時読む指示へ昇格する | process | [playbook/process.md#ace-212-1](./playbook/process.md#ace-212-1) |
+| ACE-209-1 | レビューの `--base <branch>` はローカル ref を見る —— 指摘を読む前に、diff が PR の範囲と一致しているかを確かめる | tooling | [playbook/tooling.md#ace-209-1](./playbook/tooling.md#ace-209-1) |
+| ACE-209-2 | SPA では 200 はデプロイの証拠にならない —— 経路限定の画面は本番バンドルに固有文字列があるかで裏を取る | process | [playbook/process.md#ace-209-2](./playbook/process.md#ace-209-2) |
 
 ## Changelog
+
+### [1.52.0] - 2026-08-22
+
+#### 追加
+
+- ACE-209-1: レビューの `--base` がローカル ref を見るため、diff が PR の範囲とずれる（PR #209）
+- ACE-209-2: SPA の 200 はデプロイの証拠にならない。本番バンドルの固有文字列で裏を取る（PR #209）
+
+#### カウンター更新
+
+- ACE-202-1: Helpful +1（生成物側の SSOT バージョンが `deck/build.js` の未同期を実際に検出した → Issue #211）
+- ACE-181-1: Helpful +1（README が縮退経路の署名 `固定データ抽出（スタブ）` を期待値として見せ続けていた）
 
 ### [1.51.0] - 2026-08-22
 

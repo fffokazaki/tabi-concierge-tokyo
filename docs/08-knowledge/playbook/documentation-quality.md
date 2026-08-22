@@ -380,7 +380,7 @@ CLAUDE.md / AGENTS.md のように「このファイルは単独で完結して�
 
 | Category | documentation-quality | Origin | PR #181 / Issue #168 |
 | Date | 2026-08-22 |
-| Helpful | 2 | Harmful | 0 |
+| Helpful | 3 | Harmful | 0 |
 | Status | active |
 
 主経路を差し替えても縮退先が旧実装のままなら、旧実装時代に書いた契約文書は「縮退経路の記述」としては依然として正しい。だから読み直しても嘘には見えず、**主経路の記述が丸ごと欠けていることだけが検出されない**。API.md §3.2 は Text-to-SQL へ差し替えた後も「そのデータセットが当該エリアを収録していなければ `data_not_published`」と書き続けていたが、それを返すのは縮退経路（`areaNotPublishedUnanswered`）だけで、主経路の0行は `other` だった ―― 同じ事実に、最も強い分類と弱い分類が経路で分かれていた。
@@ -409,7 +409,7 @@ CLAUDE.md / AGENTS.md のように「このファイルは単独で完結して�
 
 | Category | documentation-quality | Origin | PR #202 |
 | Date | 2026-08-22 |
-| Helpful | 0 | Harmful | 0 |
+| Helpful | 1 | Harmful | 0 |
 | Status | active |
 
 提出資料の PPTX は `docs/submission-deck.md` を原稿に `deck/build.js` が組む。冒頭コメントは「文言の SSOT: submission-deck.md v1.3.0」と宣言していたが、原稿は v1.6.0 まで進んでおり、Issue #130 が「企画時の推定値」から「初回探索体験・操作一巡の目安」へ差し替えた根拠が**資料だけ旧文言で残っていた**。原稿を直した側は生成物を思い出さず、生成物を読む側は「SSOT を宣言してあるから同期済み」と読める。
