@@ -180,11 +180,11 @@ const MAX_FACET_VALUES = 20;
  *   収録していないときの0行は**正しい未回答**なので、ここを弾くと「別のエリアの行」を返す方へ
  *   誘導してしまう
  *
- * 絞ってよい列は `dataset_id` / `category` / `area` だけ。`name` や `note` に intent の語を
- * 当てにいく形（上の1つ目）は列の時点で拒否する。**どの列の条件か読み取れないものも拒否する**
- * （読み取れないまま通すと、検査したつもりの穴になる）。
- *
- * 直らなければ既存の縮退（キーワード実装）へ落ちるので、**偽の未回答が返ることはない**。
+ * 検査するのは `dataset_id` / `category` / `area` の条件だけ。`name` などの列は**通す**
+ * （「寛永寺に行きたい」のように名指しされた施設を選ぶ SQL を弾くと、別の行へすり替わる）。
+ * 当たらない name 条件は0行になるので、`countRelaxed` の裏取り側で捕まえる ―― **この検査は
+ * 「速く・具体的に書き直させる」ための道具であって、最後の歯止めではない**。歯止めは
+ * `countRelaxed`（0行のときデータに数え直させる）である。
  *
  * 照合に使うのは `readFacets` が読んだ一覧＝**プロンプトで見せた一覧そのもの**である
  * （`MAX_FACET_VALUES` で切り詰めた分も同じ）。見せていない値で絞られても検査を通してしまうと、
@@ -211,15 +211,10 @@ function findFilterProblems(sql: string, entry: CatalogEntry, facets: Facets): s
       if (problem) add(problem);
       continue;
     }
-    if (use.column === undefined) {
-      add(`「${use.value}」がどの列の条件なのか読み取れませんでした。列 = 値 の形で素直に書いてください。`);
-      continue;
-    }
-    add(
-      `「${use.value}」で ${use.column} を絞らないでください。` +
-        "このデータセットを選んだのは検索側で、行の中身に intent の語が入っている必要はありません。" +
-        "絞ってよい列は category と area だけです。",
-    );
+    // それ以外の列（`name` など）は**通す**。「寛永寺に行きたい」のように利用者が名指しした
+    // 施設を選ぶ SQL まで弾いてしまうと、別の行へすり替わる（レビュー指摘・信頼度97）。
+    // 当たらない name 条件（興味の語を当てにいく形）は0行になるので、`countRelaxed` の
+    // 裏取りが捕まえる ―― **形で禁じるのではなく、0行になったときにデータで判定する**
   }
   return problems;
 }
@@ -377,21 +372,36 @@ function contextOf(before: string): { column?: string; op?: string } {
  * **エリアは緩めない。** 「渋谷の…」と訊かれて渋谷の行が無いとき、エリアまで外して数えると
  * 上野の行が見つかり「絞りすぎ」と誤判定してしまう ―― 書き直しの果てに**別のエリアの行**を
  * 返す方へ誘導することになる（それは偽の未回答よりさらに悪い）。
+ *
+ * ## この裏取りで「未回答」の意味が変わる
+ *
+ * category は緩めるので、`aggregate_dataset` が返す0行の未回答は
+ * **「このデータセットには（訊かれたエリアに）行が1件も無い」**を意味するようになる。
+ * 「浅草の博物館」と訊かれて博物館の行だけが無い場合は、未回答ではなく**そのデータセット・
+ * そのエリアの別の行**が返る。
+ *
+ * これは意図した挙動である ―― **どのデータセットを使うかは `search_datasets` が既に決めていて、
+ * ここは関連性を審査し直す場ではない**（このファイル冒頭の doc・Issue #78 の `query` 文言・
+ * Issue #140 の絞り込み緩和と同じ判断）。ただし [DOMAIN.md](../../docs/02-design/DOMAIN.md) §7 は
+ * `gaps` をデータ公開リクエストの一次情報として扱うので、**ここで記録される欠損を
+ * 「問いに合う行が無かった」と読まないこと。**
  */
 async function countRelaxed(
   input: AggregateDatasetInput,
   entry: CatalogEntry,
   deps: CoreDeps,
-): Promise<number> {
+): Promise<{ ok: true; count: number } | { ok: false; cause: string }> {
   const area = findRepresentativeArea(input.intent);
   const escapedId = entry.datasetId.replace(/'/g, "''");
   const areaClause = area ? ` AND area = '${area.replace(/'/g, "''")}'` : "";
   const result = await deps.sql.select(
     `SELECT COUNT(*) AS n FROM spots WHERE dataset_id = '${escapedId}'${areaClause} LIMIT 1`,
   );
-  if (!result.ok) return 0; // 数えられないなら「絞りすぎ」と主張しない（fail closed）
+  // **数えられなかったときに 0 を返さない。** 0 は「本当に無い」＝データ欠損の主張になり、
+  // 障害がそのまま `gaps` へ記録される（API.md §4 の「障害と未回答を混ぜない」に反する）
+  if (!result.ok) return { ok: false, cause: `裏取りの照会に失敗しました: ${String(result.cause)}` };
   const n = result.rows[0]?.["n"];
-  return typeof n === "number" ? n : 0;
+  return { ok: true, count: typeof n === "number" ? n : 0 };
 }
 
 /** 書き直しの指示に使う一文。何件あるかまで見せないと、同じ SQL を書き直してくる。 */
@@ -550,14 +560,16 @@ async function attemptTextToSql(
       // **「無かった」と言う前に、緩めた問いでも0行かをデータに訊く**（Issue #148）。
       // 絞り込みが強すぎただけなら、それは答えではなく書き直すべき SQL である
       const relaxed = await countRelaxed(input, entry, deps);
-      if (relaxed > 0) {
+      // 裏取りができないなら「無かった」とは言えない。障害として縮退する
+      if (!relaxed.ok) return { kind: "failed", cause: relaxed.cause };
+      if (relaxed.count > 0) {
         previousError =
-          `この SQL は0行でした。ただし ${describeRelaxed(input, relaxed)}。絞り込みが強すぎます。` +
+          `この SQL は0行でした。ただし ${describeRelaxed(input, relaxed.count)}。絞り込みが強すぎます。` +
           "category の条件を外し、エリア（訊かれている場合）だけで絞って書き直してください。";
         console.warn("[text-to-sql] 0行だが緩めれば行がある SQL を拒否しました", {
           attempt,
           datasetId: input.datasetId,
-          relaxed,
+          relaxed: relaxed.count,
           sql: guarded.sql,
         });
         continue;
