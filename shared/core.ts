@@ -32,8 +32,9 @@ export type UnansweredReason = (typeof UNANSWERED_REASONS)[number];
 /**
  * `GET /api/gaps/summary` が返す未回答ログの集計。
  *
- * 利用者の入力文 `gaps.question` は含めない。認証のない公開 API で個票を返すと、自由入力に
- * 個人情報が含まれていた場合にそのまま外へ出るため、公開境界は集計値だけに限定する
+ * 利用者の入力文 `gaps.question` は含めない。`area` も公開を決めた地名だけを返し、それ以外は
+ * `"その他のエリア"` にまとめる。認証のない公開 API で個票を返すと、自由入力に個人情報が
+ * 含まれていた場合にそのまま外へ出るため、公開境界は分類済みの集計値だけに限定する
  * （API.md §3.4）。
  */
 export type GapSummaryResponse = {

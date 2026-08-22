@@ -59,7 +59,8 @@ export function GapsDashboard() {
       {state.kind === "loaded" && <Summary summary={state.summary} />}
 
       <p className="gaps-dashboard__privacy">
-        この画面と API は集計値だけを扱います。利用者が入力した質問文（個票）は公開しません。
+        この画面と API は分類済みの集計値だけを扱います。利用者が入力した質問文（個票）や、
+        公開対象外のエリア入力は公開しません。
       </p>
     </main>
   );

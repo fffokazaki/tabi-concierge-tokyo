@@ -76,6 +76,9 @@ describe("GET /api/gaps/summary", () => {
       env.DB.prepare(
         "INSERT INTO gaps (question, area, reason) VALUES (?, ?, ?)",
       ).bind("新宿の美術館", "新宿", "out_of_area"),
+      env.DB.prepare(
+        "INSERT INTO gaps (question, area, reason) VALUES (?, ?, ?)",
+      ).bind("個人情報風のエリア入力", "user@example.com", "out_of_area"),
     ]);
 
     const response = await request("/api/gaps/summary");
@@ -84,25 +87,28 @@ describe("GET /api/gaps/summary", () => {
 
     const body = await readJson<Record<string, unknown>>(response);
     expect(body).toEqual({
-      total: 4,
+      total: 5,
       byReason: [
         { reason: "insufficient_granularity", count: 2 },
+        { reason: "out_of_area", count: 2 },
         { reason: "data_not_published", count: 1 },
-        { reason: "out_of_area", count: 1 },
       ],
       byArea: [
         { area: "上野", count: 2 },
         { area: null, count: 1 },
+        { area: "その他のエリア", count: 1 },
         { area: "新宿", count: 1 },
       ],
       byReasonAndArea: [
         { reason: "insufficient_granularity", area: "上野", count: 2 },
         { reason: "data_not_published", area: null, count: 1 },
+        { reason: "out_of_area", area: "その他のエリア", count: 1 },
         { reason: "out_of_area", area: "新宿", count: 1 },
       ],
     });
     expect(JSON.stringify(body)).not.toContain("上野でラーメンを探したい");
     expect(JSON.stringify(body)).not.toContain("マナーを知りたい");
+    expect(JSON.stringify(body)).not.toContain("user@example.com");
   });
 
   it("gaps が空なら 0 件と空の内訳を返す", async () => {

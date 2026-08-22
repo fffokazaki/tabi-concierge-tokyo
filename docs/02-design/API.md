@@ -246,10 +246,10 @@ D1 `gaps` の発生件数を、都・GovTech東京向け還元ダッシュボー
 | 項目 | 内容 |
 | ---- | ---- |
 | 入力 | なし |
-| 出力 | `{ total, byReason, byArea, byReasonAndArea }`。`byReason` は `{ reason, count }[]`、`byArea` は `{ area: string \| null, count }[]`、`byReasonAndArea` は `{ reason, area: string \| null, count }[]` |
+| 出力 | `{ total, byReason, byArea, byReasonAndArea }`。`byReason` は `{ reason, count }[]`、`byArea` は `{ area: string \| null, count }[]`、`byReasonAndArea` は `{ reason, area: string \| null, count }[]`。`area` は公開を決めた既知の地名・`null`・`"その他のエリア"` のいずれか |
 | 並び順 | 件数の降順。同数なら理由は §4 の列挙順、エリアは `null`（エリア指定なし）を先にして文字列順 |
 | 0件 | `total: 0` と3つの空配列を返す。見せるための件数を補わない |
-| 個票 | **返さない。** `gaps.question` は利用者の自由入力で個人情報を含む可能性がある。認証のない公開 API は `reason` / `area` / 件数だけを SQL で読み、質問文を処理境界へ入れない |
+| 個票 | **返さない。** `gaps.question` は利用者の自由入力で個人情報を含む可能性がある。`gaps.area` も API 入力由来の任意文字列を保存しうるため、生値は公開しない。認証のない公開 API は SQL 内で `area` を公開可能な既知の地名か `"その他のエリア"` へ丸め、質問文と公開対象外のエリア入力を処理境界へ入れない |
 | MCP | 公開しない。コア3操作の再利用面ではなく、React の行政向け集計画面専用 |
 
 画面には、この集計を東京都・GovTech東京への公開リクエストにまとめることが**構想**であり、提出プロセス自体は未実装だと明記する。集計値が存在しても「提出済み」「送信済み」とは扱わない。
@@ -385,7 +385,7 @@ D1 `gaps` の発生件数を、都・GovTech東京向け還元ダッシュボー
 #### 追加
 
 - [Issue #193](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/193) の `GET /api/gaps/summary` 契約を §3.4 に追加。総数・理由別・エリア別・理由×エリア別を D1 実データから返し、0件を補わない
-- 個票の `gaps.question` は利用者の自由入力なので公開せず、集計列だけを SQL で読むプライバシー境界を確定
+- 個票の `gaps.question` は利用者の自由入力なので公開せず、任意文字列になりうる `gaps.area` も SQL 内で既知の地名か「その他のエリア」へ丸めるプライバシー境界を確定
 - `/gaps` 画面では、都への提出プロセスが実装済みではなく**構想**だと明記する表示契約を追加
 
 #### 変更
