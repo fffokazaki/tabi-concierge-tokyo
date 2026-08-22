@@ -1,6 +1,6 @@
 ---
 title: "MASTER"
-version: "1.7.0"
+version: "1.7.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -382,7 +382,7 @@ tabi-concierge-tokyo/
 - **ページロード時間**: 未定（POC 実装時に実測して設定）
 - **API応答時間**: 未定（同上）
 - **同時接続数**: 未定（First Stage はライブデモ不可のため、収録時点で負荷要件なし）
-- **体験指標**: 情報探索時間 約30分 → 約3分（提出までに実測で更新。単一応答の SLA ではない）
+- **体験指標**: 情報探索時間 約30分 → 約3分（体験と操作一巡に基づく目安・根拠は [PROJECT.md](01-context/PROJECT.md) §8〔[Issue #130](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/130)〕。単一応答の SLA ではない）
 
 ## 開発フロー
 
@@ -785,6 +785,12 @@ Changelog エントリには以下のカテゴリを使用する（[Keep a Chang
 - [ ] 定数の配置が層責務に沿っている（Domain/Application/Infrastructure）
 
 ## Changelog
+
+### [1.7.1] - 2026-08-22
+
+#### 変更
+
+- 体験指標の「提出までに実測で更新」を解消し、[PROJECT.md](01-context/PROJECT.md) §8 の目安表現へ追随（[Issue #130](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/130)）
 
 ### [1.7.0] - 2026-08-22
 

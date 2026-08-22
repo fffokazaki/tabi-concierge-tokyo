@@ -1,6 +1,6 @@
 ---
 title: "TASKS"
-version: "1.4.1"
+version: "1.4.2"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -47,7 +47,7 @@ changeImpact: "medium"
 - [x] **提出資料と First Stage スライドの構成確定**（2026-08-21）。提出資料14枚は [submission-deck.md](../submission-deck.md)、2分版8枚と台本は [first-stage-presentation.md](../first-stage-presentation.md) v2.0。v1.0 台本が実装と乖離していた（#4「MCPでアプリに接続します」が事実でない）ため全面差し替え
 - [ ] 提出用画面キャプチャ（1600×900px・3点）の切り出し — 対象は submission-deck のスライド6/7/8（[Issue #126](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/126)）
 - [ ] 提出資料（16:9・必須4項目を含む）の作成 — 構成は [submission-deck.md](../submission-deck.md) に確定済み（[Issue #127](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/127)）
-- [ ] 「探索30分→3分」を実測するか断定を避けた表現へ直す — 提出資料スライド13 の文言に直結（[Issue #130](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/130)）
+- [x] **「探索30分→3分」を断定を避けた表現へ確定**（[Issue #130](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/130)・2026-08-22）。実測はせず、30分＝開発メンバーの初回探索体験に基づく目安・3分＝操作一巡の目安として提示する。根拠は [PROJECT.md](../01-context/PROJECT.md) §8
 - [ ] 提出フォーム送信（<https://form.jotform.com/261870604352051>）→ 提出後ただちに収録枠を予約（30分単位・早い者順）（[Issue #128](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/128)）
 
 ### 🟠 優先度: High
@@ -131,6 +131,12 @@ MCP 最小実装 ─────────────────────
 - First Stage 2分スライドと台本: [first-stage-presentation.md](../first-stage-presentation.md)
 
 ## Changelog
+
+### [1.4.2] - 2026-08-22
+
+#### 変更
+
+- Critical タスク「『探索30分→3分』を実測するか断定を避けた表現へ直す」を完了へ更新（[Issue #130](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/130)）。根拠は [PROJECT.md](../01-context/PROJECT.md) §8 に確定
 
 ### [1.4.1] - 2026-08-22
 

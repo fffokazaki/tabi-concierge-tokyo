@@ -1,6 +1,6 @@
 ---
 title: "submission-deck"
-version: "1.5.0"
+version: "1.6.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-21"
@@ -38,7 +38,7 @@ changeImpact: "medium"
 
 ### 使う数字は3つに絞る
 
-「9,600 ／ 1日200PV ／ 30分→3分」（[CONSTRAINTS.md](01-context/CONSTRAINTS.md) §7）。うち「30分→3分」は企画時の推定値で未実測のため、断定を避けた表現にする（[PROJECT.md](01-context/PROJECT.md) §8）。
+「9,600 ／ 1日200PV ／ 30分→3分」（[CONSTRAINTS.md](01-context/CONSTRAINTS.md) §7）。うち「30分→3分」は、**30分＝開発メンバーが初めてカタログを人手で探した際の体験に基づく目安、3分＝本アプリの操作一巡（条件入力〜出典付きルート表示）の目安**として提示する（生成応答は本番で押下から約13秒後に表示済みを確認・2026-08-22・1回計測。操作一巡の通し計測は行っていない）。統制された比較計測ではないため「実測30分」等の断定表記はしない（[PROJECT.md](01-context/PROJECT.md) §8・[Issue #130](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/130)）。
 
 ## 2. スライド構成（14枚）
 
@@ -56,7 +56,7 @@ changeImpact: "medium"
 | 10 | ② | データが育つループ：未回答を `gaps` に記録（本番D1で実際に動作）→ 分類 → 都への公開リクエスト（提出プロセスは構想） | — |
 | 11 | ② | 基盤の開放：コンシェルジュは MCP サーバーとして開放予定。**別リポジトリへ切り出し MIT ライセンスで OSS 公開予定**（[Issue #129](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/129)）。旅行アプリは「最初のクライアント」にすぎない | **OSS 化の対象はコンシェルジュのみ**（旅行アプリ `src/` は対象外）。データ側 CC BY 4.0 とコード側 MIT を**別物として並記** |
 | 12 | ③ | 利用オープンデータ10件：タイトル・提供元・役割・ライセンス・カタログURL | [DATABASE.md](02-design/DATABASE.md) §2 の確定表をそのまま |
-| 13 | ① | インパクト／KPI：探索30分→3分（企画時推定）、観光の分散、都政への還元 | 未実測である旨を注記 |
+| 13 | ① | インパクト／KPI：探索30分→3分（体験・操作一巡に基づく目安）、観光の分散、都政への還元 | 「30分は初めてカタログを人手で探した開発メンバーの体験に基づく目安、3分はアプリ操作一巡の目安」と注記（「実測」とは書かない。§1・[Issue #130](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/130)） |
 | 14 | ④ | チーム紹介（チームshiwata・3名） | §4 |
 
 ## 3. スライド8の文言（固定）
@@ -103,6 +103,12 @@ changeImpact: "medium"
 - [TASKS.md](07-project-management/TASKS.md) — 提出物タスクの進捗
 
 ## Changelog
+
+### [1.6.0] - 2026-08-22
+
+#### 変更
+
+- §1「使う数字は3つに絞る」とスライド13の「30分→3分」の扱いを確定（[Issue #130](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/130)）。「企画時の推定値」から「30分＝開発メンバーの初回探索体験に基づく目安・3分＝操作一巡の目安（生成応答は本番で押下から約13秒後に表示済みを確認）」へ根拠を差し替え。「実測」と表記しない方針は維持
 
 ### [1.5.0] - 2026-08-22
 
