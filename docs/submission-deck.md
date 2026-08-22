@@ -1,6 +1,6 @@
 ---
 title: "submission-deck"
-version: "1.21.0"
+version: "1.21.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-21"
@@ -22,7 +22,7 @@ changeImpact: "medium"
 >
 > **First Stage の2分スライドとは別のデッキ**（[ROADMAP.md](07-project-management/ROADMAP.md) §4）。本書がフルバージョンで、[first-stage-presentation.md](first-stage-presentation.md) の8枚はここからの切り出し。スライド番号を書くときはどちらのデッキか明示すること。
 >
-> スライドの実体（PPTX / PDF）と動画は本リポジトリの管理外。本書は構成と文言の SSOT。
+> スライドの実体（PPTX / PDF）と First Stage 用の個別シーン素材は本リポジトリの管理外。Jotform 3-8 に記載する**申請用の操作デモ動画1本**は [`public/demo/operation-demo.mp4`](../public/demo/operation-demo.mp4) で管理する。本書は構成と文言の SSOT。
 
 ## 1. 設計方針
 
@@ -173,6 +173,12 @@ changeImpact: "medium"
 - [TASKS.md](07-project-management/TASKS.md) — 提出物タスクの進捗
 
 ## Changelog
+
+### [1.21.1] - 2026-08-23
+
+#### 変更
+
+- Jotform 3-8 に記載する申請用の操作デモ動画を、リポジトリ管理の [`public/demo/operation-demo.mp4`](../public/demo/operation-demo.mp4) へ切り替えた。申請動画は2シーンを1本に編集した25.133秒の無音MP4で、First Stage資料の #3・#4 に埋め込む個別シーン素材とは成果物を分ける
 
 ### [1.21.0] - 2026-08-23
 
