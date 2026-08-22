@@ -34,3 +34,9 @@ deck/slide-*.jpg
 # （build.js 自身は __dirname 基準なので必ず deck/ へ書き出す）
 tabi-concierge-tokyo-submission.pptx
 tabi-concierge-tokyo-submission.pdf
+
+# Playwright MCP の作業ファイル（スナップショット・撮影の中間物）
+.playwright-mcp/
+
+# Codex CLI のローカル環境設定
+.codex/
