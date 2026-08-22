@@ -1,6 +1,6 @@
 ---
 title: "DECISIONS"
-version: "1.5.1"
+version: "1.6.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -595,7 +595,7 @@ AI Gateway のコア機能（分析・キャッシュ・レート制限）は**�
 1. **Workers AI の呼び出しは必ず AI Gateway 経由にする。** `env.AI.run(model, input, { gateway: { id, cacheTtl } })` の形以外で推論を呼ぶコードを書かない
 2. **ゲートウェイ ID は `vars.AI_GATEWAY_ID` から取る。コードにハードコードしない**
 3. **初期値は予約名 `"default"`** とする。`"default"` は**初回の認証済みリクエストでゲートウェイを自動作成する**。名前付きゲートウェイ（例 `tabi-concierge-tokyo`）はダッシュボードか API で**先に作らないと使えず**、未作成のまま指定すると推論そのものが落ちる（2026-08-21 実測: `AiGatewayError: 2001: Please configure AI Gateway in the Cloudflare dashboard`）。作成後は vars の値を差し替えるだけで切り替わる
-4. **キャッシュ TTL は 3600 秒**。キャッシュキーは**リクエストボディ全体**なので、**プロンプトに可変要素（タイムスタンプ・乱数・リクエスト ID・件数カウンタ等）を入れない**。入れた瞬間にキャッシュは全件ミスになる
+4. **キャッシュ TTL は既定 3600 秒。値は `vars.AI_GATEWAY_CACHE_TTL` から取り、コードにハードコードしない**（[Issue #143](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/143) で追加。`"0"` はキャッシュを使わない指定で `skipCache` に対応する）。キャッシュキーは**リクエストボディ全体**なので、**プロンプトに可変要素（タイムスタンプ・乱数・リクエスト ID・件数カウンタ等）を入れない**。入れた瞬間にキャッシュは全件ミスになる — **引き直したいときにプロンプトを汚さず TTL 側で切れる**ようにするのが、この値を vars へ出した理由
 5. **テストは AI Gateway にも Workers AI にも到達させない。** `vitest.worker.config.ts` に `remoteBindings: false` を置く（理由は「影響」を参照）
 
 ### 理由
@@ -612,13 +612,13 @@ AI Gateway のコア機能（分析・キャッシュ・レート制限）は**�
 - **ネガティブ**:
   - **ゲートウェイのログに利用者の質問文がそのまま残る。** POC の公開面は無認証（ADR-004）だが、ゲートウェイのログはアカウント内に閉じている。提出後に運用を続けるならログ保持期間の方針が要る
   - **`ai` バインディングを足すと、ローカル開発でもテストでも実 API を叩きに行く。** AI はローカル模擬を持たないバインディングで、`remote: false` は設定エラーになる。素のままだと CI（Cloudflare 認証情報を持たない）でテストが**1件も走らずに** `remote dev authentication error` で全滅する（2026-08-21 実測: `Test Files no tests / Errors 6`）。`remoteBindings: false` はこの回避であり、同時に「テストは実推論を必要としない」という注入設計（`CoreDeps`）の裏返しでもある
-  - キャッシュ TTL が効いている間はプロンプトを変えても同じ応答が返るため、プロンプト調整中は `skipCache: true` か文言変更で明示的にキーを変える必要がある
+  - キャッシュ TTL が効いている間は**同じ質問文で引き直せない**。収録リハーサルでは「たまたま良くない読み取り」がそのまま TTL のあいだ固定される（Issue #143）。`vars.AI_GATEWAY_CACHE_TTL` を `"0"` にすると `skipCache` で毎回引き直せる。手順は [DEPLOYMENT.md](../05-operations/DEPLOYMENT.md) §3「収録前の手順」
 
 ### AIへの指示
 
-- **必須**: 推論は `env.AI.run(model, input, { gateway: { id: env.AI_GATEWAY_ID, cacheTtl: 3600 } })` の形で呼ぶ。ゲートウェイ ID は必ず `env.AI_GATEWAY_ID` から読む
+- **必須**: 推論は `env.AI.run(model, input, { gateway })` の形で呼ぶ。`gateway` は `worker/core/llm.ts` が `env.AI_GATEWAY_ID` と `env.AI_GATEWAY_CACHE_TTL` から組み立てる。**ゲートウェイ ID も TTL もコードに直書きしない**
 - **必須**: `wrangler.jsonc` を変更したら `npm run cf-typegen`。`Env` 型を手書きしない
-- **禁止**: `gateway` オプション無しの `env.AI.run()` を書くこと。ゲートウェイ ID をコードに直書きすること。プロンプトにタイムスタンプ・乱数・リクエスト ID などの可変要素を混ぜること
+- **禁止**: `gateway` オプション無しの `env.AI.run()` を書くこと。ゲートウェイ ID や TTL をコードに直書きすること。プロンプトにタイムスタンプ・乱数・リクエスト ID などの可変要素を混ぜること。キャッシュを切るつもりで `cacheTtl: 0` を渡すこと（無効化は `skipCache`）
 - **禁止**: `vitest.worker.config.ts` の `remoteBindings: false` を外すこと（外すと CI が落ちる）
 - **参照すべきファイル**: `wrangler.jsonc`（バインディングと vars）／`vitest.worker.config.ts`（テストを外へ出さない設定）／[LLM-MODEL-CANDIDATES.md](./LLM-MODEL-CANDIDATES.md) §4（モデルの実測挙動）
 
@@ -728,6 +728,13 @@ AIツール（Claude Code、GitHub Copilot 等）の知識カットオフによ�
 | ADR-013 | Workers AI の呼び出しは AI Gateway を前段に挟む | 2026-08-21 | 承認済み | チームshiwata |
 
 ## Changelog
+
+### [1.6.0] - 2026-08-22
+
+#### 変更
+
+- ADR-013 決定4 を更新（[Issue #143](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/143)）。キャッシュ TTL を呼び出し側のハードコードから `vars.AI_GATEWAY_CACHE_TTL` へ移し、`"0"` を `skipCache`（キャッシュを使わない）に割り当てた。既定は 3600 秒のままで挙動は変わらない
+- 「影響（ネガティブ）」のキャッシュ項と「AIへの指示」を、vars 経由になった実態に合わせて更新。`cacheTtl: 0` でキャッシュを切ろうとすることを禁止に追加
 
 ### [1.5.1] - 2026-08-22
 

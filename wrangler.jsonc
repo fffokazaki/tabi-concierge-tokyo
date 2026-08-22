@@ -65,7 +65,23 @@
   //
   // コードにハードコードせず vars に置くのは、この差し替えと、ローカルだけ別ゲートウェイへ
   // 向けたいとき（`.dev.vars` の `AI_GATEWAY_ID=...`）のため（ADR-013）。
+
+  // AI Gateway のキャッシュ TTL（秒）。既定は ADR-013 決定4 の 3600 秒。
+  //
+  // キャッシュキーは**リクエストボディ全体**なので、同じ質問文は TTL の間ずっと同じ
+  // 推論結果を返す。通常は利点（無料枠の節約・応答の安定）だが、**収録リハーサルでは
+  // 同じ質問文を引き直せない**という形で邪魔になる（Issue #143）。
+  //
+  // `"0"` はキャッシュを使わない指定（`skipCache`）。それ以外は 60〜2592000（1ヶ月）の
+  // 10進整数で、これは AI Gateway 側の下限・上限そのまま。範囲外・非10進表記・未設定は
+  // 既定へ倒れて `console.error` に出る（`npx wrangler tail` で拾う）。解釈は
+  // worker/core/llm.ts の `resolveCachePolicy`、収録前の手順は
+  // docs/05-operations/DEPLOYMENT.md §3。
+  //
+  // 数値ではなく文字列で書く。vars は `.dev.vars` で上書きすると必ず文字列になるため、
+  // 数値で書くと生成される型（`worker-configuration.d.ts`）が実行時の値と食い違う。
   "vars": {
-    "AI_GATEWAY_ID": "default"
+    "AI_GATEWAY_ID": "default",
+    "AI_GATEWAY_CACHE_TTL": "3600"
   }
 }

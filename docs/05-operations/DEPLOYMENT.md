@@ -1,11 +1,11 @@
 ---
 title: "DEPLOYMENT"
-version: "1.11.0"
+version: "1.12.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-22"
-changeImpact: "low"
+changeImpact: "medium"
 ---
 
 # DEPLOYMENT.md - デプロイメント・運用ガイド
@@ -182,7 +182,7 @@ npx wrangler whoami  # opendata が一覧に出ることを確認
 | --- | --- | --- |
 | バインディング | `AI` | `wrangler.jsonc` の `"ai"` |
 | ゲートウェイ ID | `default` | `wrangler.jsonc` の `"vars".AI_GATEWAY_ID` |
-| キャッシュ TTL | 3600 秒 | 呼び出し側（`env.AI.run` の第3引数） |
+| キャッシュ TTL | 3600 秒（既定） | `wrangler.jsonc` の `"vars".AI_GATEWAY_CACHE_TTL` |
 
 - **`default` は予約名**で、初回の認証済みリクエストでゲートウェイが**自動作成**される。ダッシュボード（AI → AI Gateway）でログ・ニューロン消費・キャッシュ HIT を確認できる
 - **名前付きゲートウェイに変えたい場合**は、先にダッシュボードか API で作成してから `vars.AI_GATEWAY_ID` を差し替える。**作成せずに名前を指定すると推論そのものが落ちる**（`AiGatewayError: 2001: Please configure AI Gateway in the Cloudflare dashboard`）
@@ -190,6 +190,44 @@ npx wrangler whoami  # opendata が一覧に出ることを確認
 
 > **AI バインディングはローカルでも実 API を叩く。** `npm run dev` の推論は本物で、無料枠（10,000 ニューロン/日）を消費する。`--remote` は要らない。
 > テストは `vitest.worker.config.ts` の `remoteBindings: false` で外へ出ないようにしてある（外すと Cloudflare 認証情報を持たない CI が全滅する）。
+
+#### 収録前の手順 — キャッシュの引き直しとニューロン残量（[Issue #143](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/143)）
+
+キャッシュキーは**リクエストボディ全体**なので、同じ質問文は TTL の間ずっと**同じ推論結果**を返す。ふだんは利点（無料枠の節約・応答の安定）だが、収録リハーサルでは**「たまたま良くない読み取り」がそのまま TTL のあいだ固定される**。引き直すには TTL を切る。
+
+**1. 引き直す（ローカル）** — `.dev.vars` に置いて `npm run dev` を起動し直す。`.dev.vars` は Git 管理外なので、戻し忘れても本番へは出ない。
+
+```bash
+echo 'AI_GATEWAY_CACHE_TTL=0' >> .dev.vars   # 0 = キャッシュを使わない（skipCache）
+npm run dev                                  # AI バインディングはローカルでも実 API を叩く
+```
+
+**2. 引き直す（本番）** — `wrangler.jsonc` の `vars.AI_GATEWAY_CACHE_TTL` を `"0"` にして `npm run deploy`。**収録が終わったら `"3600"` へ戻して deploy し直すこと**（戻し忘れると毎回推論が走り、無料枠の消費が読めなくなる）。
+
+| 値 | 意味 |
+| --- | --- |
+| `"0"` | キャッシュを使わない（`skipCache: true`）。同じ質問文で何度でも引き直せる |
+| `"60"`〜`"2592000"` | その秒数だけキャッシュする。AI Gateway 側の下限 60 秒・上限 1ヶ月をそのまま採っている |
+| 上記以外（範囲外・小数・空・未設定、`"6e1"` `"0x3c"` `"+60"` などの非10進表記） | **既定の 3600 秒へ倒れ、`console.error` が出る**（`npx wrangler tail` で拾う）。Worker は落とさない — 収録直前に全体が死ぬほうが害が大きいため |
+
+> 解釈は `worker/core/llm.ts` の `resolveCachePolicy`。**キャッシュを使わない指定は `skipCache` であって `cacheTtl: 0` ではない**（0 を TTL として渡すとキャッシュが効いたまま「引き直したつもり」になる）。この取り違えは `llm.test.ts` の「skip は skipCache で渡す」で固定してある。
+
+> **実測（2026-08-22・ローカル `npm run dev`・実 API。サーバをウォームアップしてから各6回）**
+>
+> | | 同一の質問文を6回 | 毎回ちがう質問文を6回（対照） |
+> | --- | --- | --- |
+> | 既定 `"3600"` | 0.41〜0.78 秒（中央値 **0.43**） | 0.98〜1.40 秒（中央値 1.03） |
+> | `"0"` | 0.74〜0.98 秒（中央値 **0.87**） | 0.72〜1.11 秒（中央値 0.89） |
+>
+> 既定では**同じ質問文だけが速くなる**（＝キャッシュに当たっている）のに対し、`"0"` では同一・別の差が消える。
+>
+> **「1回目より2回目が速い」だけでは判別できない。** サーバの立ち上がりで同じ形の低下が出るため、最初に対照なしで測ったときは逆の結論が出かけた。確かめるときは必ず「毎回ちがう質問文」を並べて測ること。**`cf-aig-cache-status` はバインディング経由では読めない**ので、確証はダッシュボード（AI → AI Gateway → `default`）の Cache HIT / MISS で取る。
+>
+> 不正値（`AI_GATEWAY_CACHE_TTL=いちじかん`）では HTTP 200 のまま `console.error` が出て既定へ倒れることも同日に実測した。
+
+**3. ニューロン残量を確認する（収録直前・必須）** — ダッシュボード AI → AI Gateway → `default` の消費量を見る。無料枠は 10,000 ニューロン/日、旅程1本 ≒ **20.7 ニューロン**（[LLM-MODEL-CANDIDATES.md](../06-reference/LLM-MODEL-CANDIDATES.md) §4.3 の実測）なので約 480 プラン/日にあたる。リハーサルを繰り返しても枯れる心配はまず無い。
+
+> **枯れても画面からは気づけない。** 無料枠を使い切ると LLM 経路が失敗し、コア操作は**キーワード実装へ静かに縮退する**（#119・#120）。応答は 200 で返り、旅程も表示されるので**画面を見ても API を叩いても気づけない**。`npx wrangler tail` の `console.error` とゲートウェイのログの両方で確かめること（下の「デプロイ後の確認」と同じ失敗モード）。
 
 ### デプロイ
 
@@ -459,6 +497,16 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.12.0] - 2026-08-22
+
+#### 追加
+
+- §3 に「収録前の手順 — キャッシュの引き直しとニューロン残量」を追加（[Issue #143](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/143)）。`vars.AI_GATEWAY_CACHE_TTL` でキャッシュ TTL を切り替える手順（ローカルは `.dev.vars`・本番は deploy）と、収録直前のニューロン残量確認を明文化した
+
+#### 変更
+
+- §3 の設定表「キャッシュ TTL」の置き場所を「呼び出し側（`env.AI.run` の第3引数）」から `wrangler.jsonc` の `"vars".AI_GATEWAY_CACHE_TTL` へ更新（ハードコードをやめたため）
 
 ### [1.11.0] - 2026-08-22
 

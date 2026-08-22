@@ -75,13 +75,88 @@ type ChatCompletion = {
 };
 
 /**
+ * AI Gateway が受けるキャッシュ TTL の範囲（秒）。
+ * [公式ドキュメント](https://developers.cloudflare.com/ai-gateway/features/caching/)の
+ * 「The minimum TTL is 60 seconds and the maximum TTL is one month」より（2026-08-22 確認）。
+ */
+const MIN_CACHE_TTL_SECONDS = 60;
+const MAX_CACHE_TTL_SECONDS = 2_592_000;
+
+/** 既定の TTL。ADR-013 決定4 の 3600 秒をそのまま既定として持つ。 */
+const DEFAULT_CACHE_TTL_SECONDS = 3600;
+
+/**
+ * 受け付ける表記は**10進数字だけ**。
+ *
+ * `Number()` は `"6e1"` / `"0x3c"` / `"+60"` をどれも 60 として受理する。設定ファイルに
+ * これらが現れるのはまず書き間違いなので、**黙って 60 秒として動かさず**既定へ倒す。
+ * ついでに空文字・小数・負数・符号もこの1つで落ちる（`Number("")` が 0 になる罠も含む）。
+ */
+const DECIMAL_DIGITS = /^\d+$/;
+
+/**
+ * キャッシュをどう扱うか。**数値1本にせず種別を持たせてある。**
+ *
+ * 「0 なら無効」を秒数の中に埋めると、`cacheTtl: 0` を素で渡す実装になりやすい。
+ * AI Gateway でキャッシュを使わない指定は `skipCache` であって TTL 0 ではないので、
+ * 呼び出し側が取り違えた瞬間に**キャッシュが効いたまま「引き直したつもり」になる**。
+ */
+export type GatewayCachePolicy = { kind: "cache"; ttlSeconds: number } | { kind: "skip" };
+
+/**
+ * `env.AI.run` の第3引数に載せる gateway オプション。
+ *
+ * **呼び出しごとに作る。** 1つ作って使い回すと、SDK 側が受け取ったオブジェクトを
+ * 変異させたときに以後の全呼び出しへ波及する（このリポジトリでは D1 の `.select()` が
+ * 引数を変異させた前例がある）。組み立てはこの1関数だけで、`skip` は `skipCache` に
+ * 落ちる — **`cacheTtl: 0` は「無効」ではない**ので、そちらへ潰さないこと。
+ */
+const gatewayOptions = (gatewayId: string, cache: GatewayCachePolicy) =>
+  cache.kind === "skip"
+    ? { id: gatewayId, skipCache: true }
+    : { id: gatewayId, cacheTtl: cache.ttlSeconds };
+
+/**
+ * `vars.AI_GATEWAY_CACHE_TTL` を解釈する（[Issue #143](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/143)）。
+ *
+ * `"0"` はキャッシュを使わない指定、それ以外は秒数。収録リハーサルで同じ質問文を
+ * 引き直すための入口で、既定は現行どおり 3600 秒なので何もしなければ挙動は変わらない。
+ *
+ * **不正値でも設定欠落でも throw しない。** 生成型（`worker-configuration.d.ts`）は
+ * wrangler.jsonc の**現在の値**を写したリテラルにすぎず、「型が付いている＝実行時に必ず
+ * 入っている」ではない。ここで落とすと `coreDeps` の組み立てで死に、**LLM の縮退経路へ
+ * 入る前に `/api/*` と `/mcp` が丸ごと落ちる**。収録直前にそれが起きるほうが害が大きい。
+ * 既定へ倒して
+ * `console.error` に出す — `npx wrangler tail` で拾える形にしておくのが唯一の気づく手段になる
+ * （この判断はファイル冒頭の「縮退は静かに起きる」と同じ理由）。
+ */
+export function resolveCachePolicy(raw: string | undefined): GatewayCachePolicy {
+  const trimmed = raw?.trim() ?? "";
+
+  if (DECIMAL_DIGITS.test(trimmed)) {
+    const seconds = Number(trimmed);
+    if (seconds === 0) return { kind: "skip" };
+    if (seconds >= MIN_CACHE_TTL_SECONDS && seconds <= MAX_CACHE_TTL_SECONDS) {
+      return { kind: "cache", ttlSeconds: seconds };
+    }
+  }
+
+  console.error(
+    `AI_GATEWAY_CACHE_TTL が不正です（${JSON.stringify(raw)}）。` +
+      `0（キャッシュを使わない）か ${MIN_CACHE_TTL_SECONDS}〜${MAX_CACHE_TTL_SECONDS} の10進整数を指定してください。` +
+      `既定の ${DEFAULT_CACHE_TTL_SECONDS} 秒で続行します`,
+  );
+  return { kind: "cache", ttlSeconds: DEFAULT_CACHE_TTL_SECONDS };
+}
+
+/**
  * Workers AI の実装。**必ず AI Gateway を経由する**（ADR-013 決定1）。
  *
  * `gatewayId` は `env.AI_GATEWAY_ID` から渡すこと（ハードコード禁止・ADR-013 決定2）。
  * キャッシュキーはリクエストボディ全体なので、`system` / `user` にタイムスタンプ・乱数・
  * リクエストIDなどの可変要素を入れないこと（入れた瞬間にキャッシュが全件ミスになる）。
  */
-export function workersAiLlm(ai: Ai, gatewayId: string): LlmClient {
+export function workersAiLlm(ai: Ai, gatewayId: string, cache: GatewayCachePolicy): LlmClient {
   return {
     async complete({ purpose, system, user, maxTokens }) {
       try {
@@ -94,7 +169,7 @@ export function workersAiLlm(ai: Ai, gatewayId: string): LlmClient {
             ],
             max_tokens: maxTokens,
           } as never,
-          { gateway: { id: gatewayId, cacheTtl: 3600 } },
+          { gateway: gatewayOptions(gatewayId, cache) },
         )) as ChatCompletion;
 
         const choice = response.choices?.[0];
@@ -204,6 +279,6 @@ export type CoreDeps = {
 
 /** 殻（`worker/index.ts` / `worker/mcp.ts`）が組み立てる一式。組み立てを1箇所にまとめる。 */
 export const coreDeps = (env: Env): CoreDeps => ({
-  llm: workersAiLlm(env.AI, env.AI_GATEWAY_ID),
+  llm: workersAiLlm(env.AI, env.AI_GATEWAY_ID, resolveCachePolicy(env.AI_GATEWAY_CACHE_TTL)),
   sql: d1SqlExecutor(env.DB),
 });
