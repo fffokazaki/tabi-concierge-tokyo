@@ -1,10 +1,10 @@
 ---
 title: "DATABASE"
-version: "1.4.3"
+version: "1.5.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-18"
+updated: "2026-08-22"
 changeImpact: "low"
 ---
 
@@ -69,6 +69,26 @@ npm run db:seed              # リモートへシード投入（--remote）
 
 - `scripts/fetch-data.ts` はリソースURLをハードコードせず、毎回カタログ API から解決する。**カタログの値（タイトル・提供元・更新頻度・ライセンス・公開状態）が `scripts/lib/datasets.ts` の宣言とズレたら失敗する**ので、古い前提のまま黙って取り込むことがない
 - `scripts/seed.ts` が CSV から `db/seed.generated.sql` を生成する。生成物のため Git 管理しない（`data/` と scripts から再生成できる）
+
+### 中身を確かめる
+
+```bash
+npm run --silent db:query -- "SELECT COUNT(*) AS n FROM spots"        # 本番（--remote）
+npm run --silent db:query:local -- "SELECT COUNT(*) AS n FROM spots"  # ローカル（--local）
+```
+
+結果行だけが標準出力へ出る（`[{"n":1645}]`）。`wrangler d1 execute` の出力をパイプへ渡すと
+実行メタ情報（`duration` / `rows_read` / `size_after`）が結果行を押し出すため、確認のたびに
+`--json` とパイプを組み立てていた手数を畳んだもの（[Issue #189](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/189)）。
+
+- **受け付けるのは単一の読み取り文だけ**（`SELECT` / `WITH`）。書き込みと複数文は wrangler を
+  起動する前に拒否する。`SELECT 1; DELETE FROM spots` の 2 文目は wrangler も D1 も実行するため
+  （[Issue #118](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/118) の実測）、既定が本番のコマンドで事後に気づいても遅い。書き込みが要るときは
+  `wrangler d1 execute` を直接使う
+- **失敗したときは標準出力へ何も書かない**（標準エラーと非 0 終了で返す）。`[]` を出すと
+  「照会が失敗した」と「行が 0 件だった」の区別が消える
+- `no such table: spots` は**マイグレーション未適用**のサイン。マイグレーション済み・シード前なら
+  `[{"n":0}]` が返る（こちらは照会が成立した 0 件）
 
 ### 利用オープンデータ一覧（確定版・2026-08-16）
 
@@ -275,6 +295,12 @@ No.9「R6国・地域別外国人旅行者行動特性調査」はクロス集�
 - アクセス制御・暗号化の要件は現時点で該当なし（[CONSTRAINTS.md](../01-context/CONSTRAINTS.md) §5）
 
 ## Changelog
+
+### [1.5.0] - 2026-08-22
+
+#### 追加
+
+- 「中身を確かめる」節を追加（[Issue #189](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/189)）。`npm run db:query` / `db:query:local` と、単一の読み取り文しか受け付けないこと・失敗時に標準出力を汚さないこと・`no such table` がマイグレーション未適用のサインであることを明記
 
 ### [1.4.3] - 2026-08-18
 

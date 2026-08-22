@@ -30,6 +30,21 @@ export const UNANSWERED_REASONS = [
 export type UnansweredReason = (typeof UNANSWERED_REASONS)[number];
 
 /**
+ * `GET /api/gaps/summary` が返す未回答ログの集計。
+ *
+ * 利用者の入力文 `gaps.question` は含めない。`area` も公開を決めた地名だけを返し、それ以外は
+ * `"その他のエリア"` にまとめる。認証のない公開 API で個票を返すと、自由入力に個人情報が
+ * 含まれていた場合にそのまま外へ出るため、公開境界は分類済みの集計値だけに限定する
+ * （API.md §3.4）。
+ */
+export type GapSummaryResponse = {
+  total: number;
+  byReason: Array<{ reason: UnansweredReason; count: number }>;
+  byArea: Array<{ area: string | null; count: number }>;
+  byReasonAndArea: Array<{ reason: UnansweredReason; area: string | null; count: number }>;
+};
+
+/**
  * 回答なし（該当するオープンデータが無い・見つからない）の応答。
  *
  * HTTP エラーではなく**正常な応答**として返す（API.md §4）。エラーにしてしまうと

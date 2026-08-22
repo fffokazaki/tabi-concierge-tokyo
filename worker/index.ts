@@ -1,6 +1,7 @@
 import { Hono, type Context } from "hono";
 import type { ApiError } from "../shared/core";
 import { d1GapRecorder, type GapRecorder } from "./core/gaps";
+import { getGapSummary } from "./core/gap-summary";
 import { coreDeps, type CoreDeps } from "./core/llm";
 import { aggregateDataset, getProvenance, searchDatasets } from "./core/operations";
 import { tabiMcpHandler } from "./mcp";
@@ -85,6 +86,9 @@ app.get("/api/health", (c) =>
     runtime: navigator.userAgent,
   }),
 );
+
+/** 未回答ログの集計（Issue #193）。自由入力の個票は返さない（API.md §3.4）。 */
+app.get("/api/gaps/summary", async (c) => c.json(await getGapSummary(c.env.DB)));
 
 /** データセット検索（コア操作 `search_datasets`・API.md §3.1）。 */
 app.post("/api/search-datasets", jsonRoute(parseSearchDatasetsInput, searchDatasets));

@@ -1,6 +1,6 @@
 ---
 title: "DEPLOYMENT"
-version: "1.18.0"
+version: "1.18.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -323,12 +323,11 @@ curl -s -X POST $U/api/search-datasets -H 'content-type: application/json' \
   -d '{"query":"新宿の美術館に行きたい","category":"美術館"}'
 
 # 3. 上の呼び出しが gaps に記録されている（DOMAIN.md §8 不変条件4 が本番でも成立）
-npx wrangler d1 execute tabi-concierge-tokyo --remote \
-  --command "SELECT question, area, category, reason FROM gaps ORDER BY id DESC LIMIT 3"
+npm run --silent db:query -- \
+  "SELECT question, area, category, reason FROM gaps ORDER BY id DESC LIMIT 3"
 
 # 4. データが入っている
-npx wrangler d1 execute tabi-concierge-tokyo --remote \
-  --command "SELECT COUNT(*) FROM spots"   # 1645
+npm run --silent db:query -- "SELECT COUNT(*) AS n FROM spots"   # [{"n":1645}]
 ```
 
 **3 が最重要。** `gaps` テーブルが無くても未回答の応答は 200 で正常に返り、記録の失敗は `console.error` に出るだけなので、**画面を見ても API を叩いても気づけない**（[Issue #27](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/27) でテストを2通り書いて捕まえた失敗モードそのもの）。
@@ -508,6 +507,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.18.1] - 2026-08-22
+
+#### 変更
+
+- §3 の確認手順 3・4 を `npx wrangler d1 execute --remote --command …` から `npm run --silent db:query -- …` へ（[Issue #189](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/189)）。結果行だけが出るので、実行メタ情報に押し出されて読めない状態にならない
 
 ### [1.18.0] - 2026-08-22
 

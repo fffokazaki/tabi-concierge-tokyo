@@ -29,7 +29,9 @@
     "db:migrate": "wrangler d1 migrations apply tabi-concierge-tokyo --remote",
     "db:seed:local": "node scripts/seed.ts && wrangler d1 execute tabi-concierge-tokyo --local --file=db/seed.generated.sql",
     "db:seed": "node scripts/seed.ts && wrangler d1 execute tabi-concierge-tokyo --remote --file=db/seed.generated.sql",
-    "db:reset:local": "npm run db:migrate:local && npm run db:seed:local"
+    "db:reset:local": "npm run db:migrate:local && npm run db:seed:local",
+    "db:query": "node scripts/db/query.ts --remote",
+    "db:query:local": "node scripts/db/query.ts --local"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",

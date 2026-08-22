@@ -21,7 +21,7 @@ import { ALLOWED_TABLES, guardSelect, MAX_LIMIT } from "./sql-guard";
  * | 壁 | 何を見るか | 偽装できるか |
  * | --- | --- | --- |
  * | `sql-guard`（構文） | SELECT のみ・許可テーブルのみ・複文なし | 書き方の工夫で抜けうる。だから2枚目が要る |
- * | 行の検証（意味） | **返ってきた全行の `dataset_id` が入力と一致するか** | 生成 SQL からは偽装できない |
+ * | 行の検証（意味） | 返った `id` を固定 SQL で引き直し、実データの `dataset_id` と要求時の `area` が一致するか | 投影値の alias では偽装できない |
  *
  * ## 絞り込みを強くしすぎない
  *
@@ -50,23 +50,19 @@ const SQL_MAX_TOKENS = 300;
 /**
  * 検証に**必須**の列。ここが欠けたら書き直させる。
  *
- * `dataset_id` は行の検証（別データセット混入の検出）に、`name` は応答の組み立てに要る。
+ * `id` は固定 SQL で実データを引き直すキー、`dataset_id` は別データセット混入の検出、`name` は
+ * 応答の組み立て、`area` は要求エリアとの実行後照合（Issue #152）に要る。プロンプトで頼む
+ * だけでなく、返った行を決定的に検査する。
  */
-const REQUIRED_COLUMNS = ["dataset_id", "name"] as const;
+const REQUIRED_COLUMNS = ["id", "dataset_id", "name", "area"] as const;
 
 /**
  * 要約を豊かにするために**お願いする**列。欠けても書き直しは求めない。
  *
  * 実モデルは「必ず含める」と書いた列だけを選ぶ（実測 — `dataset_id, name` しか書かなかった）。
  * 要約から所在地が落ちるだけで応答としては成立するので、必須にはせずここで頼む。
- *
- * `area` は要約には使わない ―― 行の選定（`pickPreferredRow`・Issue #174）が行自身の値を
- * 読めるようにするための列である。SELECT に含まれていれば名前からの引き直しが不要になり、
- * 同名で別エリアの行（文化財一覧の「銅鐘」が上野・浅草に併存する実例）でも取り違えない。
- * 必須にはしない ―― 書き直しを強制すると、欠けただけの正常な SQL まで推論をやり直させ、
- * 無料枠を消費する（縮退リスクも増える）。
  */
-const PREFERRED_COLUMNS = ["address", "note", "area"] as const;
+const PREFERRED_COLUMNS = ["address", "note"] as const;
 
 const SYSTEM_PROMPT = [
   "あなたは SQLite の SELECT 文だけを書くアシスタントです。",
@@ -403,24 +399,20 @@ function contextOf(before: string): { column?: string; op?: string } {
  * 返す方を採った** ―― name の条件を書かなければ同じ行が返るので、これは name 条件に固有の
  * 損失ではない。
  *
- * ### すり替え先はエリアに縛られない
+ * ### すり替え先も、読み取れた代表エリアに縛る
  *
- * **この関数がエリアを緩めないのは「書き直させるかどうか」の判定だけで、返ってきた行の
- * エリアは誰も検証していない。** 保証できるのは1つだけ ―― intent から読み取れた代表エリアの
- * 行をこのデータセットが1行も収録していなければ、書き直させずに未回答にする（別エリアの行で
- * 埋めない）。それ以外は保証していない:
+ * Issue #152 以降は、生成 SQL が返した行も intent から読み取れた代表エリアと照合する。
+ * 別エリアと `area = NULL` は回答候補から落とし、全件落ちたらこの関数で裏取りする:
  *
  * | 状況 | 何が起きるか |
  * | --- | --- |
- * | 読み取れた代表エリアの行が0件 | 書き直させず未回答（**唯一の歯止め**） |
- * | 読み取れた代表エリアの行が1件以上 | 書き直させる。書き直し SQL がエリア条件を落としても、**返った行の中に訊かれたエリアの行があれば** `pickPreferredRow`（Issue #174）がそちらを選ぶ。無ければ別エリアの行が答えになる |
- * | 代表エリアを読み取れない（未知の地名・無指定） | `areaClause` が空。データセット全体で数えるので、訊かれた場所と無関係な行が答えになる（`pickPreferredRow` は代表エリアの行を優先するが、訊かれた場所そのものは知りようがない） |
+ * | 読み取れた代表エリアの行が0件 | 書き直させず未回答。別エリアで埋めない |
+ * | 読み取れた代表エリアの行が1件以上 | エリアを保つよう理由を添えて書き直させる |
+ * | 代表エリアを読み取れない（未知の地名・無指定） | `areaClause` が空。従来どおりエリアでは除外しない |
  *
  * `findRepresentativeArea` が拾うのは「上野」「浅草」「渋谷」の部分一致だけである
- * （`shared/core.ts` の `REPRESENTATIVE_AREAS`）。**「すり替えはエリアを越えない」と書くと
- * 実装より強い主張になる**（cross-model レビュー・信頼度96 ―― 一度そう書いて、実測で覆した）。
- * 返る行の area を実行後に検証する話は
- * [Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152) が扱う。
+ * （`shared/core.ts` の `REPRESENTATIVE_AREAS`）。未知の地名についてはエリアを判定できないので、
+ * 「すり替えは常にエリアを越えない」とは言わない。
  *
  * ## 「すり替えたと伝える」を今は採らない理由（[Issue #153](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/153)）
  *
@@ -500,8 +492,8 @@ async function readFacets(entry: CatalogEntry, deps: CoreDeps): Promise<Facets> 
 export type TextToSqlOutcome =
   /** 実照会で行が取れた。`query` には**実際に実行した SQL** を入れる */
   | { kind: "answered"; result: AggregateResult; query: string }
-  /** SQL は成功したが0行。これは障害ではなく、正当な「答えられない」（記録の対象） */
-  | { kind: "empty"; sql: string }
+  /** SQL は成功したが要求を満たす行が0件。これは正当な「答えられない」（記録の対象） */
+  | { kind: "empty"; sql: string; returnedRows: number }
   /** インフラ障害・出力不正。**縮退してキーワード実装に戻る**（記録の対象にしない） */
   | { kind: "failed"; cause: string };
 
@@ -562,21 +554,20 @@ function presentableNote(note: string, entry: CatalogEntry): string {
  * 行（area が NULL）が category だけで当たる。`rows[0]` 固定の取り出しはそれをそのまま
  * 旅程に載せていた（「文化、家族向け、自然」で蔵前の初代川柳墓が1番目に出た）。
  *
- * そこで **SQL は直さず、返ってきた行の側で選ぶ**: intent に代表エリアが載っていればその
- * エリアの行 → 無ければ代表エリアいずれかの行 → それも無ければ従来どおり先頭。SQL に触らない
- * ので0行化・書き直し・縮退は起きず、LLM の揺れに依存しない。
+ * そこで **返ってきた行の側で選ぶ**。Issue #152 の実行後検証が要求エリアの不一致行を先に
+ * 除外し、この関数は残った行から intent の代表エリア → 代表エリアいずれか → 先頭の順で選ぶ。
+ * エリア無指定時にも代表エリア外の行を優先しないための第2段である。
  *
- * 行のエリアは3段で読む: (1) 行自身の `area` 列（`PREFERRED_COLUMNS` に入れたので生成 SQL が
- * SELECT していれば最も確実）→ (2) `(name, address)` の複合キーで D1 から引き直す
+ * 行のエリアは3段で読む: (1) 行自身の `area` 列（Issue #152 の固定 SQL で引き直した実値）
+ * → (2) `(name, address)` の複合キーで D1 から引き直す
  * （`countRelaxed` と同じく LLM を使わない決定的な照会）→ (3) name 単独。ただし同名で別エリアの
  * 行がある場合（文化財一覧の「銅鐘」が上野・浅草に併存する実例 ―― cross-model レビューの指摘）は
  * **どのエリアとも主張しない**（undefined）。取り違えて選ぶくらいなら選定から外す。
  * **照会に失敗したら従来どおり先頭を返す**（選定の失敗で応答まで壊さない。ただし黙らない ――
  * console.warn に残す）。
  *
- * 代表エリアの行が1件も無いとき先頭を返すのは従来挙動の維持である。ここで未回答に倒すと
- * 「行はあるのに無いと言う」＝偽の未回答（Issue #148 の逆流）になる。返る行のエリアを検証して
- * 利用者に伝える話は [Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152) が扱う。
+ * 要求エリアがあるのに一致行が1件も無いケースは、この関数へ来る前に裏取り・再試行へ戻す。
+ * 代表エリアを読み取れない intent だけは、従来どおり先頭までフォールバックする。
  */
 async function pickPreferredRow(
   rows: Record<string, unknown>[],
@@ -663,13 +654,64 @@ function toResult(row: Record<string, unknown>, entry: CatalogEntry): AggregateR
   return { name, summary: parts.join("") };
 }
 
+/** 実行結果の全行に SELECT 必須列が載っているかを見る。0行は裏取り側で扱う。 */
+function missingRequiredColumns(rows: Record<string, unknown>[]): (typeof REQUIRED_COLUMNS)[number][] {
+  return REQUIRED_COLUMNS.filter((column) => rows.some((row) => !(column in row)));
+}
+
+type RehydratedRows =
+  | { ok: true; rows: Record<string, unknown>[]; verificationSql: string }
+  | { ok: false; cause: string; retryable: boolean };
+
+/**
+ * 生成 SQL が返した `id` だけを手掛かりに、応答へ使う行を固定 SQL で引き直す。
+ *
+ * `SELECT '上野' AS area` や `COALESCE(area, '上野') AS area` は構文ガードを通りうる。
+ * 生成 SQL の投影値をそのまま信じると、別エリアの行を要求エリアとして偽装できるため、
+ * `dataset_id`・`name`・`area`・要約列はすべてこの照会の結果だけを使う（Issue #152）。
+ */
+async function rehydrateRows(
+  rows: Record<string, unknown>[],
+  deps: CoreDeps,
+): Promise<RehydratedRows> {
+  const ids: number[] = [];
+  for (const row of rows) {
+    const id = row["id"];
+    if (typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0) {
+      return { ok: false, cause: "返った行の id が正の整数ではありません", retryable: true };
+    }
+    ids.push(id);
+  }
+  if (ids.length === 0) return { ok: true, rows: [], verificationSql: "" };
+
+  const uniqueIds = [...new Set(ids)];
+  const verificationSql =
+    "SELECT id, dataset_id, name, category, area, address, lat, lon, note, source_row " +
+    `FROM spots WHERE id IN (${uniqueIds.join(", ")})`;
+  const verified = await deps.sql.select(verificationSql);
+  if (!verified.ok) {
+    return { ok: false, cause: `実行結果の id 照合に失敗しました: ${String(verified.cause)}`, retryable: false };
+  }
+
+  const byId = new Map<number, Record<string, unknown>>();
+  for (const row of verified.rows) {
+    const id = row["id"];
+    if (typeof id === "number") byId.set(id, row);
+  }
+  if (byId.size !== uniqueIds.length) {
+    return { ok: false, cause: "返った行の id に実在しない値が含まれています", retryable: true };
+  }
+
+  return { ok: true, rows: ids.map((id) => byId.get(id)!), verificationSql };
+}
+
 /**
  * 実照会を1回試みる。
  *
  * 失敗の分類（Issue #119）:
  * - `failed` … (a) LLM やD1 のインフラ障害 / (b) 出力不正。**縮退する。記録はしない**
  *   （答えられなかったのではなく、答えを取りに行けなかった）
- * - `empty` … (c) SQL は通ったが0行。**正当な未回答として記録する**
+ * - `empty` … (c) SQL は通ったが要求を満たす行が0件。**正当な未回答として記録する**
  */
 export async function aggregateViaTextToSql(
   input: AggregateDatasetInput,
@@ -740,10 +782,35 @@ async function attemptTextToSql(
       continue;
     }
 
-    // ── 2枚目の壁（意味）。生成 SQL の書き方では偽装できない ────────────────
+    const missingColumns = missingRequiredColumns(executed.rows);
+    if (missingColumns.length > 0) {
+      previousError = `返った行に必須列 ${missingColumns.join(" と ")} がありません。SELECT する列に含めてください。`;
+      console.warn("[text-to-sql] 必須列が無い実行結果を拒否しました", {
+        attempt,
+        datasetId: input.datasetId,
+        missingColumns,
+        sql: guarded.sql,
+      });
+      continue;
+    }
+
+    // ── 2枚目の壁（意味）。投影値の alias では偽装できない ──────────────────
+    const rehydrated = await rehydrateRows(executed.rows, deps);
+    if (!rehydrated.ok) {
+      if (!rehydrated.retryable) return { kind: "failed", cause: rehydrated.cause };
+      previousError = `${rehydrated.cause}。SELECT する列に実在する id を含めてください。`;
+      console.warn("[text-to-sql] 実行結果の id を検証できない SQL を拒否しました", {
+        attempt,
+        datasetId: input.datasetId,
+        cause: rehydrated.cause,
+        sql: guarded.sql,
+      });
+      continue;
+    }
+
     // 別データセットの行が混ざったまま返すと、出典として別のデータセットを名乗ることになる。
     // それは「出典が本物であるぶん誤りが見つけにくい」最悪の壊れ方である（絶対ルール #2）
-    const foreign = executed.rows.find((row) => row["dataset_id"] !== entry.datasetId);
+    const foreign = rehydrated.rows.find((row) => row["dataset_id"] !== entry.datasetId);
     if (foreign) {
       console.error("[text-to-sql] 指定外のデータセットの行が返りました", {
         datasetId: entry.datasetId,
@@ -753,29 +820,40 @@ async function attemptTextToSql(
       return { kind: "failed", cause: "指定したデータセット以外の行が返りました" };
     }
 
-    if (executed.rows.length === 0) {
+    const requestedArea = findRepresentativeArea(input.intent);
+    const eligibleRows = requestedArea
+      ? rehydrated.rows.filter((row) => row["area"] === requestedArea)
+      : rehydrated.rows;
+
+    if (eligibleRows.length === 0) {
       // **「無かった」と言う前に、緩めた問いでも0行かをデータに訊く**（Issue #148）。
-      // 絞り込みが強すぎただけなら、それは答えではなく書き直すべき SQL である
+      // 絞り込みが強すぎた場合と、別エリア・NULL しか返らなかった場合は書き直す（Issue #152）
       const relaxed = await countRelaxed(input, entry, deps);
       // 裏取りができないなら「無かった」とは言えない。障害として縮退する
       if (!relaxed.ok) return { kind: "failed", cause: relaxed.cause };
       if (relaxed.count > 0) {
+        const rejected =
+          executed.rows.length === 0
+            ? "この SQL は0行でした。"
+            : `この SQL は ${executed.rows.length} 行を返しましたが、要求エリア「${requestedArea}」と一致する行が0件でした。`;
         previousError =
-          `この SQL は0行でした。ただし ${describeRelaxed(input, relaxed.count)}。絞り込みが強すぎます。` +
+          `${rejected}ただし ${describeRelaxed(input, relaxed.count)}。絞り込みが強すぎるか、エリア条件が落ちています。` +
           "category の条件を外し、エリア（訊かれている場合）だけで絞って書き直してください。";
-        console.warn("[text-to-sql] 0行だが緩めれば行がある SQL を拒否しました", {
+        console.warn("[text-to-sql] 要求を満たす行が無いが緩めれば行がある SQL を拒否しました", {
           attempt,
           datasetId: input.datasetId,
+          requestedArea,
+          returnedRows: executed.rows.length,
           relaxed: relaxed.count,
           sql: guarded.sql,
         });
         continue;
       }
       // (c) 障害ではない。「探したが無かった」という答えである ―― 緩めても0行なので earned
-      return { kind: "empty", sql: guarded.sql };
+      return { kind: "empty", sql: guarded.sql, returnedRows: executed.rows.length };
     }
 
-    const result = toResult(await pickPreferredRow(executed.rows, input, entry, deps), entry);
+    const result = toResult(await pickPreferredRow(eligibleRows, input, entry, deps), entry);
     if (!result) {
       previousError = `SELECT する列に ${REQUIRED_COLUMNS.join(" と ")} を含めてください`;
       console.warn("[text-to-sql] 返った行から応答を組み立てられませんでした", { attempt, sql: guarded.sql });
@@ -790,7 +868,10 @@ async function attemptTextToSql(
     return {
       kind: "answered",
       result,
-      query: `D1 実照会: ${guarded.sql}（${entry.retrievedAt} 取得のスナップショット・全${entry.rowCount}行）`,
+      query:
+        `D1 実照会: ${guarded.sql}。` +
+        `実行結果の id を固定照会で検証: ${rehydrated.verificationSql}` +
+        `（${entry.retrievedAt} 取得のスナップショット・全${entry.rowCount}行）`,
     };
   }
 
