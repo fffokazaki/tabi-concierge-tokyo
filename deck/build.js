@@ -513,7 +513,7 @@ screenSlide({
     x: 4.19, y: 5.26, w: 8.04, h: 0.58, fontFace: HEAD, fontSize: 15, bold: true,
     color: P.brand, lineSpacing: 20, margin: 0, valign: "middle",
   });
-  s.addText("左は本番の /gaps ダッシュボード。2026-08-22 時点で 46 件を記録し、理由別（粒度不足 26 / その他 18 / 対象エリア外 2）とエリア別に集計しています。都への提出プロセス自体は未実装です。", {
+  s.addText("左は本番の /gaps ダッシュボード。2026-08-22 時点で 46 件を記録し、理由別（粒度不足 26 / その他 18 / 対象エリア外 2）とエリア別に集計しています。稼働中のカウンターなので、使われるたびに増えます。都への提出プロセス自体は未実装です。", {
     x: 4.19, y: 5.9, w: 8.04, h: 0.8, fontFace: BODY, fontSize: 11,
     color: P.muted, lineSpacing: 16, margin: 0, valign: "top",
   });
