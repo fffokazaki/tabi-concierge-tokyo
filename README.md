@@ -103,8 +103,8 @@ docs/                 # AI仕様駆動開発ドキュメント（索引は docs/
 
 | URL | 内容 |
 | --- | --- |
-| <https://tabi-concierge-tokyo.opendata-002.workers.dev> | アプリ本体（実装中） |
-| <https://tabi-concierge-tokyo.opendata-002.workers.dev/showcase/> | **デザインプロトタイプ**（5画面・日英）。デザインの正典であり実装ではない |
+| <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev> | アプリ本体（実装中） |
+| <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev/showcase/> | **デザインプロトタイプ**（5画面・日英）。デザインの正典であり実装ではない |
 
 ## 開発
 

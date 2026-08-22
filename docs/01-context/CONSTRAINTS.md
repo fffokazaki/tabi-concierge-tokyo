@@ -1,11 +1,11 @@
 ---
 title: "CONSTRAINTS"
-version: "1.0.0"
+version: "1.1.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-17"
-changeImpact: "low"
+updated: "2026-08-22"
+changeImpact: "medium"
 ---
 
 # CONSTRAINTS.md - プロジェクト制約事項
@@ -29,7 +29,7 @@ changeImpact: "low"
 
 ### インフラ制約
 
-- **ホスティング環境**: Cloudflare Workers（アカウント `opendata`・PoC 用の仮アカウント）。<https://tabi-concierge-tokyo.opendata-002.workers.dev>
+- **ホスティング環境**: Cloudflare Workers（アカウント `tokyo_odh_091`・ハッカソン事務局発行）。<https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev>
 - **最大同時接続数**: 未定（First Stage はライブデモ不可のため、収録時点で負荷要件なし）
 - **ストレージ容量**: 利用オープンデータは提出登録の上限に合わせ最大10件に限定
 
@@ -186,6 +186,12 @@ changeImpact: "low"
 | 2026-08-15 | 二次利用 | カタログ掲載データは CC BY 4.0 で商用含む二次利用可、と整理 | チーム合意（事務局資料で確認） |
 
 ## Changelog
+
+### [1.1.0] - 2026-08-22
+
+#### 変更
+
+- ホスティング環境を、PoC 用の仮アカウント `opendata` からハッカソン事務局発行の `tokyo_odh_091` へ更新（[Issue #171](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/171)）。本番URLも <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev> へ変わった
 
 ### [1.0.0] - 2026-08-17
 

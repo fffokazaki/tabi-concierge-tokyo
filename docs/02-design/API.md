@@ -1,6 +1,6 @@
 ---
 title: "API"
-version: "1.11.0"
+version: "1.11.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -27,7 +27,7 @@ changeImpact: "medium"
 | 項目 | 内容 |
 | ---- | ---- |
 | 種別 | JSON API（Cloudflare Worker 上の Hono ルーティング、パスは `/api/*`） |
-| ベース URL | SPA と同一の Worker（<https://tabi-concierge-tokyo.opendata-002.workers.dev>）。SPA は同じ Worker の静的アセットとして配信されるため、フロントエンドから見て**同一オリジン** |
+| ベース URL | SPA と同一の Worker（<https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev>）。SPA は同じ Worker の静的アセットとして配信されるため、フロントエンドから見て**同一オリジン** |
 | 認証 | なし（POC。§2 参照） |
 | 想定クライアント | 旅コンシェルジュTOKYO（React SPA）のみ。Claude Desktop 等の AI クライアント・翌年のハッカソン参加者は `/mcp`（[MCP.md](./MCP.md)）を使う |
 
@@ -360,6 +360,12 @@ interests=["ラーメン","文化","家族向け","自然"] / limit=4（修正�
 - **サンドボックス環境**: 未定
 
 ## Changelog
+
+### [1.11.1] - 2026-08-22
+
+#### 変更
+
+- ベースURLを更新。Cloudflare アカウントを事務局発行の `tokyo_odh_091` へ移設したことに伴い、本番URLを <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev> へ更新（[Issue #171](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/171)）
 
 ### [1.11.0] - 2026-08-22
 

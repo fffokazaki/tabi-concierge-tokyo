@@ -1,6 +1,6 @@
 ---
 title: "DEPLOYMENT"
-version: "1.16.0"
+version: "1.17.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -155,7 +155,7 @@ GitHub Actions/GitLab CI/Jenkinsによる自動化パイプライン。
 | 環境 | 用途 | URL | 実行環境 |
 | --- | --- | --- | --- |
 | ローカル | 開発 | <http://localhost:5173> | **workerd**（`@cloudflare/vite-plugin` 経由。本番と同じランタイム） |
-| 本番 | 提出・共有 | <https://tabi-concierge-tokyo.opendata-002.workers.dev> | Cloudflare Workers |
+| 本番 | 提出・共有 | <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev> | Cloudflare Workers |
 
 ステージングは設けない（First Stage はライブデモ不可のため、常時公開の可用性要件が無い）。
 
@@ -163,7 +163,7 @@ GitHub Actions/GitLab CI/Jenkinsによる自動化パイプライン。
 
 | 項目 | 値 |
 | --- | --- |
-| Cloudflare アカウント | `opendata`（PoC 用の仮アカウント）。`wrangler.jsonc` の `account_id` に明示 |
+| Cloudflare アカウント | `tokyo_odh_091`（ハッカソン事務局発行・`8795c0673f8ae5de9884da4a25c7f7dd`）。`wrangler.jsonc` の `account_id` に明示。PoC 中は仮アカウント `opendata` を使っていた（Issue #171 で移設） |
 | Node.js | 24（`.nvmrc` / `engines`）。**ツールチェーン用であり本番ランタイムではない** |
 | wrangler | v4.123 以上（`@cloudflare/vite-plugin` が peer で要求） |
 
@@ -266,6 +266,7 @@ npm run deploy  # vite build → wrangler deploy
 
 | 日時 | Version ID | 内容 | 確認 |
 | --- | --- | --- | --- |
+| 2026-08-22 | `a17750ee-4a0d-472b-b8ee-5afa6fd5084a` | **デプロイ先アカウントの移設**（#171）。ハッカソン事務局発行の `tokyo_odh_091` へ Worker・D1 ごと移した。URL が <https://tabi-concierge-tokyo.opendata-002.workers.dev> から <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev> へ変わる。`wrangler.jsonc` の `account_id` と `d1_databases[].database_id` を同時に差し替え、新アカウントの D1（`202adb68-a563-4475-885e-5605f17d89b4`）へ **migrate ＋ seed を実行**した。コードは無変更。**旧アカウントのデプロイは提出まで残す**（ロールバック先） | チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。**新アカウントでは LLM 経路の生死を疎通で判定できない** ―― 障害時は `extractFromSamples` へ縮退して **HTTP 200 のまま旅程を返す**ため、`npx wrangler tail` を張ったうえで確認した。5リクエスト中、縮退マーカー（`[aggregate] … 縮退` / `[search] 質問の分解に失敗` / `[llm] 推論の呼び出しに失敗`）は **0件**。加えて**縮退していないことの積極的な証拠**として、`aggregate_dataset` の応答 `query` が `D1 実照会: SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = 't131067d0000000251' AND category = '名所・史跡' AND area IN ('上野') LIMIT 50` と、LLM が生成した SQL そのものであることを確認（縮退時はスタブ文言になる）。AI Gateway `default` は新アカウントで自動生成され、未作成時の `AiGatewayError: 2001` は出ていない。**データ一致を旧新で突き合わせ** ―― `datasets` 10 = 10 / `spots` 1,645 = 1,645。`gaps` は 127 → 0 だが、これは稼働中に積まれる未回答ログでシード対象外のため正常。新 D1 への書き込みも確認（`新宿の美術館に行きたい / 新宿 / 美術館 / out_of_area` が記録された）。`/mcp` の `tools/list` はコア3ツール（`search_datasets` / `aggregate_dataset` / `get_provenance`）を返す。**伝播待ちは不要だった**（新規デプロイのため旧版が存在しない） |
 | 2026-08-22 | `1e2a4be9-4f3a-4ce2-9bb6-6813f3f6bed0` | 名指しされた施設が候補データセットに無いときの扱いを、決定（①すり替える）として明文化（#153 / PR #167）。**ランタイムの挙動は変えていない** ―― 実行時に変わった値は `worker/mcp.ts` の `aggregate_dataset` の**ツール説明（`tools/list` で外部 MCP クライアントへ配る広告文）だけ**である。「集計意図に合う1件を取り出す」という言い切りをやめ、名指しが外れたら別の行が返ること・返る行が意図のエリアである保証は無いことを明示した。`worker/` の変更なので §3 の契機に該当する。`migrations/` `data/` `scripts/` `src/` は未変更のため、マイグレーション・シード・フロントの再確認は不要 | **配布中の広告文そのもので確認** ―― 本番の `/mcp` へ `tools/list` を投げ、`aggregate_dataset.description` に「返る行が意図のエリアである保証は無い」が含まれ、旧文言「集計意図に合う1件」が消えていることを確認。正常系は `/api/search-datasets {"query":"上野の文化財","limit":2}` が `answered` で文化財一覧・名所史跡を返すこと、SPA `/` が 200 を返すことを確認。**すり替えの挙動そのものは本番で実測していない** ―― この PR は挙動を変えていないため、確認対象は「広告文が反映されたこと」である |
 | 2026-08-22 | `c2efd7b1-5b71-40ba-a16d-b9a1bf18b0c5` | コア3操作の呼び出しにタイムアウト（既定 6000ms）を追加し、応答なしを `network` ではなく `timeout` として分類（#146 / PR #163）。**変更は 100% `src/`** ―― 本 PR で §3 の契機テーブルに `src/` の行を足すまで、この症状は「マージしただけでは本番で直らない」状態だった（#164）。`worker/` `shared/` `migrations/` `data/` `scripts/` は未変更のため、マイグレーション・シードは不要 | **配信中の bundle が手元のビルドとバイト一致することで確認** — `curl --compressed` で取得した `/assets/index-v_gVxkjl.js`（221,328 bytes）が `dist/client/assets/index-v_gVxkjl.js` と `cmp` で完全一致。タイムアウト時の文言（プラン・あなたへの「応答がありませんでした」×4、`◯◯ms 以内に応答がありませんでした` ×2）が bundle 内に存在する。**開発コンソール（ApiConsole）の文言は本番 bundle に無いのが正しい** ―― `App.tsx` の `import.meta.env.DEV` ガードで本番ビルドからは落ちるため、`でタイムアウト` が0件でも欠落ではない。正常系は `search_datasets({query:"上野の文化財",limit:3})` が `answered` で文化財一覧・名所史跡を返すことを確認。**タイムアウト自体の本番実測は行っていない** ―― 6秒を超える応答を意図的に作れないため（この行は「反映されたこと」の確認であって、打ち切り挙動の実測ではない） |
 | 2026-08-22 | `712c2277-22f8-4db0-8cbc-f296a79891cb` | 停留地の説明から原本の管理用メタデータ（`最終確認日`・`座標精度`）を落とす（#144 / PR #158）。`worker/core/text-to-sql.ts` の変更のためデプロイ（§3「いつデプロイするか」の1契機に該当）。`migrations/` `data/` `scripts/` `src/` は未変更のため、マイグレーション・シード・フロントの再確認は不要 | **Issue に載っていた実例そのもので実測** — `aggregate_dataset({ datasetId: "t131067d0000000393", intent: "上野エリアの文化財を1件" })` が「所在地は東京都台東区上野桜木1丁目。美術工芸品 / 所有: 寛永寺。台東区が文化財一覧として公開している190件のうちの1件。」を返す（修正前は末尾に `/ 最終確認日2024-01-09・座標精度：小字・丁目代表点` が付いていた）。**伝播待ちは不要だった**（デプロイ直後の1回目から新挙動）。**AI Gateway のキャッシュの影響を受けない** — キャッシュは SQL 生成の推論に効き、`toResult` はその後段で毎回走るため、TTL 内でも修正が即座に出る。提出用キャプチャ3点（#126）を本番から取得し、あなたへ画面の説明文も修正後であることを確認した |
@@ -298,7 +299,7 @@ npm run deploy  # vite build → wrangler deploy
 ### デプロイ後の確認
 
 ```bash
-U=https://tabi-concierge-tokyo.opendata-002.workers.dev
+U=https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev
 curl -s $U/api/health   # runtime が "Cloudflare-Workers" であること
 curl -s -o /dev/null -w '%{http_code}\n' $U/            # 200（SPA）
 curl -s -o /dev/null -w '%{http_code}\n' $U/showcase/   # 200（デザインプロトタイプ）
@@ -310,7 +311,7 @@ curl -s -o /dev/null -w '%{http_code}\n' $U/api/nope    # 404（SPA に倒れな
 **疎通だけでは足りない。** 2026-08-17 の事故は `/api/health` が正常に応答したまま起きた（古い Worker にも health はある）。コア3操作と D1 まで実際に叩く。
 
 ```bash
-U=https://tabi-concierge-tokyo.opendata-002.workers.dev
+U=https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev
 
 # 1. コア3操作が生きている（404 でない）
 curl -s -X POST $U/api/search-datasets -H 'content-type: application/json' \
@@ -506,6 +507,13 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.17.0] - 2026-08-22
+
+#### 追加
+
+- §3 デプロイ記録に `a17750ee-4a0d-472b-b8ee-5afa6fd5084a` を追加（[Issue #171](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/171)）。デプロイ先アカウントを `tokyo_odh_091` へ移設した回。**新アカウントでは疎通確認では LLM 経路の生死を判定できない**（縮退しても HTTP 200 で旅程が返る）ため、`wrangler tail` の縮退マーカー0件と、`aggregate_dataset` の `query` が LLM 生成 SQL であることの両方で確認したことを記録に残した
+- 環境一覧の Cloudflare アカウント行を `tokyo_odh_091`（ID 併記）へ更新し、本番URLを差し替えた
 
 ### [1.16.0] - 2026-08-22
 

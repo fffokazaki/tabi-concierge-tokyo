@@ -62,7 +62,7 @@ Issue があれば件名に含める: feat: #12 ...
 | フロントエンド | React 19（`src/`）。**ブラウザで動く**。workerd では動かない |
 | Worker | Hono（`worker/`）。ローカルも本番も **workerd** で動く（Node ではない） |
 | ビルド | Vite 8 ＋ `@cloudflare/vite-plugin`。ツールチェーンは Node 24（`.nvmrc`） |
-| デプロイ先 | Cloudflare Workers（アカウント `opendata`）。<https://tabi-concierge-tokyo.opendata-002.workers.dev> |
+| デプロイ先 | Cloudflare Workers（アカウント `tokyo_odh_091`・事務局発行）。<https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev> |
 | デプロイ方法 | **手動**。`npm run deploy`（= `wrangler deploy`）をローカルから実行する。`.github/workflows/ci.yml` は検証（typecheck / test / build）だけを行い、**デプロイはしない**。**いつ実行するかは [DEPLOYMENT.md](docs/05-operations/DEPLOYMENT.md) §3 で契機を定めた**（`worker/` `shared/` を変更したらデプロイ、`migrations/` なら先に `db:migrate`）。契機を決めていなかったため本番が43コミット遅れる事故があった（Issue #46） |
 | 接続（`/api/*`） | **接続済み**。プラン画面（Issue #31・`src/features/plan/buildPlan.ts`）とあなたへ画面（`src/features/foryou/buildRecommendations.ts`）が、それぞれ独立に `search_datasets` → `aggregate_dataset` → `get_provenance` の3操作を呼ぶ。**`aggregate_dataset` は D1 を実照会**（Text-to-SQL・Issue #119）、**`search_datasets` は自然文だけの呼び出しを LLM で構造化入力へ分解**してから既存のキーワード判定へ渡す（メタデータRAG・Issue #120）。候補のマッチ自体は今もキーワード表が行う |
 | 接続（`/mcp`） | **実装済み**（Issue #117・`worker/mcp.ts`）。`createMcpHandler`（ステートレス。**Durable Objects は使わない**）でコア3操作をツール公開。ツールの `inputSchema` は「広告」で、検査の実体は `parse.ts`（[MCP.md](docs/02-design/MCP.md) §3） |

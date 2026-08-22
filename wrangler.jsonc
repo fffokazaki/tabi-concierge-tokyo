@@ -3,10 +3,15 @@
   "name": "tabi-concierge-tokyo",
   "main": "./worker/index.ts",
 
-  // デプロイ先アカウント。PoC 用の仮アカウント `opendata`。
+  // デプロイ先アカウント。ハッカソン事務局が発行した `tokyo_odh_091`（Issue #171）。
+  // PoC 中は仮アカウント `opendata`（`0028241cbea27945fc2015dde8f2a5fd`）を使っていた。
   // 明示しないと、複数アカウントを持つ環境では deploy が対話プロンプトで止まる。
   // アカウント ID は秘密情報ではない（ダッシュボードの URL に現れる）。
-  "account_id": "0028241cbea27945fc2015dde8f2a5fd",
+  //
+  // アカウントを移すと **URL も D1 も AI Gateway も別物になる**。`account_id` を書き換える
+  // ときは、下の `d1_databases[].database_id` を新アカウント側で作った ID へ必ず同時に
+  // 差し替えること（片方だけ変えるとバインディングが解決できないか、旧本番へ誤デプロイする）。
+  "account_id": "8795c0673f8ae5de9884da4a25c7f7dd",
 
   // ランタイム（workerd）の挙動を固定する。Node のバージョンとは無関係。
   // 新機能を取り込みたくなったら日付を進める。
@@ -38,7 +43,7 @@
     {
       "binding": "DB",
       "database_name": "tabi-concierge-tokyo",
-      "database_id": "5086ea0f-1868-476e-86ac-8070d9b353f9"
+      "database_id": "202adb68-a563-4475-885e-5605f17d89b4"
     }
   ],
 
