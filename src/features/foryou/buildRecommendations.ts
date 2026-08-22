@@ -335,8 +335,14 @@ function readCandidates(
 function readAggregateResult(body: Record<string, unknown>): AggregateResult | undefined {
   const { result } = body;
   if (!isRecord(result)) return undefined;
-  if (!isNonEmptyString(result.name) || !isNonEmptyString(result.summary)) return undefined;
-  return { name: result.name, summary: result.summary };
+  if (
+    !isNonEmptyString(result.name) ||
+    !isNonEmptyString(result.summary) ||
+    !isNonEmptyString(result.category)
+  ) {
+    return undefined;
+  }
+  return { name: result.name, summary: result.summary, category: result.category };
 }
 
 function readSources(body: Record<string, unknown>): { sources: ProvenanceSource[] } | undefined {

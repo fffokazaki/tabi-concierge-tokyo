@@ -68,7 +68,7 @@ describe("buildPlan の集計を同時に投げる（Issue #142）", () => {
         started.push(datasetId);
         // 応答を止めたまま、後続の候補が投げられるかを見る
         await held;
-        return json({ status: "answered", result: { name: NAME_BY_ID[datasetId], summary: "…" }, query: "q" });
+        return json({ status: "answered", result: { name: NAME_BY_ID[datasetId], summary: "…", category: "名所・史跡" }, query: "q" });
       },
       [PROVENANCE]: () =>
         json({
@@ -106,7 +106,7 @@ describe("buildPlan の集計を同時に投げる（Issue #142）", () => {
           return json({ error: "internal_error", message: "D1 が応答しません" }, 500);
         }
         if (datasetId === BUNKA_ID) throw new TypeError("Failed to fetch"); // 即時の通信断
-        return json({ status: "answered", result: { name: "絹本著色元三大師画像", summary: "…" }, query: "q" });
+        return json({ status: "answered", result: { name: "絹本著色元三大師画像", summary: "…", category: "名所・史跡" }, query: "q" });
       },
       [PROVENANCE]: () => json({ status: "answered", sources: [source(BUNKAZAI_ID, "文化財一覧")] }),
     });
@@ -135,10 +135,10 @@ describe("buildPlan の集計を同時に投げる（Issue #142）", () => {
           });
         }
         if (datasetId === BUNKAZAI_ID) {
-          return json({ status: "answered", result: { name: "絹本著色元三大師画像", summary: "台東区指定文化財。" }, query: "q" });
+          return json({ status: "answered", result: { name: "絹本著色元三大師画像", summary: "台東区指定文化財。", category: "名所・史跡" }, query: "q" });
         }
         await new Promise((resolve) => setTimeout(resolve, 20)); // 1件目が最後に返る
-        return json({ status: "answered", result: { name: "寛永寺", summary: "上野桜木1丁目14番。" }, query: "q" });
+        return json({ status: "answered", result: { name: "寛永寺", summary: "上野桜木1丁目14番。", category: "名所・史跡" }, query: "q" });
       },
       [PROVENANCE]: () =>
         json({
@@ -187,7 +187,7 @@ describe("buildPlan の集計を同時に投げる（Issue #142）", () => {
         if (datasetId === BUNKA_ID) {
           return json({ status: "unanswered", reason: "data_not_published", message: "2件目の未回答。" });
         }
-        return json({ status: "answered", result: { name: "絹本著色元三大師画像", summary: "…" }, query: "q" });
+        return json({ status: "answered", result: { name: "絹本著色元三大師画像", summary: "…", category: "名所・史跡" }, query: "q" });
       },
       [PROVENANCE]: () => json({ status: "answered", sources: [source(BUNKAZAI_ID, "文化財一覧")] }),
     });
@@ -206,7 +206,7 @@ describe("buildPlan の集計を同時に投げる（Issue #142）", () => {
       [AGGREGATE]: (body) => {
         const datasetId = (body as { datasetId: string }).datasetId;
         if (datasetId === MEISHO_ID) {
-          return json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" });
+          return json({ status: "answered", result: { name: "寛永寺", summary: "…", category: "名所・史跡" }, query: "q" });
         }
         if (datasetId === BUNKA_ID) return json({ error: "internal_error", message: "D1 が応答しません" }, 500);
         return new Promise<Response>(() => {}); // 3件目は応答しない

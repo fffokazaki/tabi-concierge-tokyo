@@ -255,7 +255,7 @@ describe("マナー", () => {
           candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
         }),
       [AGGREGATE_PATH]: () =>
-        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" }),
+        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "…", category: "名所・史跡" }, query: "q" }),
       [PROVENANCE_PATH]: () =>
         jsonResponse({ status: "answered", sources: [provenanceSource(MEISHO_ID, "名所・史跡")] }),
     });

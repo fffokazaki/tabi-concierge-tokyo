@@ -221,6 +221,8 @@ export type AggregateDatasetInput = {
 export type AggregateResult = {
   name: string;
   summary: string;
+  /** D1 で選ばれた行の分類。クライアントがデータセット名から推測してはならない。 */
+  category: string;
 };
 
 export type AggregateDatasetOutput =

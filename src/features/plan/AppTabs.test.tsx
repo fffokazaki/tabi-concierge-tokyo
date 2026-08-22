@@ -180,7 +180,7 @@ describe("DataGapCard の配置と、あなたへ画面の障害表示", () => {
           candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
         }),
       [AGGREGATE_PATH]: () =>
-        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" }),
+        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "…", category: "名所・史跡" }, query: "q" }),
       // 要求したものと違う datasetId の出典だけを返す
       [PROVENANCE_PATH]: () =>
         jsonResponse({ status: "answered", sources: [provenanceSource("t131067d0000000252", "別のデータ")] }),
@@ -321,7 +321,7 @@ describe("answered — 応答由来のルートと出典", () => {
           ],
         }),
       [AGGREGATE_PATH]: () =>
-        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "所在地は…" }, query: "q" }),
+        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "所在地は…", category: "名所・史跡" }, query: "q" }),
       [PROVENANCE_PATH]: () =>
         jsonResponse({ status: "answered", sources: [provenanceSource(MEISHO_ID, "名所・史跡")] }),
     });
@@ -391,7 +391,7 @@ describe("unanswered — 正常な結果として表示する", () => {
           candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
         }),
       [AGGREGATE_PATH]: () =>
-        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" }),
+        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "…", category: "名所・史跡" }, query: "q" }),
       // extracted に無い datasetId の出典だけを返す（突き合わせが成立しない）
       [PROVENANCE_PATH]: () =>
         jsonResponse({ status: "answered", sources: [provenanceSource("t131067d0000000252", "別のデータ")] }),
@@ -446,7 +446,7 @@ describe("障害 — unanswered と区別して表示する", () => {
             });
       },
       [AGGREGATE_PATH]: () =>
-        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "所在地は…" }, query: "q" }),
+        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "所在地は…", category: "名所・史跡" }, query: "q" }),
       [PROVENANCE_PATH]: () =>
         jsonResponse({ status: "answered", sources: [provenanceSource(MEISHO_ID, "名所・史跡")] }),
     });
@@ -596,7 +596,11 @@ describe("未回答の還元の注記（Issue #192）", () => {
           ],
         }),
       [AGGREGATE_PATH]: () =>
-        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "所在地は台東区上野桜木1丁目14番。" }, query: "q" }),
+        jsonResponse({
+          status: "answered",
+          result: { name: "寛永寺", summary: "所在地は台東区上野桜木1丁目14番。", category: "名所・史跡" },
+          query: "q",
+        }),
       [PROVENANCE_PATH]: () =>
         jsonResponse({ status: "answered", sources: [provenanceSource(MEISHO_ID, "名所・史跡")] }),
     });
@@ -621,7 +625,11 @@ describe("未回答の還元の注記（Issue #192）", () => {
           ],
         }),
       [AGGREGATE_PATH]: () =>
-        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "所在地は台東区上野桜木1丁目14番。" }, query: "q" }),
+        jsonResponse({
+          status: "answered",
+          result: { name: "寛永寺", summary: "所在地は台東区上野桜木1丁目14番。", category: "名所・史跡" },
+          query: "q",
+        }),
       [PROVENANCE_PATH]: () =>
         jsonResponse({ status: "answered", sources: [provenanceSource(MEISHO_ID, "名所・史跡")] }),
     });

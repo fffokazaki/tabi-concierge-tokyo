@@ -231,7 +231,10 @@ export async function buildPlan(trip: Trip, options: BuildPlanOptions = {}): Pro
     if (!source) return missingProvenanceFailure(result.name, datasetId);
     // Stop.place ← name / Stop.note ← summary（2026-08-17 合意・API_REQUIREMENTS.md §2）。
     // マナーは出典を持つデータが無いので空。仮のマナー文を入れるのは出典なしの回答にあたる
-    stops.push({ stop: { place: result.name, note: result.summary, etiquette: [] }, source });
+    stops.push({
+      stop: { place: result.name, note: result.summary, category: result.category, etiquette: [] },
+      source,
+    });
   }
 
   // 上のループは全件 push か return するので到達しない。残しているのは、将来 `continue` を
@@ -416,8 +419,14 @@ function readCandidates(
 function readAggregateResult(body: Record<string, unknown>): AggregateResult | undefined {
   const { result } = body;
   if (!isRecord(result)) return undefined;
-  if (!isNonEmptyString(result.name) || !isNonEmptyString(result.summary)) return undefined;
-  return { name: result.name, summary: result.summary };
+  if (
+    !isNonEmptyString(result.name) ||
+    !isNonEmptyString(result.summary) ||
+    !isNonEmptyString(result.category)
+  ) {
+    return undefined;
+  }
+  return { name: result.name, summary: result.summary, category: result.category };
 }
 
 /**
