@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.36.0"
+version: "1.37.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 103
+ace_entry_count: 107
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -334,8 +334,25 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-145-2 | 並列化の「順序が変わらない」テストは、マイクロタスクの解決順に頼ると偽陽性で通る | testing | [playbook/testing.md#ace-145-2](./playbook/testing.md#ace-145-2) |
 | ACE-145-3 | 「速くなった」は体感でなく、リクエストの開始時刻で示す | process | [playbook/process.md#ace-145-3](./playbook/process.md#ace-145-3) |
 | ACE-145-4 | cross-model レビューの実行中にワークツリーを触ると、結果ごと破棄される | tooling | [playbook/tooling.md#ace-145-4](./playbook/tooling.md#ace-145-4) |
+| ACE-150-1 | プロンプトで頼んだ規則は、検査していなければ守られたか確認できない | architecture | [playbook/architecture.md#ace-150-1](./playbook/architecture.md#ace-150-1) |
+| ACE-150-2 | 生成物の妥当性は形の列挙では閉じない ―― 結果が出た時点でデータに問い直す | architecture | [playbook/architecture.md#ace-150-2](./playbook/architecture.md#ace-150-2) |
+| ACE-150-3 | 「検査した意味」と「実行される意味」がずれると、検査は静かに素通りする | testing | [playbook/testing.md#ace-150-3](./playbook/testing.md#ace-150-3) |
+| ACE-150-4 | 「無い」と報告する前に、その問いが成立していたかを残す | process | [playbook/process.md#ace-150-4](./playbook/process.md#ace-150-4) |
 
 ## Changelog
+
+### [1.37.0] - 2026-08-22
+
+#### 追加
+
+- ACE-150-1: プロンプトで頼んだ規則は、検査していなければ守られたか確認できない（Issue #148 / PR #150）
+- ACE-150-2: 生成物の妥当性は形の列挙では閉じない ―― 結果が出た時点でデータに問い直す（Issue #148 / PR #150）
+- ACE-150-3: 「検査した意味」と「実行される意味」がずれると、検査は静かに素通りする（Issue #148 / PR #150）
+- ACE-150-4: 「無い」と報告する前に、その問いが成立していたかを残す（Issue #148 / PR #150）
+
+#### カウンター更新
+
+- ACE-137-1: Helpful +1（検査する文字列と実行する文字列を揃える原則を、意味論の側（LIKE・NOT・ダブルクォート）へ延ばす形で使った）
 
 ### [1.36.0] - 2026-08-22
 
