@@ -232,10 +232,11 @@ describe("tools/list", () => {
     expect(description, "「意図に合う1件」と断定していない").not.toContain("集計意図に合う");
     expect(description, "名指しが外れたら別の行が返ることを広告している").toContain("別の行が返る");
     expect(description, "すり替えが応答に現れないことを広告している").toContain("応答に現れない");
-    // エリアについても言い切らない。返る行の area は検証していないので、「同じエリアに
-    // 限られる」と広告すると、別エリアの行が返る経路（Issue #152）を隠すことになる
-    expect(description, "返る行のエリアを保証していないと書いている").toContain("保証は無い");
-    expect(description, "unanswered になる条件を書いている").toContain("代表エリア");
+    // Issue #152 で実行結果を検証するようになったため、代表エリアを読み取れた場合は
+    // 同じエリアだけを返す。旧広告へ戻ると修正済みの制約を外部クライアントへ配ってしまう
+    expect(description, "代表エリアと一致する行だけを返すと広告している").toContain("代表エリアと一致する行だけ");
+    expect(description, "修正前のエリア保証なしという広告が残っていない").not.toContain("保証は無い");
+    expect(description, "一致行が無ければ unanswered になる条件を書いている").toContain("unanswered");
   });
 
   it("入力スキーマは説明を載せるが、型は主張しない", async () => {
