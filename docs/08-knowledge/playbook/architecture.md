@@ -730,3 +730,29 @@ AI Gateway でキャッシュを使わない指定は `skipCache: true` であ�
 書き込み失敗を応答へ載せず処理を続ける best-effort 記録では、フロントは目の前の1件の成功を知れない。成功画面で常時出る固定文が「記録しています」と言うと、記録経路を通らない問いでも個別の受領証に化ける。固定文は同期的に確定した調査済み事実へ限定し、還元ループは未回答時の機構説明として出す。個別受領証が必要なら、応答契約へ記録成否を追加する。
 
 ---
+
+<a id="ace-227-1"></a>
+
+### ACE-227-1: `public/` 配下は画面から到達できないファイルも全部配信される —— 露出調査を画面の描画経路で打ち切らない
+
+| Category | architecture | Origin | PR #227 |
+| Date | 2026-08-23 |
+| Helpful | 0 | Harmful | 0 |
+| Status | active |
+
+出典未記録の写真4点を sidecar (`.image-slots.state.json`) から除去したが、**同じ写真3点が `public/showcase/uploads/` の PDF 2点に埋め込まれたまま本番配信されていた**（画像 XObject の実寸 104×55 / 104×69 / 104×78 が sidecar 側の実測値と完全一致）。画面の描画経路だけを調べて「露出はここだけ」と判断すると、画面から到達できないファイルを丸ごと見落とす。`public/showcase/README.md` も `200 / text/markdown` で配信されるため、運用の経緯や内部判断を書くと外部に読まれる。露出の調査は描画経路ではなく `git ls-files public/` と実 GET で行い、描画に必要な資産だけを `public/` に置く。
+
+---
+
+<a id="ace-227-2"></a>
+
+### ACE-227-2: SPA フォールバック下では「消した」ことを status code で確かめられない —— 検証したい URL は消さずに空の正準値を残す
+
+| Category | architecture | Origin | PR #227 |
+| Date | 2026-08-23 |
+| Helpful | 0 | Harmful | 0 |
+| Status | active |
+
+`wrangler.jsonc` の `not_found_handling: "single-page-application"` があるため、`public/` から削除したファイルの URL は 404 ではなく **200 + 718 バイトの `index.html`** を返す（実測）。`%{http_code}` で除去を検証すると「まだある」と誤読する。あとから誰かが GET して確かめる URL は、**ファイルを消すのではなく空の正準値（`{}` など）を残す** —— 応答本文そのものが「0件」を語る。消す場合は status ではなく content-type と本文で判定する。[[ace-209-2]] は同じ設定の逆向きの罠（200 が配信の証拠にならない）。
+
+---

@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.53.0"
+version: "1.54.0"
 status: "approved"
 created: "2026-08-15"
-updated: "2026-08-22"
+updated: "2026-08-23"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 144
+ace_entry_count: 148
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -375,8 +375,25 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-218-3 | 生成物の過大主張は SSOT も同じ手で直す —— 生成物だけ直すと次の同期で戻ってくる | process | [playbook/process.md#ace-218-3](./playbook/process.md#ace-218-3) |
 | ACE-218-4 | 指定フォントが無い環境の目視QAは代替フォントの結果 —— 枠のぎりぎりは算術で確かめる | tooling | [playbook/tooling.md#ace-218-4](./playbook/tooling.md#ace-218-4) |
 | ACE-218-5 | 同じ語で呼ばれる別成果物をチェックリストの1項目に混ぜると、片方の要件が静かに消える | process | [playbook/process.md#ace-218-5](./playbook/process.md#ace-218-5) |
+| ACE-227-1 | `public/` 配下は画面から到達できないファイルも全部配信される —— 露出調査を画面の描画経路で打ち切らない | architecture | [playbook/architecture.md#ace-227-1](./playbook/architecture.md#ace-227-1) |
+| ACE-227-2 | SPA フォールバック下では「消した」ことを status code で確かめられない —— 検証したい URL は消さずに空の正準値を残す | architecture | [playbook/architecture.md#ace-227-2](./playbook/architecture.md#ace-227-2) |
+| ACE-227-3 | テンプレート生成される識別子は grep で出ない —— 「grep 0件」を「存在しない」の証拠にしない | process | [playbook/process.md#ace-227-3](./playbook/process.md#ace-227-3) |
+| ACE-227-4 | 「文書に出典を記録せよ」という指示は表示義務を満たさない —— 表示機構があるかを先に確かめる | documentation-quality | [playbook/documentation-quality.md#ace-227-4](./playbook/documentation-quality.md#ace-227-4) |
 
 ## Changelog
+
+### [1.54.0] - 2026-08-23
+
+#### 追加
+
+- ACE-227-1: `public/` 配下は画面から到達できないファイルも全部配信される（Issue #222 / PR #227）
+- ACE-227-2: SPA フォールバック下では「消した」ことを status code で確かめられない（Issue #222 / PR #227）
+- ACE-227-3: テンプレート生成される識別子は grep で出ない（Issue #222 / PR #227）
+- ACE-227-4: 「文書に出典を記録せよ」という指示は表示義務を満たさない（Issue #222 / PR #227）
+
+#### カウンター更新
+
+- ACE-209-2: Helpful +1（SPA で 200 が証拠にならない知見を、削除の検証という逆向きの場面で再利用した）
 
 ### [1.53.0] - 2026-08-22
 
