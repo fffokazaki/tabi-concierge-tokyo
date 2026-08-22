@@ -21,7 +21,7 @@ import { ALLOWED_TABLES, guardSelect, MAX_LIMIT } from "./sql-guard";
  * | 壁 | 何を見るか | 偽装できるか |
  * | --- | --- | --- |
  * | `sql-guard`（構文） | SELECT のみ・許可テーブルのみ・複文なし | 書き方の工夫で抜けうる。だから2枚目が要る |
- * | 行の検証（意味） | 全行の `dataset_id` と、要求時の `area` が入力と一致するか | 生成 SQL からは偽装できない |
+ * | 行の検証（意味） | 返った `id` を固定 SQL で引き直し、実データの `dataset_id` と要求時の `area` が一致するか | 投影値の alias では偽装できない |
  *
  * ## 絞り込みを強くしすぎない
  *
@@ -50,10 +50,11 @@ const SQL_MAX_TOKENS = 300;
 /**
  * 検証に**必須**の列。ここが欠けたら書き直させる。
  *
- * `dataset_id` は別データセット混入の検出、`name` は応答の組み立て、`area` は要求エリアとの
- * 実行後照合（Issue #152）に要る。プロンプトで頼むだけでなく、返った行を決定的に検査する。
+ * `id` は固定 SQL で実データを引き直すキー、`dataset_id` は別データセット混入の検出、`name` は
+ * 応答の組み立て、`area` は要求エリアとの実行後照合（Issue #152）に要る。プロンプトで頼む
+ * だけでなく、返った行を決定的に検査する。
  */
-const REQUIRED_COLUMNS = ["dataset_id", "name", "area"] as const;
+const REQUIRED_COLUMNS = ["id", "dataset_id", "name", "area"] as const;
 
 /**
  * 要約を豊かにするために**お願いする**列。欠けても書き直しは求めない。
@@ -557,8 +558,8 @@ function presentableNote(note: string, entry: CatalogEntry): string {
  * 除外し、この関数は残った行から intent の代表エリア → 代表エリアいずれか → 先頭の順で選ぶ。
  * エリア無指定時にも代表エリア外の行を優先しないための第2段である。
  *
- * 行のエリアは3段で読む: (1) 行自身の `area` 列（`REQUIRED_COLUMNS` に入れたので生成 SQL が
- * SELECT していれば最も確実）→ (2) `(name, address)` の複合キーで D1 から引き直す
+ * 行のエリアは3段で読む: (1) 行自身の `area` 列（Issue #152 の固定 SQL で引き直した実値）
+ * → (2) `(name, address)` の複合キーで D1 から引き直す
  * （`countRelaxed` と同じく LLM を使わない決定的な照会）→ (3) name 単独。ただし同名で別エリアの
  * 行がある場合（文化財一覧の「銅鐘」が上野・浅草に併存する実例 ―― cross-model レビューの指摘）は
  * **どのエリアとも主張しない**（undefined）。取り違えて選ぶくらいなら選定から外す。
@@ -658,6 +659,52 @@ function missingRequiredColumns(rows: Record<string, unknown>[]): (typeof REQUIR
   return REQUIRED_COLUMNS.filter((column) => rows.some((row) => !(column in row)));
 }
 
+type RehydratedRows =
+  | { ok: true; rows: Record<string, unknown>[]; verificationSql: string }
+  | { ok: false; cause: string; retryable: boolean };
+
+/**
+ * 生成 SQL が返した `id` だけを手掛かりに、応答へ使う行を固定 SQL で引き直す。
+ *
+ * `SELECT '上野' AS area` や `COALESCE(area, '上野') AS area` は構文ガードを通りうる。
+ * 生成 SQL の投影値をそのまま信じると、別エリアの行を要求エリアとして偽装できるため、
+ * `dataset_id`・`name`・`area`・要約列はすべてこの照会の結果だけを使う（Issue #152）。
+ */
+async function rehydrateRows(
+  rows: Record<string, unknown>[],
+  deps: CoreDeps,
+): Promise<RehydratedRows> {
+  const ids: number[] = [];
+  for (const row of rows) {
+    const id = row["id"];
+    if (typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0) {
+      return { ok: false, cause: "返った行の id が正の整数ではありません", retryable: true };
+    }
+    ids.push(id);
+  }
+  if (ids.length === 0) return { ok: true, rows: [], verificationSql: "" };
+
+  const uniqueIds = [...new Set(ids)];
+  const verificationSql =
+    "SELECT id, dataset_id, name, category, area, address, lat, lon, note, source_row " +
+    `FROM spots WHERE id IN (${uniqueIds.join(", ")})`;
+  const verified = await deps.sql.select(verificationSql);
+  if (!verified.ok) {
+    return { ok: false, cause: `実行結果の id 照合に失敗しました: ${String(verified.cause)}`, retryable: false };
+  }
+
+  const byId = new Map<number, Record<string, unknown>>();
+  for (const row of verified.rows) {
+    const id = row["id"];
+    if (typeof id === "number") byId.set(id, row);
+  }
+  if (byId.size !== uniqueIds.length) {
+    return { ok: false, cause: "返った行の id に実在しない値が含まれています", retryable: true };
+  }
+
+  return { ok: true, rows: ids.map((id) => byId.get(id)!), verificationSql };
+}
+
 /**
  * 実照会を1回試みる。
  *
@@ -747,10 +794,23 @@ async function attemptTextToSql(
       continue;
     }
 
-    // ── 2枚目の壁（意味）。生成 SQL の書き方では偽装できない ────────────────
+    // ── 2枚目の壁（意味）。投影値の alias では偽装できない ──────────────────
+    const rehydrated = await rehydrateRows(executed.rows, deps);
+    if (!rehydrated.ok) {
+      if (!rehydrated.retryable) return { kind: "failed", cause: rehydrated.cause };
+      previousError = `${rehydrated.cause}。SELECT する列に実在する id を含めてください。`;
+      console.warn("[text-to-sql] 実行結果の id を検証できない SQL を拒否しました", {
+        attempt,
+        datasetId: input.datasetId,
+        cause: rehydrated.cause,
+        sql: guarded.sql,
+      });
+      continue;
+    }
+
     // 別データセットの行が混ざったまま返すと、出典として別のデータセットを名乗ることになる。
     // それは「出典が本物であるぶん誤りが見つけにくい」最悪の壊れ方である（絶対ルール #2）
-    const foreign = executed.rows.find((row) => row["dataset_id"] !== entry.datasetId);
+    const foreign = rehydrated.rows.find((row) => row["dataset_id"] !== entry.datasetId);
     if (foreign) {
       console.error("[text-to-sql] 指定外のデータセットの行が返りました", {
         datasetId: entry.datasetId,
@@ -762,8 +822,8 @@ async function attemptTextToSql(
 
     const requestedArea = findRepresentativeArea(input.intent);
     const eligibleRows = requestedArea
-      ? executed.rows.filter((row) => row["area"] === requestedArea)
-      : executed.rows;
+      ? rehydrated.rows.filter((row) => row["area"] === requestedArea)
+      : rehydrated.rows;
 
     if (eligibleRows.length === 0) {
       // **「無かった」と言う前に、緩めた問いでも0行かをデータに訊く**（Issue #148）。
@@ -808,7 +868,10 @@ async function attemptTextToSql(
     return {
       kind: "answered",
       result,
-      query: `D1 実照会: ${guarded.sql}（${entry.retrievedAt} 取得のスナップショット・全${entry.rowCount}行）`,
+      query:
+        `D1 実照会: ${guarded.sql}。` +
+        `実行結果の id を固定照会で検証: ${rehydrated.verificationSql}` +
+        `（${entry.retrievedAt} 取得のスナップショット・全${entry.rowCount}行）`,
     };
   }
 

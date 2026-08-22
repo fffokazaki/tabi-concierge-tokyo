@@ -36,7 +36,7 @@ function scriptedLlm(...responses: (string | Error)[]): LlmClient & { readonly a
 const depsWith = (llm: LlmClient): CoreDeps => ({ llm, sql: d1SqlExecutor(env.DB) });
 
 /** 生成 SQL が返しうる、実在の形をした行。 */
-const SELECT_ALL = `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'`;
+const SELECT_ALL = `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'`;
 
 const seed = async (
   rows: { name: string; area: string | null; address?: string; note?: string; category?: string }[],
@@ -105,6 +105,8 @@ describe("実照会", () => {
     // 出典の再現に要る（API.md §4）。スタブの「固定データ抽出」ではなくなったことも示す
     expect(answered.query).toContain("D1 実照会");
     expect(answered.query).toContain("FROM spots");
+    expect(answered.query).toContain("実行結果の id を固定照会で検証");
+    expect(answered.query).toMatch(/SELECT id, dataset_id, name, category, area.+WHERE id IN \(\d+\)/);
   });
 
   it("```sql``` で囲まれていても取り出せる", async () => {
@@ -335,7 +337,7 @@ describe("縮退（インフラ障害・出力不正）", () => {
 
       // 構文としては通るが、`OR 1=1` で他データセットの行まで拾ってしまう SQL
       const llm = scriptedLlm(
-        `SELECT dataset_id, name, area FROM spots WHERE dataset_id = '${MEISHO_ID}' OR 1=1 ORDER BY dataset_id`,
+        `SELECT id, dataset_id, name, area FROM spots WHERE dataset_id = '${MEISHO_ID}' OR 1=1 ORDER BY dataset_id`,
       );
 
       expectFallback(await aggregate(MEISHO_ID, "上野の寺社を1件", depsWith(llm)));
@@ -426,7 +428,7 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
       await seed(BOTH_AREAS);
       // 本番で実際に生成された形。興味が3件のときは出ず、4件にすると出た（Issue #148）
       const overRestrictive =
-        `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
         " AND (category IN ('名所・史跡') OR area IN ('上野', '浅草'))" +
         " AND (name LIKE '%ラーメン%' OR name LIKE '%自然%' OR name LIKE '%文化%' OR name LIKE '%家族向け%') LIMIT 50";
       const llm = scriptedLlm(overRestrictive, SELECT_ALL);
@@ -451,7 +453,7 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
       // 本番で採取したもう1つの形（都市公園・都立公園一覧は category が「公園」しか無いのに
       // 「自然」「文化」で絞り、123行あるうち0行になった）
       const invented =
-        `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
         " AND category IN ('自然','文化') AND area = '上野' LIMIT 50";
       const llm = scriptedLlm(invented, SELECT_ALL);
 
@@ -467,7 +469,7 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
     // 部分一致で正しく引けていた経路まで書き直しへ回して無料枠を無駄にする
     await seed([{ name: "旧朝倉家住宅", area: "渋谷", category: "区民文化財" }]);
     const partial =
-      `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+      `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
       " AND category LIKE '%文化%' LIMIT 50";
     const llm = scriptedLlm(partial);
 
@@ -479,7 +481,7 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
     // 本番で `answered` を返していた SQL に含まれる形。弾くと動いていた経路が壊れる
     await seed([{ name: "寛永寺", area: "上野" }]);
     const withEmpty =
-      `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+      `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
       " AND (category = '名所・史跡' OR area IN ('上野', '浅草') OR note = '') LIMIT 50";
     const llm = scriptedLlm(withEmpty);
 
@@ -491,7 +493,7 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
     try {
       await seed(BOTH_AREAS);
       const wrongColumn =
-        `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
         " AND category = '上野' LIMIT 50";
       const llm = scriptedLlm(wrongColumn, SELECT_ALL);
 
@@ -508,7 +510,7 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
     try {
       await seed(BOTH_AREAS);
       const nameLike =
-        `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
         " AND name LIKE '%渋谷%' LIMIT 50";
       const llm = scriptedLlm(nameLike, SELECT_ALL);
 
@@ -528,9 +530,9 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
     try {
       await seed([{ name: "旧朝倉家住宅", area: "渋谷", category: "区民文化財" }]);
       const exactMismatch =
-        `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
         " AND category = '文化' LIMIT 50";
-      const relaxed = `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category LIKE '%文化%' LIMIT 50`;
+      const relaxed = `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category LIKE '%文化%' LIMIT 50`;
       const llm = scriptedLlm(exactMismatch, relaxed);
 
       expect(expectAnswered(await aggregate(MEISHO_ID, "文化財を1件", depsWith(llm))).result.name).toBe("旧朝倉家住宅");
@@ -546,7 +548,7 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       await seed(BOTH_AREAS);
-      const invented = `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category = 'ラーメン' LIMIT 50`;
+      const invented = `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category = 'ラーメン' LIMIT 50`;
       const llm = scriptedLlm(invented);
 
       const output = await aggregate(MEISHO_ID, "ラーメン、文化", depsWith(llm));
@@ -569,7 +571,7 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       await seed(BOTH_AREAS);
-      const doubleQuoted = `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category = "自然" LIMIT 50`;
+      const doubleQuoted = `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category = "自然" LIMIT 50`;
       const llm = scriptedLlm(doubleQuoted, SELECT_ALL);
 
       const output = await aggregate(MEISHO_ID, "自然を1件", depsWith(llm));
@@ -587,7 +589,7 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
     try {
       await seed(BOTH_AREAS);
       // 実在値だけで絞っているが該当が無い（＝正しい0行）
-      const noRow = `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND area = '渋谷' LIMIT 50`;
+      const noRow = `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND area = '渋谷' LIMIT 50`;
       const llm = scriptedLlm(noRow);
 
       expectUnanswered(await aggregate(MEISHO_ID, "渋谷の寺社を1件", depsWith(llm)));
@@ -605,7 +607,7 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
     try {
       await seed(BOTH_AREAS);
       // 実在値を使っていても、否定なら「全部除外して0行」になりうる
-      const negated = `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category NOT IN ('名所・史跡') LIMIT 50`;
+      const negated = `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category NOT IN ('名所・史跡') LIMIT 50`;
       const llm = scriptedLlm(negated, SELECT_ALL);
 
       expect(expectAnswered(await aggregate(MEISHO_ID, "寺社を1件", depsWith(llm))).result.name).toBe("寛永寺");
@@ -619,7 +621,7 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       await seed(BOTH_AREAS);
-      const negatedId = `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id != '${MEISHO_ID}' LIMIT 50`;
+      const negatedId = `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id != '${MEISHO_ID}' LIMIT 50`;
       const llm = scriptedLlm(negatedId, SELECT_ALL);
 
       expect(expectAnswered(await aggregate(MEISHO_ID, "寺社を1件", depsWith(llm))).result.name).toBe("寛永寺");
@@ -634,8 +636,8 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       await seed([{ name: "旧朝倉家住宅", area: "渋谷", category: "区民文化財" }]);
-      const prefixOnly = `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category LIKE '文化%' LIMIT 50`;
-      const ok = `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category LIKE '区民%' LIMIT 50`;
+      const prefixOnly = `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category LIKE '文化%' LIMIT 50`;
+      const ok = `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category LIKE '区民%' LIMIT 50`;
       const llm = scriptedLlm(prefixOnly, ok);
 
       expect(expectAnswered(await aggregate(MEISHO_ID, "文化財を1件", depsWith(llm))).result.name).toBe("旧朝倉家住宅");
@@ -647,7 +649,7 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
 
   it("当たる LIKE は素通しする（`'%文化財'` は「区民文化財」に当たる）", async () => {
     await seed([{ name: "旧朝倉家住宅", area: "渋谷", category: "区民文化財" }]);
-    const suffix = `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category LIKE '%文化財' LIMIT 50`;
+    const suffix = `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category LIKE '%文化財' LIMIT 50`;
     const llm = scriptedLlm(suffix);
 
     expect(expectAnswered(await aggregate(MEISHO_ID, "文化財を1件", depsWith(llm))).result.name).toBe("旧朝倉家住宅");
@@ -660,7 +662,7 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
     try {
       await seed([{ name: "旧朝倉家住宅", area: "渋谷", category: "区民文化財".repeat(40) }]);
       const pathological = `%`.repeat(40) + "X" + "%".repeat(40);
-      const evil = `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category LIKE '${pathological}' LIMIT 50`;
+      const evil = `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category LIKE '${pathological}' LIMIT 50`;
       const llm = scriptedLlm(evil, SELECT_ALL);
 
       expect(expectAnswered(await aggregate(MEISHO_ID, "文化財を1件", depsWith(llm))).result.name).toBe("旧朝倉家住宅");
@@ -686,7 +688,7 @@ describe("0行は緩めた問いでも0行のときだけ「無かった」と�
     try {
       await seed([{ name: "寛永寺", area: "上野" }]);
       // 文字列リテラルが1つも出てこないので、リテラル検査は素通りする
-      const constantFalse = `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND 1 = 0 LIMIT 50`;
+      const constantFalse = `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND 1 = 0 LIMIT 50`;
       const llm = scriptedLlm(constantFalse, SELECT_ALL);
 
       expect(expectAnswered(await aggregate(MEISHO_ID, "寺社を1件", depsWith(llm))).result.name).toBe("寛永寺");
@@ -701,7 +703,7 @@ describe("0行は緩めた問いでも0行のときだけ「無かった」と�
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       await seed([{ name: "寛永寺", area: "上野" }]);
-      const shibuya = `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND area = '渋谷' LIMIT 50`;
+      const shibuya = `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND area = '渋谷' LIMIT 50`;
       const llm = scriptedLlm(shibuya);
 
       expectUnanswered(await aggregate(MEISHO_ID, "渋谷の寺社を1件", depsWith(llm)));
@@ -716,7 +718,7 @@ describe("0行は緩めた問いでも0行のときだけ「無かった」と�
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       await seed([{ name: "寛永寺", area: "上野" }]);
-      const llm = scriptedLlm(`SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND 1 = 0 LIMIT 50`);
+      const llm = scriptedLlm(`SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND 1 = 0 LIMIT 50`);
 
       const answered = expectAnswered(await aggregate(MEISHO_ID, "寺社を1件", depsWith(llm)));
 
@@ -735,7 +737,7 @@ describe("0行は緩めた問いでも0行のときだけ「無かった」と�
       { name: "寛永寺", area: "上野" },
       { name: "浅草寺", area: "浅草" },
     ]);
-    const byName = `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND name LIKE '%浅草寺%' LIMIT 50`;
+    const byName = `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND name LIKE '%浅草寺%' LIMIT 50`;
     const llm = scriptedLlm(byName);
 
     expect(expectAnswered(await aggregate(MEISHO_ID, "浅草寺に行きたい", depsWith(llm))).result.name).toBe("浅草寺");
@@ -755,7 +757,7 @@ describe("0行は緩めた問いでも0行のときだけ「無かった」と�
             ? ({ ok: false, cause: new Error("D1 が応答しません") } as const)
             : real.select(sql),
       };
-      const llm = scriptedLlm(`SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND 1 = 0 LIMIT 50`);
+      const llm = scriptedLlm(`SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND 1 = 0 LIMIT 50`);
 
       const output = await aggregate(MEISHO_ID, "寺社を1件", { llm, sql: flaky });
 
@@ -796,10 +798,10 @@ describe("名指しされた施設が無いときは黙ってすり替える（I
         { name: "寛永寺", area: "上野" },
       ]);
       const byName =
-        `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
         " AND name LIKE '%浅草寺%' LIMIT 50";
       const relaxed =
-        `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
         " AND area = '浅草' LIMIT 50";
       const llm = scriptedLlm(byName, relaxed);
       const recorder = capturingGapRecorder();
@@ -840,7 +842,7 @@ describe("名指しされた施設が無いときは黙ってすり替える（I
         { name: "寛永寺", area: "上野" },
       ]);
       const byName =
-        `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
         " AND name LIKE '%とげぬき地蔵%' LIMIT 50";
       const llm = scriptedLlm(byName, SELECT_ALL); // 書き直しでエリア条件が付かない
 
@@ -861,7 +863,7 @@ describe("名指しされた施設が無いときは黙ってすり替える（I
     // 代表エリアを読み取れなければ裏取りにエリア条件は付かない（下のテスト）
     await seed([{ name: "寛永寺", area: "上野" }]);
     const byName =
-      `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+      `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
       " AND name LIKE '%浅草寺%' LIMIT 50";
     const llm = scriptedLlm(byName);
 
@@ -879,7 +881,7 @@ describe("名指しされた施設が無いときは黙ってすり替える（I
     try {
       await seed([{ name: "寛永寺", area: "上野" }]);
       const byName =
-        `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
         " AND name LIKE '%とげぬき地蔵%' LIMIT 50";
       const llm = scriptedLlm(byName, SELECT_ALL);
 
@@ -895,7 +897,7 @@ describe("名指しされた施設が無いときは黙ってすり替える（I
 
 describe("実行結果を要求エリアと照合する（Issue #152）", () => {
   const selectArea = (areaClause: string) =>
-    `SELECT dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' ${areaClause} LIMIT 50`;
+    `SELECT id, dataset_id, name, area, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' ${areaClause} LIMIT 50`;
 
   it("書き直し SQL が別エリアの行しか返さなければ、その行で回答しない", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -930,6 +932,25 @@ describe("実行結果を要求エリアと照合する（Issue #152）", () => 
     expect(llm.asked[1]!.user).toContain("要求エリア「上野」と一致する行が0件");
   });
 
+  it("生成 SQL が area を定数で偽装しても、実データのエリアで拒否して書き直させる", async () => {
+    await seed([
+      { name: "浅草神社", area: "浅草" },
+      { name: "寛永寺", area: "上野" },
+    ]);
+    const spoofed =
+      `SELECT id, dataset_id, name, '上野' AS area, address, note FROM spots ` +
+      `WHERE dataset_id = '${MEISHO_ID}' AND area = '浅草' LIMIT 50`;
+    const corrected =
+      `SELECT id, dataset_id, name, area, address, note FROM spots ` +
+      `WHERE dataset_id = '${MEISHO_ID}' AND area = '上野' LIMIT 50`;
+    const llm = scriptedLlm(spoofed, corrected);
+
+    const answered = expectAnswered(await aggregate(MEISHO_ID, "上野の寺社を1件", depsWith(llm)));
+
+    expect(answered.result.name).toBe("寛永寺");
+    expect(llm.asked, "投影値ではなく実データの area を検証する").toHaveLength(2);
+  });
+
   it("area が NULL の行は要求エリアの候補にせず、書き直させる", async () => {
     await seed([
       { name: "初代川柳墓", area: null },
@@ -955,7 +976,7 @@ describe("実行結果を要求エリアと照合する（Issue #152）", () => 
 
   it("代表エリアを読み取れなくても area 列が無ければ書き直させる", async () => {
     await seed([{ name: "寛永寺", area: "上野" }]);
-    const withoutArea = `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' LIMIT 50`;
+    const withoutArea = `SELECT id, dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' LIMIT 50`;
     const llm = scriptedLlm(withoutArea, selectArea(""));
 
     const answered = expectAnswered(await aggregate(MEISHO_ID, "史跡を1件", depsWith(llm)));
