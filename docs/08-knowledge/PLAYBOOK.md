@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.45.0"
+version: "1.46.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 123
+ace_entry_count: 126
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -354,8 +354,24 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-178-3 | CLI の終了コードはプロセス起動でテストする ―― 比較関数が正しくてもエントリーポイントの配線が壊れれば CI は緑で素通りする | testing | [playbook/testing.md#ace-178-3](./playbook/testing.md#ace-178-3) |
 | ACE-181-1 | 縮退先が「旧実装そのもの」だと、旧実装時代の契約文書はそのまま生き残り、主経路の記述が抜けても無矛盾に見える | documentation-quality | [playbook/documentation-quality.md#ace-181-1](./playbook/documentation-quality.md#ace-181-1) |
 | ACE-190-1 | 生成 SQL の実行結果も投影値は未信頼 — 安定 ID から固定 SQL で事実列を再取得する | architecture | [playbook/architecture.md#ace-190-1](./playbook/architecture.md#ace-190-1) |
+| ACE-191-1 | TDD は「ガードが効いていない瞬間」を必ず作る ―― 実プロセスを起動するテストの宛先を本番既定にしない | testing | [playbook/testing.md#ace-191-1](./playbook/testing.md#ace-191-1) |
+| ACE-191-2 | 復旧の確認を COUNT で済ませない ―― AUTOINCREMENT は DELETE で戻らないので再シードで id が変わる | testing | [playbook/testing.md#ace-191-2](./playbook/testing.md#ace-191-2) |
+| ACE-191-3 | 値を返すスクリプトでは、ゲート系なら「検査が無効化」で済む失敗が「0 件」に化ける | architecture | [playbook/architecture.md#ace-191-3](./playbook/architecture.md#ace-191-3) |
 
 ## Changelog
+
+### [1.46.0] - 2026-08-22
+
+#### 追加
+
+- ACE-191-1: TDD は「ガードが効いていない瞬間」を必ず作る ―― 実プロセスを起動するテストの宛先を本番既定にしない（Issue #189 / PR #191）
+- ACE-191-2: 復旧の確認を COUNT で済ませない ―― AUTOINCREMENT は DELETE で戻らないので再シードで id が変わる（Issue #189 / PR #191）
+- ACE-191-3: 値を返すスクリプトでは、ゲート系なら「検査が無効化」で済む失敗が「0 件」に化ける（Issue #189 / PR #191）
+
+#### カウンター更新
+
+- ACE-167-1: Helpful +1（出力側の検査を入力側のガードとして書いていた実例。3 レビュアーが独立に Critical として検出）
+- ACE-178-3: Helpful +1（エントリガードの配線をプロセス起動で固定した。値を返すスクリプトでは空振りが 0 件に化けるため）
 
 ### [1.45.0] - 2026-08-22
 

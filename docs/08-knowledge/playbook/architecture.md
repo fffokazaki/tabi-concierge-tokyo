@@ -614,7 +614,7 @@ AI Gateway でキャッシュを使わない指定は `skipCache: true` であ�
 
 | Category | architecture | Origin | PR #167 / Issue #153 |
 | Date | 2026-08-22 |
-| Helpful | 0 | Harmful | 0 |
+| Helpful | 1 | Harmful | 0 |
 | Status | active |
 
 `countRelaxed`（[ACE-150-2](#ace-150-2) の裏取り）は「訊かれた代表エリアを緩めない」と書いてあり、コードも実際に `AND area = '浅草'` を付けて数える。そこから「すり替え先は同じエリアに限られる」と doc・契約文書・MCP の広告文の3か所に書いた ―― **偽だった。**
@@ -674,5 +674,18 @@ AI Gateway でキャッシュを使わない指定は `skipCache: true` であ�
 | Status | active |
 
 生成 SQL を実行して得た行でも、SELECT 投影を生成器が決めるなら `'上野' AS area` のように事実列を偽装できる。意味検証では正の整数など最小の安定 ID だけを受け取り、固定 SQL で `dataset_id`・`area`・応答内容を丸ごと再取得してから判定する。回帰テストは WHERE 条件の欠落だけでなく、検証対象列そのものを定数・別名・式で偽装して境界を固定する。
+
+---
+
+<a id="ace-191-3"></a>
+
+### ACE-191-3: 値を返すスクリプトでは、ゲート系なら「検査が無効化」で済む失敗が「0 件」に化ける
+
+| Category | architecture | Origin | PR #191 |
+| Date | 2026-08-22 |
+| Helpful | 0 | Harmful | 0 |
+| Status | active |
+
+同じ失敗の重さがスクリプトの役目で変わる。エントリガードの空振り（`import.meta.filename === process.argv[1]` が symlink やパス別名で外れる）は、CI ゲートなら「検査が黙って無効化された」だが、値を出すスクリプトでは**空の stdout + 終了コード 0** になり、照会結果 0 件と区別できない。`spawnSync` の `error` を一括で「起動できなかった」と報告するのも同型で、ENOBUFS（既定 `maxBuffer` 1MiB は `SELECT * FROM spots` で届く）を「照会が走っていない」と誤診させる。値を返す経路では、失敗時に stdout へ何も書かないことと、打ち切り系を `error.code` で「照会は走っている（0 件ではない）」と言い分けることを実装側の契約にする（[ACE-191-1](testing.md#ace-191-1) の実プロセステストで固定する）。
 
 ---

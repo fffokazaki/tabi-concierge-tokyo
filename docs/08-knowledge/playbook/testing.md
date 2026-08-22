@@ -313,11 +313,37 @@ buildPlan / buildRecommendations のような「意図的な重複」ペアへ�
 
 | Category | testing | Origin | PR #178 / Issue #136 |
 | Date | 2026-08-22 |
-| Helpful | 0 | Harmful | 0 |
+| Helpful | 1 | Harmful | 0 |
 | Status | active |
 
 検査スクリプトを純粋関数 + `main()` で書くと、関数テストだけでは `import.meta.filename === process.argv[1]` のエントリーポイント条件や終了コードの配線を踏めない。ここが壊れると CI は何も検査しないまま緑になる。`spawnSync("node", [script, ...])` で実プロセスとして起動し、正常 0 / 違反 1 / 読込エラー 2 を固定する。
 
 追加したテストが本当に効くかは変異で確かめる。PR #178 では (a) 違反時に `EXIT_OK` を返す (b) エントリーポイント条件を `if (false)` にする (c) 読込エラーを違反と同じ終了コードにする、の 3 つを注入し、それぞれ 1 / 3 / 1 件のテストが落ちることを確認した。
+
+---
+
+<a id="ace-191-1"></a>
+
+### ACE-191-1: TDD は「ガードが効いていない瞬間」を必ず作る ―― 実プロセスを起動するテストの宛先を本番既定にしない
+
+| Category | testing | Origin | PR #191 |
+| Date | 2026-08-22 |
+| Helpful | 0 | Harmful | 0 |
+| Status | active |
+
+RED の観測とは、検査対象が機能していない状態でテストを走らせることである。そこで実バイナリを起動するテストの宛先が本番既定（`db:query` は `--remote`）だと、TDD の手順そのものが破壊の引き金になる ―― 本 PR では `findSqlProblem` をスタブにしたまま `runCli(["--remote", "DELETE FROM spots"])` を実行し、本番の `spots` 1,645 行を消した。注入した偽 runner を使うユニットテストは安全だが、実プロセスを起動するテストは別枠で扱い、宛先フラグを明示してローカルへ向け、理由をテストの doc コメントに残す。テストは壊れたときに落ちるものであって、壊れたときに壊すものではない。
+
+---
+
+<a id="ace-191-2"></a>
+
+### ACE-191-2: 復旧の確認を COUNT で済ませない ―― AUTOINCREMENT は DELETE で戻らないので再シードで id が変わる
+
+| Category | testing | Origin | PR #191 |
+| Date | 2026-08-22 |
+| Helpful | 0 | Harmful | 0 |
+| Status | active |
+
+`DELETE FROM spots` → `npm run db:seed` の復旧で行数・内容・`source_row` は一致するが、`spots.id` は 1..1645 から 1646..3290 へ振り直される（`scripts/seed.ts` は id を明示せず INSERT し、SQLite の採番は DELETE で戻らない）。`COUNT(*)` の一致は「元に戻った」の証拠にならない。実装は `spots.id` を値として参照していないので機能影響は無いが、**id を写し取った fixture や文書は、正当な再シードのあとに「実測」の主張が実際の応答と食い違う**。復旧の確認は行数だけでなく id 範囲まで見て、fixture には再シードで変わらない列（`name` / `category` / `area` / `source_row`）を使う。
 
 ---
