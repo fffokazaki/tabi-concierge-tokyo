@@ -1,6 +1,6 @@
 ---
 title: "API_REQUIREMENTS"
-version: "1.7.1"
+version: "1.8.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-16"
@@ -41,6 +41,7 @@ changeImpact: "high"
 
 🗺️ プラン（`src/features/plan/PlanScreen.tsx`）。API.md の「フロントエンド5機能とコア操作の対応」表どおり、`search_datasets` → `aggregate_dataset` → `get_provenance` の3操作を `/api/*` 経由で使います。
 👤 旅のプロフィール（`TripSetupScreen.tsx`）はツール呼び出しなし（`Trip` はクライアント側のコンテキストとして保持するのみ）なので、本書には含めません。
+📊 データ還元ダッシュボード（`/gaps`・`src/features/gaps/GapsDashboard.tsx`）は `GET /api/gaps/summary` を使います。旅行者向け5機能とは対象ユーザーが異なるため、タブには加えず独立 URL に置きます。
 
 ---
 
@@ -228,10 +229,40 @@ changeImpact: "high"
 
 ## その他、実装未着手のツール（本書の対象外）
 
-API.md §3.4 に記載のある以下は、対応する画面（📷 スキャン・✨ あなたへ）自体がまだフロントエンドに実装されていないため、本書では要件化していません。実装に着手する段階で改めて要件を出します。
+API.md §3.5 に記載のある以下は、専用のコア操作として未実装です。本書では既存のコア3操作を組み合わせる画面要件だけを扱い、専用操作の実装に着手する段階で改めて要件を出します。
 
 - `recommend_spots`（仮称） — 「あなたへ」画面用
 - `report_gap`（仮称） — 未回答のデータ公開リクエスト化用
+
+---
+
+## 4. `GET /api/gaps/summary` — 還元ダッシュボード
+
+### 呼び出しタイミング
+
+`/gaps` を開いたときに1回呼び出す。結果は D1 `gaps` の現時点のスナップショットで、画面側に固定件数を持たない。
+
+### 出力
+
+```ts
+{
+  total: number;
+  byReason: Array<{ reason: UnansweredReason; count: number }>;
+  byArea: Array<{ area: string | null; count: number }>;
+  byReasonAndArea: Array<{
+    reason: UnansweredReason;
+    area: string | null;
+    count: number;
+  }>;
+}
+```
+
+- `area: null` は画面で「エリア指定なし」と表示する
+- API 入力由来の任意のエリア文字列は返さず、公開を決めた既知の地名以外は `"その他のエリア"` と表示する
+- `reason` は日本語ラベルへ変換するが、API の閉じた英語列挙値は変えない
+- `total: 0` では「未回答の記録はまだありません」と表示し、ダミーの棒グラフや件数を置かない
+- 画面に**「構想」**と、東京都・GovTech東京への提出プロセス自体は未実装である旨を明記する
+- `gaps.question` は表示にも応答型にも含めない。`gaps.area` も生値では受け取らず、既知の公開地名以外は SQL 側で `"その他のエリア"` にまとめる。利用者の自由入力を認証なしで公開しないため、画面は分類済みの集計だけを使う
 
 ---
 
@@ -254,6 +285,18 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 | `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物が返るとは限らない。** 保証は1つだけで、訊かれた代表エリアの行をそのデータセットが1行も収録していなければ `unanswered` にする（別エリアの行では埋めない）。それ以外は返る行の `area` を実行後に検証していないため、「上野の…」と訊いて浅草の行が返りうる（[Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152)）。**返ってきた `name` を「訊いたエリアの施設」として扱わないこと。** 詳細は [API.md](./API.md) §3.2 |
 
 ## Changelog
+
+### [1.8.0] - 2026-08-22
+
+#### 追加
+
+- [Issue #193](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/193) のデータ還元ダッシュボードと `GET /api/gaps/summary` のフロントエンド要件を §4 に追加
+- 0件表示、`area: null` のラベル、都への提出が**構想**であることの表示、個票 `question` と任意の `area` を外へ出さない境界を確定。未知のエリアは「その他のエリア」へ集約する
+
+#### 修正
+
+- 追加候補の参照先を API.md §3.4 から §3.5 へ修正
+- 実装済みの「あなたへ」画面まで未実装と読める旧説明を、追加候補の専用コア操作が未実装という現況へ修正
 
 ### [1.7.1] - 2026-08-22
 
