@@ -1,11 +1,11 @@
 ---
 title: "API_REQUIREMENTS"
-version: "1.7.0"
+version: "1.7.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-16"
 updated: "2026-08-22"
-changeImpact: "medium"
+changeImpact: "high"
 ---
 
 # フロントエンドが必要とするAPI要件（プラン画面）
@@ -251,9 +251,15 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 | エラーレスポンスの形 | `{ error: "invalid_request" \| "not_found" \| "internal_error", message?: string }`。400 は**入力の形の違反だけ**に使い、「データが無い」は `unanswered` ＋ HTTP 200（API.md §4）。500 も JSON で返るので、画面は常に JSON として読んでよい |
 | 複数データセット横断時の `query` の対応関係 | 入力の `query` を各 source に同じ値で複写する。同じ ID を重ねても出典は1件にまとまる。知らない `datasetId` が混ざったら既知のぶんだけ返さず全体を `unanswered` にする（画面上の並べ方はフロントエンド側の決定事項として残る） |
 | `category` の意味 | 絞り込みの述語ではなく**スコアリングのヒント**。ただし指定して1件も当たらなければ `unanswered` になる（無関係な候補は返らない） |
-| `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物しか返らない。** 無ければ `unanswered`。別エリアの施設で代替されることはないので、画面は返ってきた `name` をそのまま信用してよい |
+| `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物が返るとは限らない。** 保証は1つだけで、訊かれた代表エリアの行をそのデータセットが1行も収録していなければ `unanswered` にする（別エリアの行では埋めない）。それ以外は返る行の `area` を実行後に検証していないため、「上野の…」と訊いて浅草の行が返りうる（[Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152)）。**返ってきた `name` を「訊いたエリアの施設」として扱わないこと。** 詳細は [API.md](./API.md) §3.2 |
 
 ## Changelog
+
+### [1.7.1] - 2026-08-22
+
+#### 修正
+
+- **「`intent` にエリアを書けばそのエリアの地物しか返らない」という保証を撤回した**（[Issue #168](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/168)）。これはスタブ時代の挙動で、主経路（D1 実照会）では成り立たない ―― 返る行の `area` を実行後に検証していないため、「上野の…」と訊いて浅草の行が返りうる（[Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152)）。**画面へ「返ってきた `name` をそのまま信用してよい」と指示していたので、`changeImpact` を `high` にした。** 保証は「訊かれた代表エリアの行を1行も収録していなければ `unanswered`」の1つだけである（[API.md](./API.md) §3.2）
 
 ### [1.7.0] - 2026-08-22
 
