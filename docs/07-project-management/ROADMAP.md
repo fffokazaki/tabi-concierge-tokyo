@@ -1,10 +1,10 @@
 ---
 title: "ROADMAP"
-version: "1.1.0"
+version: "1.2.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-21"
+updated: "2026-08-22"
 changeImpact: "low"
 ---
 
@@ -136,7 +136,7 @@ changeImpact: "low"
 | 出典クリック率（カタログ流入） | 未定 |
 | 地域スポット送客数 | 未定 |
 | データ公開リクエスト数 | 未定 |
-| 情報探索時間 | 約30分 → 約3分（提出までに実測で更新） |
+| 情報探索時間 | 約30分 → 約3分（30分は開発メンバーの初回探索体験に基づく目安・3分は操作一巡の目安。根拠は [PROJECT.md](../01-context/PROJECT.md) §8・[Issue #130](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/130)） |
 
 ## 8. コミュニケーション計画
 
@@ -159,6 +159,12 @@ changeImpact: "low"
 | 2026-08-15 | スコープを POC レベルへ縮小、アーキテクチャを MCP 構成に確定 |
 
 ## Changelog
+
+### [1.2.0] - 2026-08-22
+
+#### 変更
+
+- §7 KPI 表の「情報探索時間」から「提出までに実測で更新」を解消（[Issue #130](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/130)）。根拠の詳細は [PROJECT.md](../01-context/PROJECT.md) §8 に一本化
 
 ### [1.1.0] - 2026-08-21
 
