@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.40.0"
+version: "1.41.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 116
+ace_entry_count: 117
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -347,8 +347,15 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-175-1 | 非決定的な生成は指示で従わせるより、決定的な後段で吸収する ―― 指示の効果は引き直しの実測で判定する | architecture | [playbook/architecture.md#ace-175-1](./playbook/architecture.md#ace-175-1) |
 | ACE-175-2 | name 単独の対応付けは同名レコードの実データで壊れる ―― 複合キー化し、曖昧なら「主張しない」へ倒す | data-processing | [playbook/data-processing.md#ace-175-2](./playbook/data-processing.md#ace-175-2) |
 | ACE-175-3 | AI Gateway のキャッシュは「引き直して良い結果を固定する」運用を許さない ―― skipCache は書き込みもしない | architecture | [playbook/architecture.md#ace-175-3](./playbook/architecture.md#ace-175-3) |
+| ACE-173-1 | URL・名称の一括置換は「過去の事実の記録」まで書き換える ―― 置換後に記録行だけ手で戻す | documentation-quality | [playbook/documentation-quality.md#ace-173-1](./playbook/documentation-quality.md#ace-173-1) |
 
 ## Changelog
+
+### [1.41.0] - 2026-08-22
+
+#### 追加
+
+- ACE-173-1: URL・名称の一括置換は「過去の事実の記録」まで書き換える ―― 置換後に記録行だけ手で戻す（Issue #171 / PR #173）
 
 ### [1.40.0] - 2026-08-22
 
