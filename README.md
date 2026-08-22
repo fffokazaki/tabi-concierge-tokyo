@@ -4,6 +4,8 @@
 
 東京都知事杯オープンデータ・ハッカソン 2026 参加プロジェクト（チームshiwata）
 
+**本番（Cloudflare Workers）**: <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev> — 管理画面（データ還元ダッシュボード）は <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev/gaps>
+
 ## 概要
 
 訪日観光客向けのAI旅行ガイドアプリ。東京都オープンデータカタログ（約9,600データセット）をバックエンドの「オープンデータ・コンシェルジュ」経由で活用し、出典付きで旅程提案・文化ガイド・周辺案内を提供する。
@@ -12,12 +14,12 @@
 
 ```
 📱 旅コンシェルジュTOKYO（React SPA） ── /api/*（JSON） ──┐
-🤖 AI クライアント（Claude Desktop 等） ── /mcp（未実装） ─┤
+🤖 AI クライアント（Claude Desktop 等） ── /mcp（実装済み） ─┤
                                                           ⇅
 🧠 オープンデータ・コンシェルジュ（worker/core/ — 検索・集計・出典強制）
 ```
 
-コア3操作（`search_datasets` / `aggregate_dataset` / `get_provenance`）を単一の Cloudflare Worker が二面公開する（ADR-008）。現時点の中身は固定データによるスタブで、メタデータRAG / Text-to-SQL への差し替えを予定している。
+コア3操作（`search_datasets` / `aggregate_dataset` / `get_provenance`）を単一の Cloudflare Worker が二面公開する（ADR-008）。**中身はもう固定データのスタブではない** — `aggregate_dataset` は D1 を実照会し（Text-to-SQL・Issue #119）、`search_datasets` は自然文だけの呼び出しを LLM で構造化入力へ分解してから既存のキーワード判定へ渡す（メタデータRAG・Issue #120。候補のマッチ自体は今もキーワード表が行う）。LLM や D1 が使えないときは、どちらもスタブ時代の実装へ縮退する。
 
 - 回答には出典（東京都オープンデータカタログのデータセットリンク）を100%強制付与
 - CC BY 4.0の出典表示義務を設計レベルで自動達成
@@ -101,10 +103,24 @@ docs/                 # AI仕様駆動開発ドキュメント（索引は docs/
 
 ## 公開URL
 
+すべて手動デプロイ（`npm run deploy`）。以下は 2026-08-22 に本番へ実際に到達することを確認した。
+
 | URL | 内容 |
 | --- | --- |
-| <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev> | アプリ本体（実装中） |
+| <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev> | **アプリ本体（本番）**。プラン画面・あなたへ画面が `/api/*` 経由で D1 の実データを引く |
+| <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev/gaps> | **データ還元ダッシュボード（管理画面）**。答えられなかった問いの集計を東京都・GovTech東京向けに見せる（下記） |
+| <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev/mcp> | **MCP エンドポイント**。AI クライアント向けの基盤開放面。ブラウザで開く URL ではない（JSON-RPC。仕様は [MCP.md](docs/02-design/MCP.md)） |
 | <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev/showcase/> | **デザインプロトタイプ**（5画面・日英）。デザインの正典であり実装ではない |
+
+### 管理画面 — データ還元ダッシュボード（`/gaps`）
+
+答えられなかった問い（未回答ログ）の**エスカレーション先の画面**。旅行者向けの5機能とは対象ユーザーが違う（東京都・GovTech東京向け）ため、タブには加えず独立 URL に置いている。実装は `src/features/gaps/GapsDashboard.tsx`、データ源は `GET /api/gaps/summary`（契約は [API.md](docs/02-design/API.md) §3.4）。
+
+- **見せるもの** — D1 `gaps` の総数・理由別（データ未公開 / 粒度不足 / 対象エリア外 / その他）・エリア別・理由×エリア別の集計。画面側に固定件数は持たず、開いた時点のスナップショットを表示する
+- **どこから記録が来るか** — `/api/*` と `/mcp` の**両経路**の未回答が同じように D1 へ残る（`worker/core/gaps.ts`・ADR-008）
+- **都への提出プロセスは構想で、実装していない** — この画面が担うのは集計の可視化まで。画面上にもその旨を表示している
+- **個票は公開しない** — 利用者が入力した質問文は出さず、`area` も既知の公開地名か「その他のエリア」へ丸めた集計値だけを返す
+- **認証はない** — POC 段階のため認証は実装しない方針（[MASTER.md](docs/MASTER.md)）。URL を知れば誰でも開ける前提で、上記のとおり個票を持たせていない
 
 ## 開発
 
