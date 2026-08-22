@@ -1,6 +1,6 @@
 ---
 title: "API"
-version: "1.14.0"
+version: "1.15.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -14,9 +14,9 @@ changeImpact: "medium"
 >
 > 両面は `worker/core/` の**同じコア操作**を露出する薄い皮であり、**入出力スキーマと共通仕様の SSOT は本書 §3・§4 に置く**（MCP.md には二重定義しない）。
 >
-> **コア3操作（§3.1〜§3.3）のエンドポイントパス・操作名・入出力スキーマは 2026-08-17 に確定した**（Issue #22）。§3.4 の追加候補（`recommend_spots` / `report_gap`）は引き続き**仮称・未確定**で、実装時に確定させること（推測で確定扱いにしない）。
+> **コア3操作（§3.1〜§3.3）のエンドポイントパス・操作名・入出力スキーマは 2026-08-17 に確定した**（Issue #22）。§3.5 の追加候補（`recommend_spots` / `report_gap`）は引き続き**仮称・未確定**で、実装時に確定させること（推測で確定扱いにしない）。
 >
-> 実装状況（2026-08-22）: `GET /api/health` と コア3操作。**中身はもう固定データのスタブではない** — `aggregate_dataset` は D1 を実照会し（Text-to-SQL・[Issue #119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119)）、`search_datasets` は自然文だけの呼び出しを LLM で構造化入力へ分解してから既存のキーワード判定へ渡す（メタデータRAG・[Issue #120](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/120)。候補のマッチ自体は今もキーワード表が行う）。**入出力の形は Step 5 でも変えていない**ので、フロントエンドは今の形に対して実装してよい。LLM やD1 が使えないときは、どちらもスタブ時代の実装へ**縮退**する（§4）。
+> 実装状況（2026-08-22）: `GET /api/health`、コア3操作、`GET /api/gaps/summary`。**コア3操作の中身はもう固定データのスタブではない** — `aggregate_dataset` は D1 を実照会し（Text-to-SQL・[Issue #119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119)）、`search_datasets` は自然文だけの呼び出しを LLM で構造化入力へ分解してから既存のキーワード判定へ渡す（メタデータRAG・[Issue #120](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/120)。候補のマッチ自体は今もキーワード表が行う）。**入出力の形は Step 5 でも変えていない**ので、フロントエンドは今の形に対して実装してよい。LLM やD1 が使えないときは、どちらもスタブ時代の実装へ**縮退**する（§4）。
 >
 > 入出力の TypeScript 型は [`shared/core.ts`](../../shared/core.ts) にあり、`worker/`（実装）と `src/`（React）が同じ定義を参照する。本書と型定義がずれたら本書を正とする。
 
@@ -47,7 +47,7 @@ changeImpact: "medium"
 
 ## 3. エンドポイント一覧
 
-コア操作名（`search_datasets` 等）は `worker/core/` の関数名および `/mcp` のツール名に対応する共通の語彙。§3.1〜§3.3 は確定済み、§3.4 は仮称。
+コア操作名（`search_datasets` 等）は `worker/core/` の関数名および `/mcp` のツール名に対応する共通の語彙。§3.1〜§3.3 は確定済み。§3.4 は React の還元ダッシュボード専用の読み取り API で、MCP ツールには公開しない。§3.5 は仮称。
 
 ### 3.0 `GET /api/health` — 疎通確認（実装済み）
 
@@ -239,7 +239,22 @@ interests=["ラーメン","文化","家族向け","自然"] / limit=4（修正�
 | 複数データセット横断 | 入力の `query` を各 source に同じ値で複写する（source ごとに別のクエリを持たせない）。同じ `datasetId` を重ねて渡されても出典は1件にまとめる。**知らない `datasetId` が1件でも混ざったら、既知のぶんだけ返さず全体を `unanswered` にする**（黙って落とすと呼び出し側が「出典が揃った」と誤認するため） |
 | 未確定 | 複数ソースを画面上でどう並べるか（表示ルールはフロントエンド側の決定事項） |
 
-### 3.4 追加候補（未実装）
+### 3.4 `GET /api/gaps/summary` — 未回答ログ集計（実装済み）
+
+D1 `gaps` の発生件数を、都・GovTech東京向け還元ダッシュボード（`/gaps`）へ返す。
+
+| 項目 | 内容 |
+| ---- | ---- |
+| 入力 | なし |
+| 出力 | `{ total, byReason, byArea, byReasonAndArea }`。`byReason` は `{ reason, count }[]`、`byArea` は `{ area: string \| null, count }[]`、`byReasonAndArea` は `{ reason, area: string \| null, count }[]` |
+| 並び順 | 件数の降順。同数なら理由は §4 の列挙順、エリアは `null`（エリア指定なし）を先にして文字列順 |
+| 0件 | `total: 0` と3つの空配列を返す。見せるための件数を補わない |
+| 個票 | **返さない。** `gaps.question` は利用者の自由入力で個人情報を含む可能性がある。認証のない公開 API は `reason` / `area` / 件数だけを SQL で読み、質問文を処理境界へ入れない |
+| MCP | 公開しない。コア3操作の再利用面ではなく、React の行政向け集計画面専用 |
+
+画面には、この集計を東京都・GovTech東京への公開リクエストにまとめることが**構想**であり、提出プロセス自体は未実装だと明記する。集計値が存在しても「提出済み」「送信済み」とは扱わない。
+
+### 3.5 追加候補（未実装）
 
 | コア操作 | 用途 | 状態 |
 | ------ | ---- | ---- |
@@ -264,7 +279,7 @@ interests=["ラーメン","文化","家族向け","自然"] / limit=4（修正�
 
 ### 応答の必須要素
 
-すべての応答は次のいずれかの形をとる。
+コア3操作の応答は次のいずれかの形をとる（疎通確認と §3.4 の集計 API は対象外）。
 
 1. **回答あり**: 結果 ＋ 根拠情報（`status: "answered"`）
 2. **回答なし**: 未回答理由の分類 ＋ 確かめた事実を述べる `message`（`status: "unanswered"`）
@@ -364,6 +379,18 @@ interests=["ラーメン","文化","家族向け","自然"] / limit=4（修正�
 - **サンドボックス環境**: 未定
 
 ## Changelog
+
+### [1.15.0] - 2026-08-22
+
+#### 追加
+
+- [Issue #193](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/193) の `GET /api/gaps/summary` 契約を §3.4 に追加。総数・理由別・エリア別・理由×エリア別を D1 実データから返し、0件を補わない
+- 個票の `gaps.question` は利用者の自由入力なので公開せず、集計列だけを SQL で読むプライバシー境界を確定
+- `/gaps` 画面では、都への提出プロセスが実装済みではなく**構想**だと明記する表示契約を追加
+
+#### 変更
+
+- 旧 §3.4「追加候補」を §3.5 へ移動し、§4 の回答形式の対象をコア3操作に限定（集計 API は `answered` / `unanswered` 形式ではないため）
 
 ### [1.14.0] - 2026-08-22
 

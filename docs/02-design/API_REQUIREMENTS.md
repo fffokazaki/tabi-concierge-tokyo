@@ -1,6 +1,6 @@
 ---
 title: "API_REQUIREMENTS"
-version: "1.7.1"
+version: "1.8.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-16"
@@ -41,6 +41,7 @@ changeImpact: "high"
 
 🗺️ プラン（`src/features/plan/PlanScreen.tsx`）。API.md の「フロントエンド5機能とコア操作の対応」表どおり、`search_datasets` → `aggregate_dataset` → `get_provenance` の3操作を `/api/*` 経由で使います。
 👤 旅のプロフィール（`TripSetupScreen.tsx`）はツール呼び出しなし（`Trip` はクライアント側のコンテキストとして保持するのみ）なので、本書には含めません。
+📊 データ還元ダッシュボード（`/gaps`・`src/features/gaps/GapsDashboard.tsx`）は `GET /api/gaps/summary` を使います。旅行者向け5機能とは対象ユーザーが異なるため、タブには加えず独立 URL に置きます。
 
 ---
 
@@ -235,6 +236,35 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 
 ---
 
+## 4. `GET /api/gaps/summary` — 還元ダッシュボード
+
+### 呼び出しタイミング
+
+`/gaps` を開いたときに1回呼び出す。結果は D1 `gaps` の現時点のスナップショットで、画面側に固定件数を持たない。
+
+### 出力
+
+```ts
+{
+  total: number;
+  byReason: Array<{ reason: UnansweredReason; count: number }>;
+  byArea: Array<{ area: string | null; count: number }>;
+  byReasonAndArea: Array<{
+    reason: UnansweredReason;
+    area: string | null;
+    count: number;
+  }>;
+}
+```
+
+- `area: null` は画面で「エリア指定なし」と表示する
+- `reason` は日本語ラベルへ変換するが、API の閉じた英語列挙値は変えない
+- `total: 0` では「未回答の記録はまだありません」と表示し、ダミーの棒グラフや件数を置かない
+- 画面に**「構想」**と、東京都・GovTech東京への提出プロセス自体は未実装である旨を明記する
+- `gaps.question` は表示にも応答型にも含めない。利用者の自由入力を認証なしで公開しないため、個票は集計の入力にだけ使う
+
+---
+
 ## 前提として確認したいこと（API.md 側で未定の項目）
 
 以下は API.md 自体が「未定」としている項目です。
@@ -254,6 +284,13 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 | `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物が返るとは限らない。** 保証は1つだけで、訊かれた代表エリアの行をそのデータセットが1行も収録していなければ `unanswered` にする（別エリアの行では埋めない）。それ以外は返る行の `area` を実行後に検証していないため、「上野の…」と訊いて浅草の行が返りうる（[Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152)）。**返ってきた `name` を「訊いたエリアの施設」として扱わないこと。** 詳細は [API.md](./API.md) §3.2 |
 
 ## Changelog
+
+### [1.8.0] - 2026-08-22
+
+#### 追加
+
+- [Issue #193](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/193) のデータ還元ダッシュボードと `GET /api/gaps/summary` のフロントエンド要件を §4 に追加
+- 0件表示、`area: null` のラベル、都への提出が**構想**であることの表示、個票 `question` を外へ出さない境界を確定
 
 ### [1.7.1] - 2026-08-22
 

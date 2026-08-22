@@ -1,8 +1,11 @@
 import { AppTabs } from "./features/plan/AppTabs";
 import { HealthPanel } from "./features/health/HealthPanel";
 import { ApiConsole } from "./features/console/ApiConsole";
+import { GapsDashboard } from "./features/gaps/GapsDashboard";
 
 export function App() {
+  if (window.location.pathname.replace(/\/+$/, "") === "/gaps") return <GapsDashboard />;
+
   return (
     <>
       <AppTabs />

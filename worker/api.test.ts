@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { env } from "cloudflare:workers";
 import type { AggregateDatasetOutput, GetProvenanceOutput, SearchDatasetsOutput } from "../shared/core";
 import { DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT } from "./core/operations";
 import {
@@ -57,6 +58,65 @@ const search = async (body: unknown) => readJson<SearchDatasetsOutput>(await pos
 const aggregate = async (body: unknown) =>
   readJson<AggregateDatasetOutput>(await postJson("/api/aggregate-dataset", body));
 const provenance = async (body: unknown) => readJson<GetProvenanceOutput>(await postJson("/api/provenance", body));
+
+describe("GET /api/gaps/summary", () => {
+  beforeEach(clearGaps);
+
+  it("D1 の gaps を理由別・エリア別・理由×エリア別に集計して返す", async () => {
+    await env.DB.batch([
+      env.DB.prepare(
+        "INSERT INTO gaps (question, area, reason) VALUES (?, ?, ?)",
+      ).bind("上野でラーメンを探したい", "上野", "insufficient_granularity"),
+      env.DB.prepare(
+        "INSERT INTO gaps (question, area, reason) VALUES (?, ?, ?)",
+      ).bind("上野の麺料理を探したい", "上野", "insufficient_granularity"),
+      env.DB.prepare(
+        "INSERT INTO gaps (question, reason) VALUES (?, ?)",
+      ).bind("マナーを知りたい", "data_not_published"),
+      env.DB.prepare(
+        "INSERT INTO gaps (question, area, reason) VALUES (?, ?, ?)",
+      ).bind("新宿の美術館", "新宿", "out_of_area"),
+    ]);
+
+    const response = await request("/api/gaps/summary");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/json");
+
+    const body = await readJson<Record<string, unknown>>(response);
+    expect(body).toEqual({
+      total: 4,
+      byReason: [
+        { reason: "insufficient_granularity", count: 2 },
+        { reason: "data_not_published", count: 1 },
+        { reason: "out_of_area", count: 1 },
+      ],
+      byArea: [
+        { area: "上野", count: 2 },
+        { area: null, count: 1 },
+        { area: "新宿", count: 1 },
+      ],
+      byReasonAndArea: [
+        { reason: "insufficient_granularity", area: "上野", count: 2 },
+        { reason: "data_not_published", area: null, count: 1 },
+        { reason: "out_of_area", area: "新宿", count: 1 },
+      ],
+    });
+    expect(JSON.stringify(body)).not.toContain("上野でラーメンを探したい");
+    expect(JSON.stringify(body)).not.toContain("マナーを知りたい");
+  });
+
+  it("gaps が空なら 0 件と空の内訳を返す", async () => {
+    const response = await request("/api/gaps/summary");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      total: 0,
+      byReason: [],
+      byArea: [],
+      byReasonAndArea: [],
+    });
+  });
+});
 
 describe("POST /api/search-datasets", () => {
   it("代表エリアの質問には実在データセットの候補を返す", async () => {
