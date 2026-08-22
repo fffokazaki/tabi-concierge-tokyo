@@ -1,5 +1,5 @@
 // 旅コンシェルジュTOKYO — 提出資料（16:9・14枚）
-// 文言の SSOT: docs/submission-deck.md v1.20.0 / docs/02-design/DATABASE.md §2
+// 文言の SSOT: docs/submission-deck.md v1.21.0 / docs/02-design/DATABASE.md §2
 //
 // 縦のリズム: kicker 0.24 / title 0.55–1.55 / 本文 1.95–6.85 / 下マージン 0.65
 const pptxgen = require("pptxgenjs");
