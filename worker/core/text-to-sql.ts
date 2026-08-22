@@ -1,6 +1,7 @@
-import type { AggregateDatasetInput, AggregateResult } from "../../shared/core";
+import { REPRESENTATIVE_AREAS, type AggregateDatasetInput, type AggregateResult } from "../../shared/core";
 import type { CatalogEntry } from "./catalog";
 import type { CoreDeps } from "./llm";
+import { findRepresentativeArea } from "./search-gaps";
 import { ALLOWED_TABLES, guardSelect, MAX_LIMIT } from "./sql-guard";
 
 /**
@@ -140,6 +141,289 @@ type Facets = { categories: string[]; areas: string[] };
 const MAX_FACET_VALUES = 20;
 
 /**
+ * 生成 SQL が「この dataset_id の行に実際に入っている値」だけで絞っているかを検査する
+ * （[Issue #148](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/148)）。
+ *
+ * **プロンプトは前から同じことを頼んでいた。頼んでいるだけで検査していなかった。**
+ * 本番（Version `c957fa38`・2026-08-22）で採取した2つの形は、どちらも一覧に無い語で絞って
+ * 0行になり、45行・123行あるデータセットについて「当てはまる行は見つかりませんでした」という
+ * **偽の未回答**を返していた:
+ *
+ * ```sql
+ * -- 名所・史跡（45行）: 興味の語を name に当てにいった
+ * ... AND (category IN ('名所・史跡') OR area IN ('上野','浅草'))
+ *     AND (name LIKE '%ラーメン%' OR name LIKE '%自然%' OR name LIKE '%文化%' OR name LIKE '%家族向け%')
+ * -- 都市公園・都立公園一覧（123行・category は「公園」だけ）: 無い値で絞った
+ * ... AND category IN ('自然','文化') AND area = '渋谷'
+ * ```
+ *
+ * 0行そのものは答えでありうる（DOMAIN.md §7）が、**それは問いが成立している場合の話**である。
+ * 存在しない値で絞った結果の0行を「無い」と報告すると、確かめていないことを主張することになり
+ * （CLAUDE.md 絶対ルール #1）、`gaps` に偽の欠損が記録される。
+ *
+ * ## リテラルだけを見ても足りない ―― 列と演算子まで見る
+ *
+ * 値の集合だけで照合すると、次の2つが素通りする（どちらも0行になる）:
+ *
+ * | 素通りする形 | なぜ0行か |
+ * | --- | --- |
+ * | `category = '上野'` | 「上野」は実在値だが **area の**実在値。category には無い |
+ * | `category = '文化'`（実値は「区民文化財」） | 部分一致が成立するのは `LIKE` のときだけ。`=` では当たらない |
+ *
+ * なので列ごとの実在値と突き合わせ、**完全一致は `=` / `IN` に、部分一致は `LIKE` に**限る。
+ *
+ * ## 通すもの
+ *
+ * - `dataset_id = '<この ID>'`（必須なので当然通る。別の ID は拒否）
+ * - 空文字（`note` は空のことがある。本番で `answered` を返していた SQL に含まれる形）
+ * - `area` に対する**代表エリア名**（上野・浅草・渋谷）。訊かれたエリアをこのデータセットが
+ *   収録していないときの0行は**正しい未回答**なので、ここを弾くと「別のエリアの行」を返す方へ
+ *   誘導してしまう
+ *
+ * 検査するのは `dataset_id` / `category` / `area` の条件だけ。`name` などの列は**通す**
+ * （「寛永寺に行きたい」のように名指しされた施設を選ぶ SQL を弾くと、別の行へすり替わる）。
+ * 当たらない name 条件は0行になるので、`countRelaxed` の裏取り側で捕まえる ―― **この検査は
+ * 「速く・具体的に書き直させる」ための道具であって、最後の歯止めではない**。歯止めは
+ * `countRelaxed`（0行のときデータに数え直させる）である。
+ *
+ * 照合に使うのは `readFacets` が読んだ一覧＝**プロンプトで見せた一覧そのもの**である
+ * （`MAX_FACET_VALUES` で切り詰めた分も同じ）。見せていない値で絞られても検査を通してしまうと、
+ * 「見せた値だけで絞れ」という指示を検査で裏づけたことにならない。
+ */
+function findFilterProblems(sql: string, entry: CatalogEntry, facets: Facets): string[] {
+  const problems: string[] = [];
+  const add = (problem: string) => {
+    if (!problems.includes(problem)) problems.push(problem);
+  };
+
+  for (const use of literalUses(sql)) {
+    if (use.value === "") continue; // 空文字との比較は値を作り出していない
+    if (use.column === "dataset_id") {
+      // `!=` は対象外のデータセット全部を指す。値が正しくても演算子が逆なら限定にならない
+      if (use.op !== "=" || use.value !== entry.datasetId) {
+        add(`dataset_id は = で '${entry.datasetId}' に限定してください（否定や部分一致は使わない）。`);
+      }
+      continue;
+    }
+    if (use.column === "category" || use.column === "area") {
+      const actual = use.column === "area" ? [...facets.areas, ...REPRESENTATIVE_AREAS] : facets.categories;
+      const problem = judgeAgainstActual(use, actual);
+      if (problem) add(problem);
+      continue;
+    }
+    // それ以外の列（`name` など）は**通す**。「寛永寺に行きたい」のように利用者が名指しした
+    // 施設を選ぶ SQL まで弾いてしまうと、別の行へすり替わる（レビュー指摘・信頼度97）。
+    // 当たらない name 条件（興味の語を当てにいく形）は0行になるので、`countRelaxed` の
+    // 裏取りが捕まえる ―― **形で禁じるのではなく、0行になったときにデータで判定する**
+  }
+  return problems;
+}
+
+/**
+ * 列の実在値と突き合わせる。完全一致は `=` / `IN`、パターン一致は `LIKE` のときだけ許す。
+ *
+ * **否定は許さない。** `category NOT IN ('公園')` は実在値を使っていても「全部除外して0行」に
+ * なりうる ―― 実在値かどうかだけを見ると素通りする（レビュー指摘・信頼度98）。
+ *
+ * **`LIKE` はワイルドカードの位置まで見る。** `LIKE '文化'` はワイルドカードが無いので
+ * SQLite では完全一致であり、実値が「区民文化財」なら0行になる。`includes` で判定すると
+ * これが通ってしまう（同・信頼度97）。SQL と同じ意味で照合する。
+ */
+function judgeAgainstActual(use: LiteralUse, actual: string[]): string | undefined {
+  const listed = actual.length > 0 ? `「${actual.join("」「")}」` : "（1件もありません）";
+  if (use.op === "LIKE") {
+    if (actual.some((value) => likeMatches(use.value, value))) return undefined;
+    return (
+      `${use.column} に「${use.value}」に当たる値はありません（LIKE はワイルドカードの位置まで効きます）。` +
+      `実際に入っているのは ${listed} です。`
+    );
+  }
+  if (use.op !== "=" && use.op !== "IN") {
+    return (
+      `${use.column} を「${use.op}」で絞らないでください。除外の条件は全行を落として0行になりえます。` +
+      "使ってよいのは =、IN、LIKE です。"
+    );
+  }
+  if (actual.includes(use.value)) return undefined;
+  return (
+    `${use.column} の値は ${listed} です。「${use.value}」は完全一致しないので0行になります。` +
+    "一覧の値をそのまま書くか、部分一致させたいなら LIKE を使ってください。"
+  );
+}
+
+/**
+ * SQLite の `LIKE` と同じ意味で照合する（`%` は0文字以上・`_` は1文字）。
+ *
+ * 位置を無視して「含むかどうか」で見ると、`LIKE '文化%'`（前方一致）が「区民文化財」に
+ * 当たると誤判定する。**検査は実行される意味と同じでなければ、検査したことにならない**
+ * （[ACE-137-1](../../docs/08-knowledge/playbook/architecture.md#ace-137-1) と同じ筋）。
+ *
+ * **正規表現に変換しない。** `%` を `[\s\S]*` へ写すと `%%%…X%%%` のようなパターンが
+ * 破滅的バックトラックを起こす ―― 実測で `%` 40個 × 200文字の非一致に対し **2分でも終わらなかった**
+ * （`likeMatches` は LLM が書いた文字列を毎回受け取るので、これは Worker の CPU を焼く経路になる）。
+ * 貪欲マッチの位置を覚えて戻る、素直な線形の照合にしてある。
+ */
+function likeMatches(pattern: string, value: string): boolean {
+  // SQLite の LIKE は ASCII の大小を区別しない。日本語は元から区別されないので影響しない
+  const chars = [...pattern.toLowerCase()];
+  const target = [...value.toLowerCase()];
+  let p = 0;
+  let v = 0;
+  let star = -1;
+  let resume = 0;
+  while (v < target.length) {
+    if (p < chars.length && (chars[p] === "_" || chars[p] === target[v])) {
+      p++;
+      v++;
+      continue;
+    }
+    if (p < chars.length && chars[p] === "%") {
+      star = p++;
+      resume = v;
+      continue;
+    }
+    if (star < 0) return false;
+    // 直前の `%` が1文字多く飲み込んだ、として再開する（戻り先は1つだけなので指数爆発しない）
+    p = star + 1;
+    v = ++resume;
+  }
+  while (p < chars.length && chars[p] === "%") p++;
+  return p === chars.length;
+}
+
+/** 文字列リテラルと、その直前に現れる「列 演算子」。 */
+type LiteralUse = { value: string; column?: string; op?: string };
+
+/**
+ * SQL 中の文字列リテラルを、直前の「列 演算子」つきで取り出す。
+ *
+ * **検査するのは `guardSelect` を通ったあとの文字列**（＝実際に D1 へ渡すもの）である。
+ * 生成された生テキストを見て別の文字列を実行すると、その差がそのまま迂回路になる
+ * （[ACE-137-1](../../docs/08-knowledge/playbook/architecture.md#ace-137-1)）。
+ *
+ * **ダブルクォートも見る。** SQLite は `"自然"` を「その名前の列が無ければ文字列」として
+ * 扱うため、`category = "自然"` は**エラーにならず0行を返す**（実測。D1 で確認したうえで
+ * `text-to-sql.test.ts` に固定した）。シングルクォートだけ見ていると、この書き方が
+ * そのまま偽の未回答になる。ただし `"name"` のような**識別子としての**引用もあるので、
+ * 直前に「列 演算子」が読み取れたときだけ値として扱う。
+ */
+function literalUses(sql: string): LiteralUse[] {
+  const uses: LiteralUse[] = [];
+  let i = 0;
+  while (i < sql.length) {
+    const quote = sql[i];
+    if (quote !== "'" && quote !== '"') {
+      i++;
+      continue;
+    }
+    const start = i;
+    i++;
+    let value = "";
+    while (i < sql.length) {
+      if (sql[i] === quote) {
+        if (sql[i + 1] === quote) {
+          value += quote;
+          i += 2;
+          continue;
+        }
+        i++;
+        break;
+      }
+      value += sql[i];
+      i++;
+    }
+    const context = contextOf(sql.slice(0, start));
+    // ダブルクォートは「列 演算子」が読み取れたときだけ値とみなす（識別子の引用と区別する）
+    if (quote === '"' && context.column === undefined) continue;
+    uses.push({ value, ...context });
+  }
+  return uses;
+}
+
+/**
+ * リテラルの直前から「列 演算子」を読む。`IN ('a','b')` の2つ目以降も同じ列に結びつける。
+ * 読み取れなければ `undefined` を返し、呼び出し側が拒否する（読めないものは通さない）。
+ */
+const LITERAL_CONTEXT =
+  /([A-Za-z_][A-Za-z0-9_]*)\s*(=|<>|!=|(?:not\s+)?like|(?:not\s+)?in)\s*\(?\s*(?:(?:'(?:[^']|'')*'|"(?:[^"]|"")*")\s*,\s*)*$/i;
+
+function contextOf(before: string): { column?: string; op?: string } {
+  const matched = LITERAL_CONTEXT.exec(before);
+  if (!matched) return {};
+  // **`NOT` を潰さない。** `NOT LIKE` を `LIKE` に正規化すると、除外の条件が
+  // 「当たる LIKE」として通ってしまう（レビュー指摘）
+  const op = matched[2]!.toUpperCase().replace(/\s+/g, " ");
+  return { column: matched[1]!.toLowerCase(), op };
+}
+
+/**
+ * 「絞り込みを全部外したら何行あるか」をデータに訊く（[Issue #148](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/148)）。
+ *
+ * ## なぜ形の検査だけでは閉じないか
+ *
+ * 生成 SQL の書き方を並べて禁じる検査は、レビューのたびに新しい抜け道が出た ―― 数値比較
+ * （`AND 1 = 0`）・`IS NULL`・外側の `NOT`・空文字との比較・定数式。**どれも「実在値だけで
+ * 絞れ」を満たしたまま0行にできる。** 形の列挙では閉じない。
+ *
+ * 0行になった時点で「dataset_id（＋訊かれたエリア）だけ」で数え直せば、**絞り込みが強すぎたのか
+ * 本当に無いのか**がデータで分かる。どんな書き方をされても効くのでここが最後の歯止めになる。
+ * 推論は増えない（D1 を1回引くだけ）。
+ *
+ * **エリアは緩めない。** 「渋谷の…」と訊かれて渋谷の行が無いとき、エリアまで外して数えると
+ * 上野の行が見つかり「絞りすぎ」と誤判定してしまう ―― 書き直しの果てに**別のエリアの行**を
+ * 返す方へ誘導することになる（それは偽の未回答よりさらに悪い）。
+ *
+ * ## この裏取りで「未回答」の意味が変わる
+ *
+ * category は緩めるので、`aggregate_dataset` が返す0行の未回答は
+ * **「このデータセットには（訊かれたエリアに）行が1件も無い」**を意味するようになる。
+ * 「浅草の博物館」と訊かれて博物館の行だけが無い場合は、未回答ではなく**そのデータセット・
+ * そのエリアの別の行**が返る。
+ *
+ * これは意図した挙動である ―― **どのデータセットを使うかは `search_datasets` が既に決めていて、
+ * ここは関連性を審査し直す場ではない**（このファイル冒頭の doc・Issue #78 の `query` 文言・
+ * Issue #140 の絞り込み緩和と同じ判断）。ただし [DOMAIN.md](../../docs/02-design/DOMAIN.md) §7 は
+ * `gaps` をデータ公開リクエストの一次情報として扱うので、**ここで記録される欠損を
+ * 「問いに合う行が無かった」と読まないこと。**
+ *
+ * ## 引き受けたトレードオフ
+ *
+ * 名指しされた施設（「浅草寺に行きたい」→ `name LIKE '%浅草寺%'`）がこのデータセットに無い場合も
+ * 0行になり、裏取りは「エリアに行はある」と判定して書き直させる ―― 結果、**同じデータセットの
+ * 別の施設**が返る。「浅草寺が見つからなかった」とは言わない。
+ *
+ * リテラルだけを見て「興味の語（ラーメン）」と「施設名（浅草寺）」を区別する決定的な方法は無い
+ * （どちらも利用者の入力語である）。**偽の未回答を残すより、選んだデータセットの実在する行を
+ * 返す方を採った** ―― name の条件を書かなければ同じ行が返るので、これは name 条件に固有の
+ * 損失ではない。すり替えを利用者に伝えるかどうかは [#153](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/153) で扱う。
+ */
+async function countRelaxed(
+  input: AggregateDatasetInput,
+  entry: CatalogEntry,
+  deps: CoreDeps,
+): Promise<{ ok: true; count: number } | { ok: false; cause: string }> {
+  const area = findRepresentativeArea(input.intent);
+  const escapedId = entry.datasetId.replace(/'/g, "''");
+  const areaClause = area ? ` AND area = '${area.replace(/'/g, "''")}'` : "";
+  const result = await deps.sql.select(
+    `SELECT COUNT(*) AS n FROM spots WHERE dataset_id = '${escapedId}'${areaClause} LIMIT 1`,
+  );
+  // **数えられなかったときに 0 を返さない。** 0 は「本当に無い」＝データ欠損の主張になり、
+  // 障害がそのまま `gaps` へ記録される（API.md §4 の「障害と未回答を混ぜない」に反する）
+  if (!result.ok) return { ok: false, cause: `裏取りの照会に失敗しました: ${String(result.cause)}` };
+  const n = result.rows[0]?.["n"];
+  return { ok: true, count: typeof n === "number" ? n : 0 };
+}
+
+/** 書き直しの指示に使う一文。何件あるかまで見せないと、同じ SQL を書き直してくる。 */
+function describeRelaxed(input: AggregateDatasetInput, count: number): string {
+  const area = findRepresentativeArea(input.intent);
+  return area
+    ? `この dataset_id には「${area}」の行が ${count} 件あります`
+    : `この dataset_id には ${count} 件の行があります`;
+}
+
+/**
  * `category` / `area` の実在値を D1 から読む。**LLM は使わない**（推論回数を増やさない）。
  *
  * SQL に埋める `dataset_id` は `entry.datasetId`（カタログの定数）であって、利用者入力の
@@ -249,6 +533,20 @@ async function attemptTextToSql(
       continue;
     }
 
+    // 実在しない値で絞っていないか（Issue #148）。**実行する前に**見る ―― 実行してしまうと
+    // 0行が返り、それが「探したが無かった」という答えとして利用者にも gaps にも流れる
+    const problems = findFilterProblems(guarded.sql, entry, facets);
+    if (problems.length > 0) {
+      previousError = problems.join("\n");
+      console.warn("[text-to-sql] 実在しない値で絞る SQL を拒否しました", {
+        attempt,
+        datasetId: input.datasetId,
+        problems,
+        sql: guarded.sql,
+      });
+      continue;
+    }
+
     const executed = await deps.sql.select(guarded.sql);
     if (!executed.ok) {
       previousError = `SQL の実行に失敗しました: ${String(executed.cause)}`;
@@ -270,7 +568,24 @@ async function attemptTextToSql(
     }
 
     if (executed.rows.length === 0) {
-      // (c) 障害ではない。「探したが無かった」という答えである
+      // **「無かった」と言う前に、緩めた問いでも0行かをデータに訊く**（Issue #148）。
+      // 絞り込みが強すぎただけなら、それは答えではなく書き直すべき SQL である
+      const relaxed = await countRelaxed(input, entry, deps);
+      // 裏取りができないなら「無かった」とは言えない。障害として縮退する
+      if (!relaxed.ok) return { kind: "failed", cause: relaxed.cause };
+      if (relaxed.count > 0) {
+        previousError =
+          `この SQL は0行でした。ただし ${describeRelaxed(input, relaxed.count)}。絞り込みが強すぎます。` +
+          "category の条件を外し、エリア（訊かれている場合）だけで絞って書き直してください。";
+        console.warn("[text-to-sql] 0行だが緩めれば行がある SQL を拒否しました", {
+          attempt,
+          datasetId: input.datasetId,
+          relaxed: relaxed.count,
+          sql: guarded.sql,
+        });
+        continue;
+      }
+      // (c) 障害ではない。「探したが無かった」という答えである ―― 緩めても0行なので earned
       return { kind: "empty", sql: guarded.sql };
     }
 

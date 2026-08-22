@@ -534,6 +534,10 @@ async function resolveAggregate(
     return { status: "answered", result: outcome.result, query: outcome.query };
   }
   if (outcome.kind === "empty") {
+    // **0行になった SQL を残す。** 応答にも `gaps` にも SQL は載らないので、ここで記録しないと
+    // 「本当に無かった」のか「変な絞り込みで0行になった」のかを後から区別できない ―― Issue #148 は
+    // まさにそれで、実データに45行あるのに偽の未回答が返っていることに気づくまで時間がかかった
+    console.warn("[aggregate] 生成 SQL が0行を返しました", { datasetId: input.datasetId, sql: outcome.sql });
     return sqlNoRowUnanswered(guard.entry.title, input.intent);
   }
 
