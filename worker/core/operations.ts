@@ -485,9 +485,9 @@ const describeQuery = (entry: CatalogEntry, sample: CatalogSample, selection: st
  * 集計・抽出。前段ガードの後、主経路は Text-to-SQL で D1 を実照会し、
  * 障害・不正出力時は固定サンプル抽出へ縮退する。
  *
- * 縮退経路は固定サンプルを指定エリアで絞る。一方、主経路は返る行の `area` を実行後に
- * 検証していないため、指定エリアの行だけを返すとは保証しない。エリアに関する保証と
- * 既知の制約は API.md §3.2 を参照。
+ * 縮退経路は固定サンプルを指定エリアで絞り、主経路も返った行の `area` を実行後に照合する。
+ * intent から代表エリアを読み取れた場合は、そのエリアと一致する行だけを回答候補にする。
+ * エリアに関する保証と既知の制約は API.md §3.2 を参照。
  */
 export async function aggregateDataset(
   input: AggregateDatasetInput,
