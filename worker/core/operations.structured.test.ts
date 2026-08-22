@@ -280,19 +280,43 @@ describe("構造化入力: interests（訊かれた興味）", () => {
     ]);
   });
 
-  it("すべての興味に答えられなければ、従来どおり unanswered を返す（answered ＋ 全部 gaps にしない）", async () => {
-    const recorder = capturingGapRecorder();
-    const output = await searchDatasets({ query: "", interests: ["ショッピング"] }, recorder, stubDeps());
+  it.each([
+    {
+      label: "興味のみ",
+      input: { interests: ["ショッピング"] },
+      expectedMessage:
+        "利用中の10データセットのキーワードには、興味の語に当たるものがありませんでした。",
+      recordedQuestion: "ショッピング",
+    },
+    {
+      label: "質問文と興味",
+      input: { query: "演劇", interests: ["ショッピング"] },
+      expectedMessage:
+        "利用中の10データセットのキーワードには、質問文・興味の語に当たるものがありませんでした。",
+      recordedQuestion: "ショッピング、演劇",
+    },
+    {
+      label: "質問文のみ",
+      input: { query: "演劇" },
+      expectedMessage:
+        "利用中の10データセットのキーワードには、質問文の語に当たるものがありませんでした。",
+      recordedQuestion: "演劇",
+    },
+  ])(
+    "最後のフォールバックは $label の照合対象だけを message に述べる",
+    async ({ input, expectedMessage, recordedQuestion }) => {
+      const recorder = capturingGapRecorder();
+      const output = await searchDatasets(input, recorder, stubDeps());
 
-    expect(output.status).toBe("unanswered");
-    if (output.status !== "unanswered") return;
-    expect(output.reason).toBe("other");
-    // 質問文の無い呼び出しに「質問文の語」と書かない（実際に照合した入力だけを書く）
-    expect(output.message).toContain("興味");
-    expect(recorder.records).toEqual([
-      { question: "ショッピング", area: undefined, category: undefined, reason: "other" },
-    ]);
-  });
+      expect(output.status).toBe("unanswered");
+      if (output.status !== "unanswered") return;
+      expect(output.reason).toBe("other");
+      expect(output.message).toBe(expectedMessage);
+      expect(recorder.records).toEqual([
+        { question: recordedQuestion, area: undefined, category: undefined, reason: "other" },
+      ]);
+    },
+  );
 
   it("unanswered の早期 return でも、areas で明示された対象エリア外は gaps と記録に残る（Issue #70）", async () => {
     // ジャンル判定が unanswered を返しても、目的地と明示された新宿の out_of_area は
