@@ -1,6 +1,6 @@
 ---
 title: "submission-deck"
-version: "1.2.0"
+version: "1.3.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-21"
@@ -32,8 +32,8 @@ changeImpact: "medium"
 
 | 層 | 定義 | 該当 |
 | --- | --- | --- |
-| **稼働中** | 本番URLで今動く | 旅のプロフィール入力・プラン生成・あなたへ・出典チップ・`gaps` 記録・D1（10データセット / 1,645スポット） |
-| **設計済み・未実装** | 仕様が文書で確定していて、コードがまだ無い | MCP サーバー公開（[MCP.md](02-design/MCP.md)）・Text-to-SQL（[LLM-MODEL-CANDIDATES.md](06-reference/LLM-MODEL-CANDIDATES.md) でモデル選定済み）・データ公開リクエストの都への提出 |
+| **稼働中** | 本番URLで今動く | 旅のプロフィール入力・プラン生成・あなたへ・出典チップ・`gaps` 記録・D1（10データセット / 1,645スポット）・**`/mcp` のコア3操作公開**（[Issue #117](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/117)）・**Text-to-SQL による D1 実照会**（[Issue #119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119)）・**メタデータRAG による自然文の分解**（[Issue #120](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/120)） |
+| **設計済み・未実装** | 仕様が文書で確定していて、コードがまだ無い | データ公開リクエストの都への提出・コンシェルジュの別リポジトリ切り出しと MIT での OSS 公開（[Issue #129](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/129)） |
 | **デザイン構想** | 画面デザインのみ存在 | スキャン・周辺（`public/showcase/`） |
 
 ### 使う数字は3つに絞る
@@ -103,6 +103,13 @@ changeImpact: "medium"
 - [TASKS.md](07-project-management/TASKS.md) — 提出物タスクの進捗
 
 ## Changelog
+
+### [1.3.0] - 2026-08-22
+
+#### 変更
+
+- §1 の3層表を実装の現況に合わせた。**MCP サーバー公開と Text-to-SQL を「設計済み・未実装」から「稼働中」へ移した** — `/mcp` は本番で `tools/list` が3ツールを返し（2026-08-22 実測）、`aggregate_dataset` は D1 実照会で応答する（同日実測。[Issue #117](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/117) / [#119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119) / [#120](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/120) はいずれもマージ・デプロイ済み）。本書 v1.0 は #117 のマージ当日に書かれており、その時点の状態のまま据え置かれていた
+- 「設計済み・未実装」には、データ公開リクエストの都への提出と、コンシェルジュの別リポジトリ切り出し・MIT 公開（[Issue #129](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/129)）が残る
 
 ### [1.2.0] - 2026-08-22
 

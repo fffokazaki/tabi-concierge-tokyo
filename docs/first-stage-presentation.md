@@ -1,10 +1,10 @@
 ---
 title: "first-stage-presentation"
-version: "2.1.0"
+version: "2.1.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-21"
+updated: "2026-08-22"
 changeImpact: "high"
 ---
 
@@ -49,7 +49,7 @@ v1.0（2026-08-15）の台本は、その後1週間の実装と乖離した。�
 | v1.0 の主張 | 判定 | 実測（2026-08-21） |
 | --- | --- | --- |
 | #3「UIは実装済み」5画面 | 一部誤り | 動くのは3画面（プロフィール／プラン／あなたへ）。スキャン・周辺は `AppTabs.tsx` の `INACTIVE_TABS` で disabled |
-| #4「MCPでアプリに接続します」 | 誤り | MCP 未着手。`/api/*` のコア3操作で接続している |
+| #4「MCPでアプリに接続します」 | 誤り | 台本 v2.0 執筆時点では MCP 未着手で、`/api/*` のコア3操作で接続していた。**その後 `/mcp` は実装・デプロイされ、2026-08-22 時点では本番で3ツールを公開している**（[Issue #117](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/117)）。ただし React 側は引き続き `/api/*` を呼ぶ（[ADR-008](06-reference/DECISIONS.md)。React に MCP クライアントを実装するのは禁止）ため、「MCPでアプリに接続します」は**現在も誤り** |
 | #4「出典100%・CC BY 自動準拠」 | 真 | 10件全て CKAN `package_show` で検証済み |
 | #5「浅草と上野、ラーメンが好き」 | 真 | `insufficient_granularity` を理由付きで返す実装が稼働 |
 | #6「未回答を都へ自動還元」 | 真（記録まで） | `gaps` は本番 D1 で実際に行が増える。都への提出プロセスは構想 |
@@ -73,6 +73,12 @@ v1.0（2026-08-15）の台本は、その後1週間の実装と乖離した。�
 - 提出用キャプチャ（1600×900px・1〜3点）は[提出資料側](submission-deck.md) §5 のチェックリストで管理する
 
 ## Changelog
+
+### [2.1.1] - 2026-08-22
+
+#### 変更
+
+- §3 の事実照合表の #4 行を現況に更新。`/mcp` は [Issue #117](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/117) で実装・デプロイ済みで、本番で3ツールを公開している（2026-08-22 実測）。**「MCPでアプリに接続します」が誤りである結論は変わらない** — React 側は ADR-008 により `/api/*` を呼ぶため。台本本文（§2）は変更していない
 
 ### [2.1.0] - 2026-08-21
 
