@@ -1,6 +1,6 @@
 ---
 title: "submission-deck"
-version: "1.21.2"
+version: "1.22.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-21"
@@ -160,11 +160,16 @@ changeImpact: "medium"
   - **地図の帰属表示** — **地図を1枚も使っていない**ため規定の対象外。10点すべてを目視し、地図・航空写真・地図タイルが写っていないことを確認した。`src/` に地図ライブラリの依存は無く（`leaflet` / `mapbox` / `maps.google` いずれも0件）、showcase モックの `google` 参照は **Google Fonts**、`map` 参照は **`Array.prototype.map`**
   - **引用は出典明記** — スライド12が10件すべてに提供元・データセットID・カタログURL・CC BY 4.0 を明示。スライド6・7のキャプチャには出典チップ（データセット名・提供元・取得日・CC BY 4.0）が写り、スライド7には**マナー情報の「参考: JNTO」バッジと「日本政府観光局（JNTO）の公式ページ」リンクが実際に写っている**（オープンデータの「出典」と外部情報の「参考」を見た目で分ける [ADR-012](06-reference/DECISIONS.md) の実装が、資料の中でも確認できる）
 - [x] **スライド5のスキャン画面キャプチャを撮り直した**（2026-08-23）。旧 `deck-scan-showcase.png` は画面見出し「カメラを向けて、解説を見よう。」が**ステータスバー帯とダイナミックアイランドに重なって潰れていた**。撮り方の誤りを疑って同条件で撮り直したが**同じ結果**になり、原因は showcase モック側だと確定した —— ステータスバーは `z-index: 10` の絶対配置オーバーレイ（フレーム上端から64px）で、スキャン画面だけがその下に本文の上余白を持たない（周辺画面は持つ）。**撮影時に本文へ64pxの上余白を与えて**他画面と同じ見え方で撮り直した。モック本体の修正は [Issue #221](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/221)
-- [x] **著作権リスク1件を解消した（showcase の写真4点を除去）** — `public/showcase/.image-slots.state.json` に出典未記録の写真4点が data URI で埋め込まれていた（[Issue #222](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/222)）。チーム判断により**4点すべてを除去**し、sidecar を `{}` に固定した（124,215 → 3 バイト）。**PPTX には元々入っていない**（デッキが showcase から使うのはスキャン・周辺の2画面で、写真スロットがあるのはプラン・あなたへ側。デッキ内10点を全点目視して確認済み）ため、資料の再ビルドは不要
+- [x] **著作権リスク1件をリポジトリ側で除去した（showcase の写真4点）** — `public/showcase/.image-slots.state.json` に出典未記録の写真4点が data URI で埋め込まれていた（[Issue #222](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/222)）。チーム判断により**4点すべてを除去**し、sidecar を `{}` に固定した（124,215 → 3 バイト）。**本番反映は下の項目で別に追う**（この項目はリポジトリ側の除去のみを指す）。**PPTX には元々入っていない**（デッキが showcase から使うのはスキャン・周辺の2画面で、写真スロットがあるのはプラン・あなたへ側。デッキ内10点を全点目視して確認済み）ため、資料の再ビルドは不要
 
   **起票時の「画面には表示されていない」という限定条件は誤りだった**（2026-08-23 に本番で実測して訂正）。スロット ID はテンプレート生成で（`photoId` が `stop-<scenarioId>-<index>` と `rec-<recommendationId>` を組み立てる）、初期 state が `scenarioId: 'ramen'` / `activeInterest: 'Ramen'` のため**既定の描画で4枠すべてが出る**。本番の `/showcase/Japanese version.dc.html` を操作して確認したところ、プラン画面の3枠（浅草寺／上野公園の桜／ラーメン二郎 上野店の店舗外観・naturalSize 104×55 / 104×69 / 104×78）と「あなたへ」画面の1枠（同店の外観・**720×540**）が**実際に画面へ表示されていた**。露出は「JSON として取得可能」ではなく「ページ上で表示中」だった
 
-  除去後はローカル（`npm run dev`）で4枠すべてが破線のプレースホルダ（キャプション「写真」）になり、**レイアウト崩れなし・コンソールエラー0件**を実測。**本番反映には `npm run deploy` が必要**で、反映後の `GET /showcase/.image-slots.state.json` の実測結果は Issue #222 に記録する
+  除去後はローカル（`npm run dev`）で4枠すべてが破線のプレースホルダ（キャプション「写真」）になり、**レイアウト崩れなし・コンソールエラー0件**を実測。
+
+  **sidecar だけでは足りなかった。** `public/showcase/uploads/` の PDF 2点（`Gap_Design_new.pdf` / `Gap_Design_new_jap.pdf`）に**同じ写真3点が埋め込まれていた** —— 画像 XObject の実寸 **104×55 / 104×69 / 104×78** が sidecar 側の実測値と完全一致する（2026-08-23 実測）。両 PDF は git 追跡下で本番配信されていたため、sidecar を空にしても写真は本番から消えていなかった。PDF 2点と `Tourism.docx` を [`docs/02-design/design-canvas/`](02-design/design-canvas/) へ移し、`public/` 配下から外した。参照元（[API_REQUIREMENTS.md](02-design/API_REQUIREMENTS.md) §5・`src/features/plan/components/DataGapCard.tsx`）のパスも更新済み。**`public/` に置いたものは画面から到達できなくても全部配信される**
+
+  **除去漏れの網羅確認**（2026-08-23）: `data:image/*;base64` はリポジトリ全体で**0件**。`public/` 配下に残るバイナリは `demo/operation-demo.mp4`（h264・1600×900・25.13秒・**音声ストリーム0本**・6フレーム抽出して目視、写真0点でアイコンはカテゴリイラスト）と `showcase/.thumbnail`（旅のプロフィール画面のスクリーンショット）のみで、いずれも第三者写真を含まない
+- [ ] **上記を本番へ反映する（#222 の DoD）** — `npm run deploy` を実行し、`GET /showcase/.image-slots.state.json` が `{}` を返すこと、`GET /showcase/uploads/Gap_Design_new.pdf` と `..._jap.pdf` が PDF を返さないことを実測する。結果を [Issue #222](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/222) に記録してからクローズする
 - [ ] **提出フォームの「利用オープンデータ」入力時の注意** — 登録は**データURL＋タイトル**。No.10 の資料表記「都市公園・都立公園一覧（渋谷区）」のうち **（渋谷区）は資料内の識別用補足**で、カタログの登録タイトルは「都市公園・都立公園一覧」。この名前は**37件のデータセットが共有している**（2026-08-23 実測。自治体ごとに同名）ため資料側の補足は外さず、フォームには `t131130d2025000003` のURLを添えて登録する
 - [ ] **提出後ただちに収録枠を予約**（30分単位・早い者順）
 
@@ -177,6 +182,18 @@ changeImpact: "medium"
 - [TASKS.md](07-project-management/TASKS.md) — 提出物タスクの進捗
 
 ## Changelog
+
+### [1.22.0] - 2026-08-23
+
+#### 変更
+
+- §6 の著作権リスク項目の見出しを「解消した」から「**リポジトリ側で除去した**」へ狭めた。本番反映は別項目（`npm run deploy`）として分離し、実測してからチェックする形にした
+- **sidecar の除去だけでは不足だったことを追記。** `public/showcase/uploads/` の PDF 2点に同じ写真3点が埋め込まれており（画像 XObject の実寸が sidecar 側と完全一致）、git 追跡下で本番配信されていた。PDF 2点と `Tourism.docx` を `docs/02-design/design-canvas/` へ移して公開経路から外した
+
+#### 追加
+
+- §6 に「上記を本番へ反映する（#222 の DoD）」を新規項目として追加
+- 除去漏れの網羅確認結果を記録（`data:image/*;base64` がリポジトリ全体で0件、`public/` 配下の残存バイナリ2点はいずれも第三者写真を含まない。申請用デモ動画は音声ストリーム0本・6フレーム目視）
 
 ### [1.21.2] - 2026-08-23
 

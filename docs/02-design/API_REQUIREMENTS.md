@@ -1,10 +1,10 @@
 ---
 title: "API_REQUIREMENTS"
-version: "1.10.1"
+version: "1.10.2"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-16"
-updated: "2026-08-22"
+updated: "2026-08-23"
 changeImpact: "low"
 ---
 
@@ -131,7 +131,7 @@ changeImpact: "low"
 2. `message` はバックエンドが返す日本語をそのまま表示する（英語表示は Issue #17 の多言語化とあわせて後日）
 3. 表示は必須。`gaps.length > 0` のとき無条件に表示され、オプトアウトはない
 
-承認済みデザインカンプ（`Gap_Design_new_jap.pdf`）のうち、「このデータをリクエストする」ボタンと件数表示は、対応するサーバー側のオプトイン機構が無いため意図的に実装から外した。
+承認済みデザインカンプ（[`design-canvas/Gap_Design_new_jap.pdf`](design-canvas/Gap_Design_new_jap.pdf)）のうち、「このデータをリクエストする」ボタンと件数表示は、対応するサーバー側のオプトイン機構が無いため意図的に実装から外した。
 
 ### 未回答の還元を画面に出す（2026-08-22・[Issue #192](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/192)）
 
@@ -307,6 +307,12 @@ API.md §3.5 に記載のある以下は、専用のコア操作として未実�
 | `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物が返るとは限らない。** 保証は1つだけで、訊かれた代表エリアの行をそのデータセットが1行も収録していなければ `unanswered` にする（別エリアの行では埋めない）。それ以外は返る行の `area` を実行後に検証していないため、「上野の…」と訊いて浅草の行が返りうる（[Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152)）。**返ってきた `name` を「訊いたエリアの施設」として扱わないこと。** 詳細は [API.md](./API.md) §3.2 |
 
 ## Changelog
+
+### [1.10.2] - 2026-08-23
+
+#### 変更
+
+- §5 のデザインカンプ参照を新しい配置へ更新。`Gap_Design_new_jap.pdf` を `public/showcase/uploads/` から [`design-canvas/`](design-canvas/) へ移した（[Issue #222](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/222)）。`public/` 配下は静的アセットとしてそのまま配信されるため、出典未記録の写真が埋め込まれた PDF を公開経路から外す必要があった
 
 ### [1.10.1] - 2026-08-22
 
