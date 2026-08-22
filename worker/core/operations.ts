@@ -512,7 +512,7 @@ export async function aggregateDataset(
  * | 何が起きたか | 返すもの | `gaps` |
  * | --- | --- | --- |
  * | (a) LLM / D1 の障害・(b) 出力不正 | キーワード実装の応答へ縮退 ＋ `console.error` | **Text-to-SQL の失敗そのものは記録しない**。縮退先が未回答ならその理由で記録される（Step 5 以前と同じ扱い） |
- * | (c) SQL は通ったが0行 | `other` の未回答（`sqlNoRowUnanswered`） | **する** |
+ * | (c) SQL は通ったが要求を満たす行が0件 | `other` の未回答（`sqlNoRowUnanswered`） | **する** |
  *
  * (c) を記録するのは、それが**障害ではなく答え**だからである。「探したが無かった」は
  * DOMAIN.md §7 のデータ公開リクエストへ還元すべき一次情報で、握りつぶすと
@@ -535,10 +535,15 @@ async function resolveAggregate(
     return { status: "answered", result: outcome.result, query: outcome.query };
   }
   if (outcome.kind === "empty") {
-    // **0行になった SQL を残す。** 応答にも `gaps` にも SQL は載らないので、ここで記録しないと
-    // 「本当に無かった」のか「変な絞り込みで0行になった」のかを後から区別できない ―― Issue #148 は
+    // **要求を満たす行が無かった SQL を残す。** 応答にも `gaps` にも SQL は載らないので、ここで
+    // 記録しないと「本当に無かった」のか「変な絞り込み・別エリアだった」のかを区別できない。
+    // Issue #148 は
     // まさにそれで、実データに45行あるのに偽の未回答が返っていることに気づくまで時間がかかった
-    console.warn("[aggregate] 生成 SQL が0行を返しました", { datasetId: input.datasetId, sql: outcome.sql });
+    console.warn("[aggregate] 生成 SQL に要求を満たす行がありませんでした", {
+      datasetId: input.datasetId,
+      returnedRows: outcome.returnedRows,
+      sql: outcome.sql,
+    });
     return sqlNoRowUnanswered(guard.entry.title, input.intent);
   }
 
@@ -691,11 +696,12 @@ export const areaNotPublishedUnanswered = (title: string, area: RepresentativeAr
   unanswered("data_not_published", `「${title}」は「${area}」の地物を収録していません。`);
 
 /**
- * D1 実照会（Text-to-SQL）が0行を返したときの未回答（[Issue #119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119)）。
+ * D1 実照会（Text-to-SQL）に要求を満たす行が無いときの未回答
+ * （[Issue #119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119)・Issue #152）。
  *
  * ## なぜ `data_not_published` ではなく `other` なのか
  *
- * 0行が意味するのは「**生成された SQL の WHERE 句に当たる行が無かった**」ことであって、
+ * 意味するのは「**生成 SQL の結果に intent を満たす行が無かった**」ことであって、
  * 「そのデータが公開されていない」ことではない。SQL を書いたのは LLM で、意図をうまく
  * 表現できていなかった可能性が残る。API.md §4 は `data_not_published` を
  * 「存在しないことを**確かめられた**場合。最も強い主張なので、迷ったら使わない」と定めており、
