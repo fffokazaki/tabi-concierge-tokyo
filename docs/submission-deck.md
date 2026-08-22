@@ -1,6 +1,6 @@
 ---
 title: "submission-deck"
-version: "1.4.0"
+version: "1.5.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-21"
@@ -87,7 +87,7 @@ changeImpact: "medium"
 ## 5. 提出前チェックリスト
 
 - [ ] **必須4項目の充足** — ①②③④が全て資料内に存在することを指差し確認
-- [x] **キャプチャ3点**（1600×900px・スライド6/7/8）を本番URLから取得。プロフィール入力から実際に操作して撮る — 2026-08-22 取得済み。**取得元は移設前の旧URL <https://tabi-concierge-tokyo.opendata-002.workers.dev>（Version `712c2277`）**で、現在の本番は <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev>（[Issue #171](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/171) で移設）。**画像自体の差し替えは不要** — キャプチャはビューポートのみでアドレスバーが写っておらず、取得後に反映された変更（`c2efd7b1` タイムアウト分類・`1e2a4be9` ツール説明・本移設はコード無変更）はいずれも正常系の画面表示を変えない。新URLでの撮り直しは [Issue #172](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/172) で扱う（[Issue #126](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/126) にコメント）。**操作条件は「興味チップのみ・自由文は空」**（[Issue #143](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/143) の決定。自由文が空だと `search_datasets` が LLM 分解を通らず候補選定が決定的になる）。スライド6は**ラーメンを外した「文化・家族向け・自然」**で撮る — 入れたままだと未回答バナーが出て、スライド8の山を先に撃つ
+- [x] **キャプチャ3点**（1600×900px・スライド6/7/8）を本番URLから取得。プロフィール入力から実際に操作して撮る — 2026-08-22 取得済み。**取得元は移設前の旧URL <https://tabi-concierge-tokyo.opendata-002.workers.dev>（Version `712c2277`）**で、現在の本番は <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev>（[Issue #171](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/171) で移設）。**画像自体の差し替えは不要と確定** — [Issue #172](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/172)（2026-08-22）。根拠は2つ: (1) キャプチャはビューポートのみでアドレスバーが写っていない (2) **新本番で3画面とも同一操作を再現し、表示内容がキャプチャと一致することを実測**（スライド6: 寛永寺／上野観光連盟／上野公園大黒天横の3停留地・説明文・出典まで一致。スライド7: 文化チップの寛永寺＋旧東京音楽学校奏楽堂・JNTO文言まで一致。スライド8: ラーメン `insufficient_granularity` の文言一致）。この一致は [Issue #174](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/174) の行選定修正が前提 — 修正前の新本番は約50%で蔵前の停留地が混ざっていた（[Issue #126](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/126) にコメント）。**操作条件は「興味チップのみ・自由文は空」**（[Issue #143](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/143) の決定。自由文が空だと `search_datasets` が LLM 分解を通らず候補選定が決定的になる）。スライド6は**ラーメンを外した「文化・家族向け・自然」**で撮る — 入れたままだと未回答バナーが出て、スライド8の山を先に撃つ
 - [ ] **タブバーの見え方を確認** — スキャン・周辺は `AppTabs.tsx` の `INACTIVE_TABS` で disabled 表示。キャプチャだけを見る審査員はスライド4の凡例を見ないため、「未完成に見える」ならキャプチャ内かキャプション側に「スキャン・周辺はデザイン構想」と明示する。**見え方の確認は済み**（2026-08-22・薄いグレーのラベルで「壊れている」ようには見えないが、キャプチャ単体では「まだ作っていない」と読める）。**キャプション側に置く方針**で、記載は資料作成（[Issue #127](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/127)）で行うため未チェックのまま残す
 - [ ] **カタログURL の生存確認** — 確定10件を提出直前に再確認（[DATABASE.md](02-design/DATABASE.md) §3）
 - [ ] **スライド11 の OSS 記述の確認** — OSS 化の対象は**コンシェルジュ（`worker/` `shared/` `scripts/` `migrations/`）のみ**で、旅行アプリ `src/` は含まない。切り出しの実施は提出後〜Final Stage（[Issue #129](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/129)）のため、提出資料には「公開予定」と書く
@@ -103,6 +103,12 @@ changeImpact: "medium"
 - [TASKS.md](07-project-management/TASKS.md) — 提出物タスクの進捗
 
 ## Changelog
+
+### [1.5.0] - 2026-08-22
+
+#### 変更
+
+- §5 キャプチャ行の判断を確定（[Issue #172](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/172)）。撮り直し不要 — 新本番で3画面とも同一操作を再現し、表示内容の一致を実測した。一致の前提が [Issue #174](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/174) の行選定修正であることも明記
 
 ### [1.4.0] - 2026-08-22
 
