@@ -13,18 +13,22 @@ import {
 
 /**
  * wrangler `d1 execute --json` が実際に返した stdout（2026-08-22 実測・本番 D1）。
- * `SELECT id, name, area FROM spots WHERE area = '上野' ORDER BY id LIMIT 3` の応答から
- * meta の一部を抜粋した。結果行が meta に押し出されるのがこのツールの動機なので、
+ * `SELECT name, category, area FROM spots WHERE area = '上野' ORDER BY name LIMIT 3` の
+ * 応答から meta の一部を抜粋した。結果行が meta に押し出されるのがこのツールの動機なので、
  * テストも「本物の形」から meta だけを落とせているかで判定する。
  *
  * **3 行あるのは意図的。** 1 行だと「先頭 1 行だけ返す」実装でもテストが通ってしまう。
+ *
+ * **`id` を含めないのも意図的。** `spots.id` は AUTOINCREMENT で、`DELETE` + 再シードを
+ * 通すと採番が続きから振られる（実測: 1..1645 → 1646..3290）。id を写し取ると、
+ * 正当な再シードのあとに「実測」の主張が実際の応答と合わなくなる。
  */
 const REAL_PAYLOAD = JSON.stringify([
   {
     results: [
-      { id: 3, name: "寛永寺", area: "上野" },
-      { id: 23, name: "浄名院八万四千体地蔵", area: "上野" },
-      { id: 31, name: "旧寛永寺五重塔", area: "上野" },
+      { name: "&Here TOKYO UENO", category: "旅館・ホテル営業", area: "上野" },
+      { name: "88ｹﾞｽﾄﾊｳｽ", category: "簡易宿所営業", area: "上野" },
+      { name: "Air Stay 入谷", category: "旅館・ホテル営業", area: "上野" },
     ],
     success: true,
     meta: {
@@ -48,9 +52,9 @@ describe("extractRows", () => {
   it("応答から結果行だけを取り出す（meta を落とし、行は切り詰めない）", () => {
     expect(extractRows(REAL_PAYLOAD)).toEqual({
       rows: [
-        { id: 3, name: "寛永寺", area: "上野" },
-        { id: 23, name: "浄名院八万四千体地蔵", area: "上野" },
-        { id: 31, name: "旧寛永寺五重塔", area: "上野" },
+        { name: "&Here TOKYO UENO", category: "旅館・ホテル営業", area: "上野" },
+        { name: "88ｹﾞｽﾄﾊｳｽ", category: "簡易宿所営業", area: "上野" },
+        { name: "Air Stay 入谷", category: "旅館・ホテル営業", area: "上野" },
       ],
     });
   });
