@@ -939,6 +939,91 @@ describe("返す行は代表エリアを優先する（Issue #174）", () => {
     expect(answered.result.name, "先頭（上野）ではなく訊かれた浅草の行").toBe("浅草寺");
   });
 
+  it("同名で別エリアの行は住所で見分ける（文化財一覧の「銅鐘」の実例）", async () => {
+    // cross-model レビューの指摘（信頼度97）: name だけの対応付けは、同名施設が複数エリアに
+    // ある実データ（文化財一覧の「銅鐘」が上野・浅草に併存）で最初の1件に吸われ、
+    // 浅草を訊かれても上野の行を選んでしまう。(name, address) の複合キーで見分ける
+    await seed([
+      { name: "銅鐘", area: "上野", address: "上野桜木1丁目14番" },
+      { name: "銅鐘", area: "浅草", address: "浅草2丁目3番1号" },
+    ]);
+    const llm = scriptedLlm(SELECT_ALL);
+
+    const answered = expectAnswered(await aggregate(MEISHO_ID, "浅草の銅鐘を見たい", depsWith(llm)));
+
+    expect(answered.result.summary, "上野桜木ではなく浅草の住所の行").toContain("浅草2丁目3番1号");
+  });
+
+  it("intent のエリアの行が結果に無ければ、別の代表エリアの行へ倒す", async () => {
+    // 「渋谷の…」と訊かれても結果が上野の行と area NULL の行だけなら、NULL（対象エリア外）より
+    // 代表エリアの行を選ぶ。訊かれたエリアと違うこと自体は既知の制約（#152・#153）で、
+    // ここで固定するのは「エリア外の行よりはまし」という優先順位だけである
+    await seed([
+      { name: "初代川柳墓", area: null },
+      { name: "寛永寺", area: "上野" },
+    ]);
+    const llm = scriptedLlm(SELECT_ALL);
+
+    const answered = expectAnswered(await aggregate(MEISHO_ID, "渋谷の寺社を1件", depsWith(llm)));
+
+    expect(answered.result.name, "area NULL の先頭ではなく代表エリア（上野）の行").toBe("寛永寺");
+    expect(llm.asked, "選定はやり直しを発生させない").toHaveLength(1);
+  });
+
+  it("選定用の area 照会が失敗しても、先頭の行で答えを維持する", async () => {
+    // D1 の一時障害が「答えの消失」や縮退へ化けないこと（選定は付加機能で、本体ではない）
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await seed([
+        { name: "初代川柳墓", area: null },
+        { name: "寛永寺", area: "上野" },
+      ]);
+      const llm = scriptedLlm(SELECT_ALL);
+      const real = d1SqlExecutor(env.DB);
+      const flaky: CoreDeps = {
+        llm,
+        sql: {
+          select: (sql) =>
+            sql.includes("SELECT name, area, address")
+              ? Promise.resolve({ ok: false, cause: new Error("補助照会だけ落ちる") })
+              : real.select(sql),
+        },
+      };
+
+      const answered = expectAnswered(await aggregate(MEISHO_ID, "文化、家族向け、自然", flaky));
+
+      expect(answered.result.name, "選定できないときは従来どおり先頭").toBe("初代川柳墓");
+      expect(llm.asked, "障害で LLM をやり直さない").toHaveLength(1);
+      expect(warn).toHaveBeenCalledWith(
+        "[text-to-sql] 行の選定用の area 照会に失敗したため先頭の行を返します",
+        expect.objectContaining({ datasetId: MEISHO_ID }),
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("1行しか返らなければ選定用の照会を発行しない", async () => {
+    // 不要な D1 照会が増えてもテストが通ってしまう、を防ぐ（レイテンシと障害点の固定）
+    await seed([{ name: "寛永寺", area: "上野" }]);
+    const llm = scriptedLlm(`${SELECT_ALL} LIMIT 1`);
+    const real = d1SqlExecutor(env.DB);
+    const issued: string[] = [];
+    const recording: CoreDeps = {
+      llm,
+      sql: {
+        select: (sql) => {
+          issued.push(sql);
+          return real.select(sql);
+        },
+      },
+    };
+
+    expectAnswered(await aggregate(MEISHO_ID, "上野の寺社を1件", recording));
+
+    expect(issued.filter((sql) => sql.includes("SELECT name, area, address"))).toHaveLength(0);
+  });
+
   it("代表エリアの行が1件も無ければ従来どおり先頭を返す", async () => {
     // ここで未回答に倒すと「行はあるのに無いと言う」＝偽の未回答（Issue #148 の逆流）になる。
     // 返る行のエリアを検証して伝える話は Issue #152 が扱う

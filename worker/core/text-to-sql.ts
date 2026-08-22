@@ -59,8 +59,14 @@ const REQUIRED_COLUMNS = ["dataset_id", "name"] as const;
  *
  * 実モデルは「必ず含める」と書いた列だけを選ぶ（実測 — `dataset_id, name` しか書かなかった）。
  * 要約から所在地が落ちるだけで応答としては成立するので、必須にはせずここで頼む。
+ *
+ * `area` は要約には使わない ―― 行の選定（`pickPreferredRow`・Issue #174）が行自身の値を
+ * 読めるようにするための列である。SELECT に含まれていれば名前からの引き直しが不要になり、
+ * 同名で別エリアの行（文化財一覧の「銅鐘」が上野・浅草に併存する実例）でも取り違えない。
+ * 必須にはしない ―― 書き直しを強制すると、欠けただけの正常な SQL まで推論をやり直させ、
+ * 無料枠を消費する（縮退リスクも増える）。
  */
-const PREFERRED_COLUMNS = ["address", "note"] as const;
+const PREFERRED_COLUMNS = ["address", "note", "area"] as const;
 
 const SYSTEM_PROMPT = [
   "あなたは SQLite の SELECT 文だけを書くアシスタントです。",
@@ -560,11 +566,13 @@ function presentableNote(note: string, entry: CatalogEntry): string {
  * エリアの行 → 無ければ代表エリアいずれかの行 → それも無ければ従来どおり先頭。SQL に触らない
  * ので0行化・書き直し・縮退は起きず、LLM の揺れに依存しない。
  *
- * 生成 SQL の SELECT 列に `area` は無い（`REQUIRED_COLUMNS` / `PREFERRED_COLUMNS` に含めて
- * いない）ため、行の名前から D1 で引き直す（`countRelaxed` と同じく LLM を使わない決定的な
- * 照会）。同名で area が異なる行は最初の1件で代表させる ―― 厳密さより「エリア外を先頭に
- * 出さない」が目的なので、この近似で足りる。**照会に失敗したら従来どおり先頭を返す**
- * （選定の失敗で応答まで壊さない。ただし黙らない ―― console.warn に残す）。
+ * 行のエリアは3段で読む: (1) 行自身の `area` 列（`PREFERRED_COLUMNS` に入れたので生成 SQL が
+ * SELECT していれば最も確実）→ (2) `(name, address)` の複合キーで D1 から引き直す
+ * （`countRelaxed` と同じく LLM を使わない決定的な照会）→ (3) name 単独。ただし同名で別エリアの
+ * 行がある場合（文化財一覧の「銅鐘」が上野・浅草に併存する実例 ―― cross-model レビューの指摘）は
+ * **どのエリアとも主張しない**（undefined）。取り違えて選ぶくらいなら選定から外す。
+ * **照会に失敗したら従来どおり先頭を返す**（選定の失敗で応答まで壊さない。ただし黙らない ――
+ * console.warn に残す）。
  *
  * 代表エリアの行が1件も無いとき先頭を返すのは従来挙動の維持である。ここで未回答に倒すと
  * 「行はあるのに無いと言う」＝偽の未回答（Issue #148 の逆流）になる。返る行のエリアを検証して
@@ -579,29 +587,52 @@ async function pickPreferredRow(
   const first = rows[0]!;
   if (rows.length === 1) return first;
 
-  const escapedId = entry.datasetId.replace(/'/g, "''");
-  const lookup = await deps.sql.select(
-    `SELECT name, area FROM spots WHERE dataset_id = '${escapedId}' AND area IS NOT NULL`,
-  );
-  if (!lookup.ok) {
-    console.warn("[text-to-sql] 行の選定用の area 照会に失敗したため先頭の行を返します", {
-      datasetId: entry.datasetId,
-      cause: lookup.cause,
-    });
-    return first;
-  }
+  // 行自身が area を持っていれば照会は不要（全行に無い場合だけ引き直す）
+  const direct = (row: Record<string, unknown>): string | undefined =>
+    typeof row["area"] === "string" ? row["area"] : undefined;
+  const needsLookup = rows.some((row) => direct(row) === undefined);
 
-  const areaByName = new Map<string, string>();
-  for (const row of lookup.rows) {
-    const name = row["name"];
-    const area = row["area"];
-    if (typeof name === "string" && typeof area === "string" && !areaByName.has(name)) {
-      areaByName.set(name, area);
+  const byNameAddress = new Map<string, string>();
+  const byName = new Map<string, Set<string>>();
+  if (needsLookup) {
+    const escapedId = entry.datasetId.replace(/'/g, "''");
+    const lookup = await deps.sql.select(
+      `SELECT name, area, address FROM spots WHERE dataset_id = '${escapedId}' AND area IS NOT NULL`,
+    );
+    if (!lookup.ok) {
+      console.warn("[text-to-sql] 行の選定用の area 照会に失敗したため先頭の行を返します", {
+        datasetId: entry.datasetId,
+        cause: lookup.cause,
+      });
+      return first;
+    }
+    for (const row of lookup.rows) {
+      const name = row["name"];
+      const area = row["area"];
+      if (typeof name !== "string" || typeof area !== "string") continue;
+      const address = row["address"];
+      if (typeof address === "string" && address !== "") {
+        byNameAddress.set(`${name}\u0000${address}`, area);
+      }
+      const areas = byName.get(name) ?? new Set<string>();
+      areas.add(area);
+      byName.set(name, areas);
     }
   }
+
   const areaOf = (row: Record<string, unknown>): string | undefined => {
+    const own = direct(row);
+    if (own !== undefined) return own;
     const name = row["name"];
-    return typeof name === "string" ? areaByName.get(name) : undefined;
+    if (typeof name !== "string") return undefined;
+    const address = row["address"];
+    if (typeof address === "string" && address !== "") {
+      const exact = byNameAddress.get(`${name}\u0000${address}`);
+      if (exact !== undefined) return exact;
+    }
+    const areas = byName.get(name);
+    // 同名で別エリアの行がある名前は、どのエリアとも主張しない（取り違え防止）
+    return areas !== undefined && areas.size === 1 ? [...areas][0] : undefined;
   };
 
   const intended = findRepresentativeArea(input.intent);
