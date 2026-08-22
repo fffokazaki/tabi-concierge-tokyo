@@ -70,7 +70,7 @@ describe("単一チップ", () => {
           candidates: [{ datasetId: MEISHO_ID, title: "トイレ情報", provider: "台東区", url: "u", matchReason: "r" }],
         }),
       [AGGREGATE]: () =>
-        json({ status: "answered", result: { name: "上野公園大黒天横", summary: "多目的トイレあり。" }, query: "q" }),
+        json({ status: "answered", result: { name: "上野公園大黒天横", summary: "多目的トイレあり。", category: "名所・史跡" }, query: "q" }),
       [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "トイレ情報")] }),
     });
 
@@ -133,7 +133,7 @@ describe("「すべて」", () => {
             { status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" },
           ],
         }),
-      [AGGREGATE]: () => json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" }),
+      [AGGREGATE]: () => json({ status: "answered", result: { name: "寛永寺", summary: "…", category: "名所・史跡" }, query: "q" }),
       [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
     });
 
@@ -156,7 +156,7 @@ describe("抽出・出典の欠落", () => {
         }),
       [AGGREGATE]: (body) =>
         (body as { datasetId: string }).datasetId === MEISHO_ID
-          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…", category: "名所・史跡" }, query: "q" })
           : json({
               status: "unanswered",
               reason: "insufficient_granularity",
@@ -189,7 +189,7 @@ describe("抽出・出典の欠落", () => {
         }),
       [AGGREGATE]: (body) =>
         (body as { datasetId: string }).datasetId === MEISHO_ID
-          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…", category: "名所・史跡" }, query: "q" })
           : json({ status: "unanswered", reason: "other", message: "固定データにその行がありません。" }),
       [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
     });
@@ -215,7 +215,7 @@ describe("抽出・出典の欠落", () => {
         }),
       [AGGREGATE]: (body) =>
         (body as { datasetId: string }).datasetId === MEISHO_ID
-          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…", category: "名所・史跡" }, query: "q" })
           : json(failure),
       [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
     });
@@ -253,7 +253,7 @@ describe("抽出・出典の欠落", () => {
         }),
       [AGGREGATE]: (body) =>
         (body as { datasetId: string }).datasetId === MEISHO_ID
-          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…", category: "名所・史跡" }, query: "q" })
           : json(shared),
       [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
     });
@@ -278,7 +278,7 @@ describe("抽出・出典の欠落", () => {
         }),
       [AGGREGATE]: (body) => {
         const id = (body as { datasetId: string }).datasetId;
-        if (id === MEISHO_ID) return json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" });
+        if (id === MEISHO_ID) return json({ status: "answered", result: { name: "寛永寺", summary: "…", category: "名所・史跡" }, query: "q" });
         // 検索側の gap と reason だけ同じ（message は別）
         if (id === BUNKA_ID) return json({ status: "unanswered", reason: "other", message: "固定データにその行がありません。" });
         // 検索側の gap と message だけ同じ（reason は別）
@@ -320,7 +320,7 @@ describe("抽出・出典の欠落", () => {
         }),
       [AGGREGATE]: (body) =>
         (body as { datasetId: string }).datasetId === MEISHO_ID
-          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…", category: "名所・史跡" }, query: "q" })
           : json(gapA),
       [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
     });
@@ -366,8 +366,8 @@ describe("抽出・出典の欠落", () => {
         }),
       [AGGREGATE]: (body) =>
         (body as { datasetId: string }).datasetId === MEISHO_ID
-          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
-          : json({ status: "answered", result: { name: "国立西洋美術館", summary: "…" }, query: "q" }),
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…", category: "名所・史跡" }, query: "q" })
+          : json({ status: "answered", result: { name: "国立西洋美術館", summary: "…", category: "名所・史跡" }, query: "q" }),
       // BUNKA_ID の出典を返さない
       [PROVENANCE]: () => json({ status: "answered", sources: [source(MEISHO_ID, "名所・史跡")] }),
     });
@@ -395,7 +395,7 @@ describe("抽出・出典の欠落", () => {
         }),
       [AGGREGATE]: (body) =>
         (body as { datasetId: string }).datasetId === MEISHO_ID
-          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…", category: "名所・史跡" }, query: "q" })
           : json({ status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" }),
       [PROVENANCE]: () => json({ status: "unanswered", reason: "other", message: "出典を生成できません。" }),
     });
@@ -444,7 +444,7 @@ describe("抽出・出典の欠落", () => {
         }),
       [AGGREGATE]: (body) =>
         (body as { datasetId: string }).datasetId === MEISHO_ID
-          ? json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" })
+          ? json({ status: "answered", result: { name: "寛永寺", summary: "…", category: "名所・史跡" }, query: "q" })
           : json(shared),
       [PROVENANCE]: () => json({ status: "unanswered", reason: "other", message: "出典を生成できません。" }),
     });
@@ -493,7 +493,7 @@ describe("抽出・出典の欠落", () => {
           status: "answered",
           candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
         }),
-      [AGGREGATE]: () => json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" }),
+      [AGGREGATE]: () => json({ status: "answered", result: { name: "寛永寺", summary: "…", category: "名所・史跡" }, query: "q" }),
       [PROVENANCE]: () => json({ status: "unanswered", reason: "other", message: "出典を生成できません。" }),
     });
 
@@ -553,7 +553,7 @@ describe("障害", () => {
           status: "answered",
           candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
         }),
-      [AGGREGATE]: () => json({ status: "answered", result: { name: "寛永寺", summary: "…" }, query: "q" }),
+      [AGGREGATE]: () => json({ status: "answered", result: { name: "寛永寺", summary: "…", category: "名所・史跡" }, query: "q" }),
       [PROVENANCE]: () =>
         json({ status: "answered", sources: [{ ...source(MEISHO_ID, "名所・史跡"), license: "その他" }] }),
     });

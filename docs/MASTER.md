@@ -1,6 +1,6 @@
 ---
 title: "MASTER"
-version: "1.7.1"
+version: "1.8.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -592,6 +592,7 @@ metrics:
 ### 追加文書（初期セット外・作業中に追加）
 
 - [02-design/API_REQUIREMENTS.md](./02-design/API_REQUIREMENTS.md) - フロントエンドが必要とするAPI要件（プラン画面）。API.md のコア3操作に対する入出力の具体化提案で、ProvenanceSource の確認結果を反映済み
+- [02-design/CATEGORY_ILLUSTRATIONS.md](./02-design/CATEGORY_ILLUSTRATIONS.md) - プラン画面のカテゴリイラスト写像、生成資産、フォールバック、検証・リリース境界
 - [02-design/MCP.md](./02-design/MCP.md) - MCP設計書（`/mcp` 基盤開放面。ADR-008 の二面公開のうち AI クライアント向けの面。スキーマは API.md を参照で運び二重定義しない）
 
 ### リポジトリルートの運用ファイル
@@ -785,6 +786,12 @@ Changelog エントリには以下のカテゴリを使用する（[Keep a Chang
 - [ ] 定数の配置が層責務に沿っている（Domain/Application/Infrastructure）
 
 ## Changelog
+
+### [1.8.0] - 2026-08-22
+
+#### 追加
+
+- 追加文書の索引に [CATEGORY_ILLUSTRATIONS.md](./02-design/CATEGORY_ILLUSTRATIONS.md) を追加（[Issue #188](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/188)）
 
 ### [1.7.1] - 2026-08-22
 

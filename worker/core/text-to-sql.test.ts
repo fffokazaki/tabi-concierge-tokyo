@@ -102,6 +102,7 @@ describe("実照会", () => {
 
     expect(answered.result.name).toBe("寛永寺");
     expect(answered.result.summary).toContain("所在地は上野桜木1丁目14番。");
+    expect(answered.result.category).toBe("名所・史跡");
     // 出典の再現に要る（API.md §4）。スタブの「固定データ抽出」ではなくなったことも示す
     expect(answered.query).toContain("D1 実照会");
     expect(answered.query).toContain("FROM spots");

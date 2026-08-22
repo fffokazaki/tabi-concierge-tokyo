@@ -1,12 +1,14 @@
 ---
 title: "API_REQUIREMENTS"
-version: "1.9.0"
+version: "1.10.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-16"
 updated: "2026-08-22"
 changeImpact: "high"
 ---
+
+<!-- markdownlint-disable MD013 MD022 MD024 MD025 MD032 -->
 
 # フロントエンドが必要とするAPI要件（プラン画面）
 
@@ -176,6 +178,7 @@ changeImpact: "high"
   result: {
     name: string;      // 汎用語彙。フロントエンドが Stop.place にマッピングする
     summary: string;    // 汎用語彙。フロントエンドが Stop.note にマッピングする
+    category: string;   // 選択行の分類。フロントエンドが Stop.category にマッピングする
     // その他の集計結果フィールドは要検討（例: 営業時間の生データ、混雑度など）
   };
   query: string;       // 実行したクエリ。出典に必須（API.md §4）
@@ -189,6 +192,7 @@ changeImpact: "high"
 ### 備考
 - `query`（実行クエリ）は出典に必須。省略不可（API.md §4「実行クエリの不在を理由に出典を省略してはならない」）。
 - **2026-08-17 合意**: 出力フィールド名は `place` / `note` ではなく `name` / `summary` の汎用語彙とする。API.md 設計原則4「アプリ固有の語彙を持ち込まない」（`/mcp` 経由で翌年参加者にも同じ操作を開放するため）に沿った Okazaki の逆提案に Sho が合意した。`Stop.place ← name`、`Stop.note ← summary` のマッピングはフロントエンド側の責務とする
+- **2026-08-22 追加**: `category` は固定 SQL で検証した選択行の非空分類をそのまま返す。データセット内に複数分類があるため、フロントエンドはデータセット名から推測せず `Stop.category ← category` とする（[Issue #188](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/188)）
 - **未対応**: `Stop.time`（表示用の時刻ラベル）は現在 `Scenario.schedule[position]` としてフロントエンド側で保持しており、データセット由来ではない（並べ替えても時刻が逆行しないための設計）。この集計結果に時刻情報を含める必要はありません。
 
 ---
@@ -295,7 +299,7 @@ API.md §3.5 に記載のある以下は、専用のコア操作として未実�
 
 | 項目 | 決定 |
 | ---- | ---- |
-| `aggregate_dataset` の出力語彙 | `name` / `summary` の汎用語彙。`Stop.place` / `Stop.note` へのマッピングはフロントエンド側（§2 参照） |
+| `aggregate_dataset` の出力語彙 | `name` / `summary` / `category` の汎用語彙。`Stop.place` / `Stop.note` / `Stop.category` へのマッピングはフロントエンド側（§2 参照） |
 | `search_datasets` の `limit` | 既定 4・上限 10。範囲外は 400（黙って丸めない）。既定値は1ルート3〜4停留地という本書 §1 の想定に合わせた |
 | エラーレスポンスの形 | `{ error: "invalid_request" \| "not_found" \| "internal_error", message?: string }`。400 は**入力の形の違反だけ**に使い、「データが無い」は `unanswered` ＋ HTTP 200（API.md §4）。500 も JSON で返るので、画面は常に JSON として読んでよい |
 | 複数データセット横断時の `query` の対応関係 | 入力の `query` を各 source に同じ値で複写する。同じ ID を重ねても出典は1件にまとまる。知らない `datasetId` が混ざったら既知のぶんだけ返さず全体を `unanswered` にする（画面上の並べ方はフロントエンド側の決定事項として残る） |
@@ -303,6 +307,12 @@ API.md §3.5 に記載のある以下は、専用のコア操作として未実�
 | `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物が返るとは限らない。** 保証は1つだけで、訊かれた代表エリアの行をそのデータセットが1行も収録していなければ `unanswered` にする（別エリアの行では埋めない）。それ以外は返る行の `area` を実行後に検証していないため、「上野の…」と訊いて浅草の行が返りうる（[Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152)）。**返ってきた `name` を「訊いたエリアの施設」として扱わないこと。** 詳細は [API.md](./API.md) §3.2 |
 
 ## Changelog
+
+### [1.10.0] - 2026-08-22
+
+#### 追加
+
+- `aggregate_dataset` の回答あり `result` に、選択行由来の必須 `category` と `Stop.category` への写像を追加（[Issue #188](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/188)）
 
 ### [1.9.0] - 2026-08-22
 

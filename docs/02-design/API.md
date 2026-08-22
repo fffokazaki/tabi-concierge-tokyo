@@ -1,12 +1,14 @@
 ---
 title: "API"
-version: "1.15.0"
+version: "1.16.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 ---
+
+<!-- markdownlint-disable MD013 MD024 MD025 MD032 MD040 -->
 
 # API.md - API設計書（フロントエンド ↔ バックエンド `/api/*`）
 
@@ -16,7 +18,7 @@ changeImpact: "medium"
 >
 > **コア3操作（§3.1〜§3.3）のエンドポイントパス・操作名・入出力スキーマは 2026-08-17 に確定した**（Issue #22）。§3.5 の追加候補（`recommend_spots` / `report_gap`）は引き続き**仮称・未確定**で、実装時に確定させること（推測で確定扱いにしない）。
 >
-> 実装状況（2026-08-22）: `GET /api/health`、コア3操作、`GET /api/gaps/summary`。**コア3操作の中身はもう固定データのスタブではない** — `aggregate_dataset` は D1 を実照会し（Text-to-SQL・[Issue #119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119)）、`search_datasets` は自然文だけの呼び出しを LLM で構造化入力へ分解してから既存のキーワード判定へ渡す（メタデータRAG・[Issue #120](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/120)。候補のマッチ自体は今もキーワード表が行う）。**入出力の形は Step 5 でも変えていない**ので、フロントエンドは今の形に対して実装してよい。LLM やD1 が使えないときは、どちらもスタブ時代の実装へ**縮退**する（§4）。
+> 実装状況（2026-08-22）: `GET /api/health`、コア3操作、`GET /api/gaps/summary`。**コア3操作の中身はもう固定データのスタブではない** — `aggregate_dataset` は D1 を実照会し（Text-to-SQL・[Issue #119](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119)）、`search_datasets` は自然文だけの呼び出しを LLM で構造化入力へ分解してから既存のキーワード判定へ渡す（メタデータRAG・[Issue #120](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/120)。候補のマッチ自体は今もキーワード表が行う）。LLM やD1 が使えないときは、どちらもスタブ時代の実装へ**縮退**する（§4）。`aggregate_dataset` は [Issue #188](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/188) で、固定 SQL で検証した選択行の `category` も返す契約へ拡張した。
 >
 > 入出力の TypeScript 型は [`shared/core.ts`](../../shared/core.ts) にあり、`worker/`（実装）と `src/`（React）が同じ定義を参照する。本書と型定義がずれたら本書を正とする。
 
@@ -215,9 +217,9 @@ interests=["ラーメン","文化","家族向け","自然"] / limit=4（修正�
 | 項目 | 内容 |
 | ---- | ---- |
 | 入力 | `{ datasetId: string, intent: string }`。両方必須 |
-| 出力（回答あり） | `{ status: "answered", result: { name, summary }, query: string }` |
+| 出力（回答あり） | `{ status: "answered", result: { name, summary, category }, query: string }` |
 | 出力（回答なし） | `{ status: "unanswered", reason, message }` |
-| 出力語彙 | `result` は **`name` / `summary` の汎用語彙**（設計原則4）。`Stop.place` / `Stop.note` へのマッピングはフロントエンド側の責務（2026-08-17 合意） |
+| 出力語彙 | `result` は **`name` / `summary` / `category` の汎用語彙**（設計原則4）。`category` は主経路では生成 SQL の `id` を固定 SQL で引き直した実データ、縮退経路では原本CSVで照合した固定サンプルの非空分類であり、クライアントがデータセット名から推測しない。`Stop.place` / `Stop.note` / `Stop.category` へのマッピングはフロントエンド側の責務 |
 | 前段ガード | **両経路の手前で確定する**（`guardAggregate`）。利用中の10件に無い `datasetId`（`other`・§4）・飲食店データセットへのジャンル指定・統計表（`insufficient_granularity`）・対象エリア外の地名（`out_of_area`）は、**D1 を1度も引かずに未回答を返す**。ここを LLM の後ろへ回すと、実データで検証済みの誠実な未回答（ラーメン ＝ 粒度不足）が「それらしい行」に置き換わる |
 | `query` | 実行したクエリ。**省略不可**（§4）。**主経路は実際に D1 へ渡した生成 SQL と、その結果の `id` を実データへ引き直した固定 SQL の両方**（`D1 実照会: <生成SQL>。実行結果の id を固定照会で検証: <固定SQL>（<取得日> 取得のスナップショット・全<行数>行）`）。載る生成 SQL は**書き直した後**のもの。**縮退経路**は SQL を実行していないため、SQL 風の文字列ではなく「どのスナップショットのヘッダを除く何行目を、どう選んで固定で返したか」を記録する。行の選定根拠（固定サンプルのうち当該エリアの最初の1件 / 既知のエリア名が見つからず固定サンプルの先頭）と、**intent の内容との照合はしていない**ことを必ず含む（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)） |
 | 未回答の分類 | **主経路は `data_not_published` を返さない。** 生成 SQL が0行、または要求エリアと一致しない行しか返さなかったときは、`countRelaxed` が `dataset_id` ＋読み取れた代表エリアだけで数え直す。0件なら `other`（`sqlNoRowUnanswered`）―― D1 から確かめられるのは「このデータセットに当該エリアの行が無い」ことまでである。1件以上なら未回答にせず、エリアを保った SQL へ書き直させる。書き直し上限まで有効な SQL が得られない場合は障害として縮退し、主経路の未回答としては記録しない。`data_not_published` を返すのは**縮退経路だけ**で、そのデータセットの収録エリア（`areas`）に訊かれた代表エリアが無い場合に限る（`areaNotPublishedUnanswered`）。同じ事実が経路によって別の分類になる。`gaps`（[DOMAIN.md](./DOMAIN.md) §7）に `data_not_published` が現れたら縮退経路が返したものだが、レコードからは経路を判別できないため手がかりは `console.error` だけ |
@@ -225,7 +227,7 @@ interests=["ラーメン","文化","家族向け","自然"] / limit=4（修正�
 | `intent` に既知のエリア名が無い場合 | **主経路**: エリアの条件を持たない SQL に**なることを期待しているが、そこは検査していない** ―― 実行前の検査（`findFilterProblems`）は代表エリア名を無条件に通すので、訊かれていない `area = '上野'` で絞る SQL も通る。裏取りの `COUNT(*)` の側は確実にデータセット全体を数える（読み取れた代表エリアが無ければエリア条件を付けない）。返す行は代表エリア（上野・浅草・渋谷）のものを優先するが（`pickPreferredRow`・[Issue #174](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/174)）、**訊かれた場所そのものは知りようがない**。**縮退経路**: 固定サンプルの先頭を代表として返す。どちらも「エリア無指定」とは断定しない — 判定は既知の語彙表（代表エリア・対象外エリア）への照合であって網羅ではなく、未知の地名（例: 巣鴨）が書かれていてもこの経路に落ちる。縮退経路で選定が収録順に依存する事実は `query` に明記して読み取れるようにする（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)） |
 | `intent` の内容（エリア以外） | **主経路は intent を `category` / `name` の絞り込みへ写すよう LLM に頼むが、述語が付いたかは検査していない** ―― 実行前に見るのは「実在しない値で絞っていないか」だけ（`findFilterProblems`）なので、`dataset_id` だけで絞る SQL も通る。さらに0行になったとき、裏取り（`countRelaxed`）が「エリアには行がある」と判定すれば `category` の条件を外してエリアだけで絞るよう書き直させる。したがって**返った行が intent の内容に合っている保証は無い**。「浅草の博物館」で博物館の行だけが無い場合、`unanswered` ではなく**そのデータセットにある浅草の別の行**が返る。どのデータセットを使うかは `search_datasets` が既に決めており、ここは関連性を審査し直す場ではない（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)・[PR #140](https://github.com/fffokazaki/tabi-concierge-tokyo/pull/140)）。**縮退経路は内容との照合を一切していない**（内容側のガードは前段の飲食店 × ジャンル指定だけ） |
 | `intent` に名指しされた施設 | **無ければ同じデータセットの別の行が返る**（黙ってすり替える。[Issue #153](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/153) の決定）。代表エリアを読み取れた場合、すり替え先はそのエリアの行に限定する。代表エリアを読み取れなければ（未知の地名・エリア無指定。上の行と同じ境界）エリアによる歯止めは働かない。エリアの扱いと逆に見えるが、根拠が違う ―― **エリアの取り違えは場所についての事実誤り**で、収録範囲はデータから確かめられる。一方**どのデータセットを使うかは `search_datasets` が既に決めており、ここは関連性を審査し直す場ではない**（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)）。加えて「興味の語（ラーメン）」と「施設名（浅草寺）」をリテラルから区別する決定的な方法が無く、名指しを未回答にすると [Issue #148](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/148) の偽の未回答が戻る。**すり替えは応答に現れない**（`query` に載るのは書き直した後の SQL）。伝える形は [Issue #166](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/166) で扱う |
-| 未確定 | `result` に集計値そのもの（件数・平均等）を載せる形。現状はどちらの経路も**1行を1件として返す**だけで（`{ name, summary }`）、COUNT / AVG のような集計値を運ぶ器が無い |
+| 未確定 | `result` に集計値そのもの（件数・平均等）を載せる形。現状はどちらの経路も**1行を1件として返す**だけで（`{ name, summary, category }`）、COUNT / AVG のような集計値を運ぶ器が無い |
 
 ### 3.3 `get_provenance` — 出典取得（`POST /api/provenance`・確定）
 
@@ -379,6 +381,12 @@ D1 `gaps` の発生件数を、都・GovTech東京向け還元ダッシュボー
 - **サンドボックス環境**: 未定
 
 ## Changelog
+
+### [1.16.0] - 2026-08-22
+
+#### 変更
+
+- [Issue #188](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/188) により、`aggregate_dataset` の回答あり `result` に、固定 SQL で検証した選択行の非空 `category` を追加。主経路と縮退経路の出所、およびフロントエンドがデータセット名から推測しない境界を明記
 
 ### [1.15.0] - 2026-08-22
 

@@ -382,7 +382,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .stop-card--selected { border-color: var(--accent); background: var(--accent-soft); }
 .stop-card--drag-over { border-color: var(--accent); background: var(--accent-tint); }
 .stop-card__handle { width: 14px; padding-top: 5px; flex-shrink: 0; cursor: grab; color: var(--muted); }
-.stop-card__thumb { width: 52px; height: 52px; flex-shrink: 0; border-radius: 10px; background: var(--border); }
+.stop-card__thumb { width: 52px; height: 52px; flex-shrink: 0; border-radius: 10px; overflow: hidden; background: var(--border); }
+.stop-card__thumb--illustrated { background: transparent; }
+.stop-card__thumb-image { display: block; width: 100%; height: 100%; object-fit: contain; }
 .stop-card__body { flex: 1; min-width: 0; }
 .stop-card__time { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.3px; }
 .stop-card__place { font-family: "Lora", Georgia, "Yu Mincho", serif; font-size: 15px; font-weight: 600; color: var(--ink); margin: 2px 0 0; }

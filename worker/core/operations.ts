@@ -641,7 +641,7 @@ function guardAggregate(input: AggregateDatasetInput): AggregateGuard {
 function extractFromSamples(input: AggregateDatasetInput, entry: CatalogEntry): AggregateDatasetOutput {
   const extracted = (sample: CatalogSample, selection: string): AggregateDatasetOutput => ({
     status: "answered",
-    result: { name: sample.name, summary: sample.summary },
+    result: { name: sample.name, summary: sample.summary, category: sample.category },
     query: describeQuery(entry, sample, selection),
   });
 

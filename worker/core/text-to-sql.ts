@@ -422,7 +422,7 @@ function contextOf(before: string): { column?: string; op?: string } {
  *
  * - 入力 `AggregateDatasetInput` は `{ datasetId, intent }` だけ。どの語が名指し（固有名詞）で
  *   どれが興味の語かは渡ってこない（エリアすら `findRepresentativeArea` が自然文から拾っている）
- * - 出力 `AggregateResult` は `{ name, summary }` だけ。「頼まれたものは無かった」を載せる器が無い
+ * - 出力 `AggregateResult` は `{ name, summary, category }` だけ。「頼まれたものは無かった」を載せる器が無い
  * - 足すと `shared/core.ts`（型）→ `parse.ts`（検査の実体）→ **`worker/mcp.ts` の
  *   `AGGREGATE_DATASET_SCHEMA`（外部クライアントへ公開している広告スキーマ・
  *   [MCP.md](../../docs/02-design/MCP.md) §3）** → API.md / MCP.md →
@@ -640,7 +640,8 @@ async function pickPreferredRow(
 
 function toResult(row: Record<string, unknown>, entry: CatalogEntry): AggregateResult | undefined {
   const name = typeof row["name"] === "string" ? row["name"].trim() : "";
-  if (name === "") return undefined;
+  const category = typeof row["category"] === "string" ? row["category"].trim() : "";
+  if (name === "" || category === "") return undefined;
 
   const address = typeof row["address"] === "string" ? row["address"].trim() : "";
   const note = presentableNote(typeof row["note"] === "string" ? row["note"].trim() : "", entry);
@@ -651,7 +652,7 @@ function toResult(row: Record<string, unknown>, entry: CatalogEntry): AggregateR
     `${entry.provider}が${entry.title}として公開している${entry.rowCount}件のうちの1件。`,
   ].filter((part): part is string => part !== undefined);
 
-  return { name, summary: parts.join("") };
+  return { name, summary: parts.join(""), category };
 }
 
 /** 実行結果の全行に SELECT 必須列が載っているかを見る。0行は裏取り側で扱う。 */
