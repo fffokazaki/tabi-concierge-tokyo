@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.50.0"
+version: "1.51.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 136
+ace_entry_count: 137
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -367,8 +367,15 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-202-3 | 一時領域で育てたスクリプトを取り込むときは、cwd 依存を `__dirname` 基準へ直す | tooling | [playbook/tooling.md#ace-202-3](./playbook/tooling.md#ace-202-3) |
 | ACE-202-4 | 「検証」欄に、その差分を1行も通っていないゲートを並べない | process | [playbook/process.md#ace-202-4](./playbook/process.md#ace-202-4) |
 | ACE-205-1 | best-effort 記録の成否を応答に載せないなら、UI は個別の受領証を名乗らない | architecture | [playbook/architecture.md#ace-205-1](./playbook/architecture.md#ace-205-1) |
+| ACE-212-1 | 同じ誤りを再発した知見は、「いつ使うか」を危険な文型と結び付けて常時読む指示へ昇格する | process | [playbook/process.md#ace-212-1](./playbook/process.md#ace-212-1) |
 
 ## Changelog
+
+### [1.51.0] - 2026-08-22
+
+#### 追加
+
+- ACE-212-1: 同じ誤りを再発した知見は、「いつ使うか」を危険な文型と結び付けて常時読む指示へ昇格する（Issue #170 / PR #212）
 
 ### [1.50.0] - 2026-08-22
 
