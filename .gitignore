@@ -29,3 +29,8 @@ db/seed.generated.sql
 deck/*.pptx
 deck/*.pdf
 deck/slide-*.jpg
+
+# soffice / pdftoppm を deck/ の外から叩いたときの取りこぼし対策
+# （build.js 自身は __dirname 基準なので必ず deck/ へ書き出す）
+tabi-concierge-tokyo-submission.pptx
+tabi-concierge-tokyo-submission.pdf

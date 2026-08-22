@@ -1,8 +1,14 @@
 // 旅コンシェルジュTOKYO — 提出資料（16:9・14枚）
-// 文言の SSOT: docs/submission-deck.md v1.3.0 / docs/02-design/DATABASE.md §2
+// 文言の SSOT: docs/submission-deck.md v1.7.0 / docs/02-design/DATABASE.md §2
 //
 // 縦のリズム: kicker 0.24 / title 0.55–1.55 / 本文 1.95–6.85 / 下マージン 0.65
 const pptxgen = require("pptxgenjs");
+const { join } = require("node:path");
+
+// 画像の読み込みと PPTX の書き出しは、このファイルの場所を基準にする。
+// cwd 基準にすると `node deck/build.js` のように deck/ の外から叩いたとき、
+// 画像が見つからず落ちる（実測: ENOENT で exit 1）。
+const here = (f) => join(__dirname, f);
 
 const P = {
   espresso: "2A1E14",
@@ -119,7 +125,7 @@ function closer(slide, text, o = {}) {
     x: 0.9, y: 5.85, w: 7.2, h: 0.35, fontFace: BODY, fontSize: 13, bold: true,
     color: P.gold, margin: 0, valign: "middle",
   });
-  s.addImage({ path: "img/deck-plan.png", x: 9.25, y: 0.85, w: 3.18, h: 5.79 });
+  s.addImage({ path: here("img/deck-plan.png"), x: 9.25, y: 0.85, w: 3.18, h: 5.79 });
   s.addNotes("表紙。数字は9,600・200PV/日・30分→3分の3つに絞る。");
 }
 
@@ -325,7 +331,7 @@ function screenSlide(o) {
 screenSlide({
   kicker: "動く画面 ①  ②",
   title: "すべての提案に、出典が付く。",
-  image: "img/deck-plan.png",
+  image: here("img/deck-plan.png"),
   imageRight: true,
   points: [
     { t: "旅のプロフィールから旅程を組み立てる", d: "同行者・日数・興味・ペース・予算を受け取り、オープンデータから停留地を選びます。" },
@@ -339,7 +345,7 @@ screenSlide({
 screenSlide({
   kicker: "動く画面 ②  ②",
   title: "興味から、出典つきで薦める。",
-  image: "img/deck-foryou.png",
+  image: here("img/deck-foryou.png"),
   imageRight: false,
   points: [
     { t: "興味チップを選ぶとレコメンドが変わる", d: "「文化」を選ぶと、その興味に答えられるデータセットから候補を選びます。" },
@@ -356,7 +362,7 @@ screenSlide({
   kicker(s, "プロダクト ②  この資料の山", true);
   title(s, "答えられないときは、答えません", { color: P.cream, w: 8.0 });
 
-  s.addImage({ path: "img/deck-ramen.png", x: 9.05, y: 1.62, w: 2.86, h: 5.21 });
+  s.addImage({ path: here("img/deck-ramen.png"), x: 9.05, y: 1.62, w: 2.86, h: 5.21 });
 
   pill(s, 0.75, 1.72, "live");
   s.addText("このケースでは 粒度不足 と判定し、理由とともに返します", {
@@ -552,19 +558,21 @@ screenSlide({
   });
 
   const rows = [
-    ["1", "名所・史跡", "台東区", "45", "中核。寺社と史跡。作法案内の出典"],
-    ["2", "文化観光施設", "台東区", "30", "中核。上野の館と浅草文化観光センター"],
-    ["3", "文化財一覧", "台東区", "190", "指定文化財の詳細。No.1 の説明を深める"],
-    ["4", "トイレ情報", "台東区", "69", "旅程の実行可能性。自治体標準データ準拠"],
-    ["5", "めぐりん停留所（東西めぐりん）", "台東区", "72", "エリア間の移動手段"],
-    ["6", "銭湯", "台東区", "23", "営業時間・料金を持つ文化体験"],
-    ["7", "宿泊施設（旅館台帳）", "台東区", "883", "旅の拠点"],
-    ["8", "東京都内の飲食店のバリアフリー情報", "東京都産業労働局", "210", "飲食の唯一の店舗単位データ。欠損の実例"],
-    ["9", "R6国・地域別外国人旅行者行動特性調査", "東京都産業労働局", "22", "訪日客の行動特性。唯一の統計表"],
-    ["10", "都市公園・都立公園一覧（渋谷区）", "渋谷区", "123", "第2エリア（渋谷）の面"],
+    ["1", "名所・史跡", "台東区", "45", "t131067d0000000251", "中核。寺社と史跡。作法案内の出典"],
+    ["2", "文化観光施設", "台東区", "30", "t131067d0000000236", "中核。上野の館と浅草文化観光センター"],
+    ["3", "文化財一覧", "台東区", "190", "t131067d0000000393", "指定文化財の詳細。No.1 の説明を深める"],
+    ["4", "トイレ情報", "台東区", "69", "t131067d0000000249", "旅程の実行可能性。自治体標準データ準拠"],
+    ["5", "めぐりん停留所（東西めぐりん）", "台東区", "72", "t131067d0000000247", "エリア間の移動手段"],
+    ["6", "銭湯", "台東区", "23", "t131067d0000000256", "営業時間・料金を持つ文化体験"],
+    ["7", "宿泊施設（旅館台帳）", "台東区", "883", "t131067d2025000004", "旅の拠点"],
+    ["8", "東京都内の飲食店のバリアフリー情報", "東京都産業労働局", "210", "t000012d0000000063", "飲食の唯一の店舗単位データ。欠損の実例"],
+    ["9", "R6国・地域別外国人旅行者行動特性調査", "東京都産業労働局", "22", "t000012d0000000081", "訪日客の行動特性。唯一の統計表"],
+    ["10", "都市公園・都立公園一覧（渋谷区）", "渋谷区", "123", "t131130d2025000003", "第2エリア（渋谷）の面"],
   ];
-  const head = ["No.", "登録タイトル", "提供元", "件数", "役割"];
-  const colW = [0.6, 4.25, 1.85, 0.8, 4.3];
+  const head = ["No.", "登録タイトル", "提供元", "件数", "データセットID", "役割"];
+  // 合計は 11.8（表の幅）と一致させる。データセットID は 18 桁固定なので専用幅を取る。
+  const colW = [0.5, 3.6, 1.5, 0.65, 1.6, 3.95];
+  const ID_COL = 4;
   const tblRows = [
     head.map((h) => ({
       text: h,
@@ -580,7 +588,7 @@ screenSlide({
           fill: { color: i % 2 === 0 ? P.white : "FAF7F2" },
           color: j === 1 ? P.ink : P.muted,
           bold: j === 1,
-          fontSize: 10.5, fontFace: BODY,
+          fontSize: j === ID_COL ? 9 : 10.5, fontFace: BODY,
           align: j === 0 || j === 3 ? "center" : "left",
           valign: "middle", margin: [4, 8, 4, 8],
         },
@@ -588,14 +596,21 @@ screenSlide({
     ),
   ];
   s.addTable(tblRows, {
-    x: 0.75, y: 1.85, w: 11.8, colW, rowH: 0.41,
+    x: 0.75, y: 1.85, w: 11.8, colW, rowH: 0.38,
     border: { type: "solid", color: P.line, pt: 1 },
     autoPage: false,
   });
-  s.addText("カタログURL は https://catalog.data.metro.tokyo.lg.jp/dataset/<データセットID>。件数は取り込み済みのレコード数（合計 1,645 スポット）。", {
-    x: 0.75, y: 6.5, w: 11.8, h: 0.38, fontFace: BODY, fontSize: 10.5,
-    color: P.muted, margin: 0, valign: "middle",
-  });
+  s.addText(
+    [
+      // ライセンス（全件 CC BY 4.0）は上の小見出しに出ているので、ここでは繰り返さない。
+      "カタログURL: https://catalog.data.metro.tokyo.lg.jp/dataset/ に上表のデータセットIDをそのまま繋いだもの。出典を表示したうえで二次利用しています。",
+      "件数: 原データの行数。No.9 は統計表のため D1 のスポット表へは取り込まず、出典情報のみ登録している（スポット合計 1,645 件）。",
+    ].join("\n"),
+    {
+      x: 0.75, y: 6.2, w: 11.8, h: 0.42, fontFace: BODY, fontSize: 9,
+      color: P.muted, lineSpacing: 11, margin: 0, valign: "top",
+    },
+  );
   s.addNotes("利用オープンデータ10件。提出フォームにはデータURL＋タイトルで登録する。");
 }
 
@@ -608,8 +623,8 @@ screenSlide({
   const kpis = [
     {
       n: "約30分 → 約3分", size: 24, c: P.brand, t: "情報探索時間",
-      d: "カタログを開いて目的のデータに辿り着くまでの時間。企画時の推定値で、まだ実測していません。",
-      tag: "企画時の推定値・未実測",
+      d: "30分＝開発メンバーが初めてカタログを人手で探した体験に基づく目安。3分＝アプリの操作一巡（条件入力〜出典付きルート表示）の目安。",
+      tag: "体験・操作一巡に基づく目安",
     },
     {
       n: "100%", size: 44, c: P.live, t: "出典付与率",
@@ -647,10 +662,10 @@ screenSlide({
     });
   });
 
-  closer(s, "「約30分 → 約3分」は企画時の推定値です。提出までに実測できていないため、断定していません。", {
+  closer(s, "「約30分 → 約3分」は統制された比較計測ではありません。30分は開発メンバーの初回探索体験、3分は操作一巡の目安で、通しの計測は行っていないため「実測」とは書いていません。", {
     y: 5.85, h: 1.0, fill: P.espresso, face: BODY, size: 12.5, bold: false, color: P.cream,
   });
-  s.addNotes("KPI。30分→3分は未実測であることをスライド上で明示する（Issue #130）。");
+  s.addNotes("KPI。30分→3分は体験・操作一巡に基づく目安であることをスライド上で明示する。「実測」とは書かない（Issue #130 / submission-deck.md v1.6.0 §1）。");
 }
 
 // ─────────────────────────────────────────── 14. チーム紹介
@@ -688,11 +703,11 @@ screenSlide({
     x: 0.75, y: 5.55, w: 11.8, h: 0.6, fontFace: HEAD, fontSize: 24, bold: true,
     color: P.gold, margin: 0, valign: "middle",
   });
-  s.addText("https://tabi-concierge-tokyo.opendata-002.workers.dev", {
+  s.addText("https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev", {
     x: 0.75, y: 6.22, w: 11.8, h: 0.35, fontFace: BODY, fontSize: 12,
     color: "9E9184", margin: 0, valign: "middle",
   });
   s.addNotes("チーム紹介。役割分担のみを載せる。");
 }
 
-pres.writeFile({ fileName: "tabi-concierge-tokyo-submission.pptx" }).then((f) => console.log("wrote", f));
+pres.writeFile({ fileName: here("tabi-concierge-tokyo-submission.pptx") }).then((f) => console.log("wrote", f));
