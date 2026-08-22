@@ -3,7 +3,7 @@ import type { Unanswered } from "../../../../shared/core";
 /**
  * 答えられなかった興味の表示（Issue #29 の `gaps`）。
  *
- * 承認済みデザインカンプ（public/showcase/uploads/Gap_Design_new_jap.pdf）から
+ * 承認済みデザインカンプ（docs/02-design/design-canvas/Gap_Design_new_jap.pdf）から
  * 借りているのは**見た目のスタイル**（角丸の破線カード）だけ。**レイアウトは踏襲していない**
  * ―― デザインカンプは gap ごとに個別カード＋代替案を並べる構成だが、本実装は
  * gaps 配列をまとめて1枚のカードに列挙する単一サマリー方式にしてある。
