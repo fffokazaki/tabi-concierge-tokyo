@@ -93,4 +93,7 @@ const FAILURE_TITLES: Record<RecommendationFailure["kind"], string> = {
   network: "サーバーに接続できませんでした",
   http: "サーバーがエラーを返しました",
   parse: "応答を読み取れませんでした",
+  // 「接続できませんでした」（network）とは意図的に文言を分ける（Issue #146）。
+  // サーバーには届いている可能性があり、原因を誤誘導しないため
+  timeout: "応答がありませんでした",
 };

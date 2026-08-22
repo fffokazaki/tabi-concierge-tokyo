@@ -510,6 +510,21 @@ describe("障害", () => {
     expect(outcome.kind === "failure" && outcome.failure.kind).toBe("network");
   });
 
+  it("応答しない呼び出しは network ではなく timeout の障害にする（Issue #146。プラン側と対）", async () => {
+    // signal が発火するまで一切解決しない fetch。実装が timeoutMs を coreOperations.ts へ
+    // 渡し忘れていると、このテストは実時間で固まる（それ自体が退行の検出になる）
+    const fetchImpl = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted due to timeout", "TimeoutError"));
+        });
+      });
+    }) as unknown as typeof fetch;
+
+    const outcome = await buildRecommendations("culture", { fetchImpl, timeoutMs: 20 });
+    expect(outcome.kind === "failure" && outcome.failure.kind).toBe("timeout");
+  });
+
   it("HTTP エラーは unanswered と区別された障害にする", async () => {
     const { fetchImpl } = stubFetch({
       [SEARCH]: () => json({ error: "invalid_request", message: '"interests" の要素が不正です' }, 400),
