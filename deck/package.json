@@ -1,0 +1,14 @@
+{
+  "name": "tabi-concierge-tokyo-deck",
+  "version": "1.0.0",
+  "description": "提出資料（PPTX 14枚）を pptxgenjs で生成するビルダー",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "pptxgenjs": "^4.0.1"
+  },
+  "private": true
+}
