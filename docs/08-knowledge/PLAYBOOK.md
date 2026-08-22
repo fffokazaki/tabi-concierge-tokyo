@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.49.0"
+version: "1.50.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 135
+ace_entry_count: 136
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -366,8 +366,20 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-202-2 | 資料に載せた集計値は足し算で検算する —— 列の合計と注記の総計が 22 件ズレ、差は「取り込んでいない1件」だった | documentation-quality | [playbook/documentation-quality.md#ace-202-2](./playbook/documentation-quality.md#ace-202-2) |
 | ACE-202-3 | 一時領域で育てたスクリプトを取り込むときは、cwd 依存を `__dirname` 基準へ直す | tooling | [playbook/tooling.md#ace-202-3](./playbook/tooling.md#ace-202-3) |
 | ACE-202-4 | 「検証」欄に、その差分を1行も通っていないゲートを並べない | process | [playbook/process.md#ace-202-4](./playbook/process.md#ace-202-4) |
+| ACE-205-1 | best-effort 記録の成否を応答に載せないなら、UI は個別の受領証を名乗らない | architecture | [playbook/architecture.md#ace-205-1](./playbook/architecture.md#ace-205-1) |
 
 ## Changelog
+
+### [1.50.0] - 2026-08-22
+
+#### 追加
+
+- ACE-205-1: best-effort 記録の成否を応答に載せないなら、UI は個別の受領証を名乗らない（Issue #201 / PR #205）
+
+#### カウンター更新
+
+- ACE-51-4: Helpful +1（非発火経路の送信入力を確認してテスト到達性を固定）
+- ACE-62-3: Helpful +1（広すぎる否定アサートを対象の受領証文言へ限定）
 
 ### [1.49.0] - 2026-08-22
 

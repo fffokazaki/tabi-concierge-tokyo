@@ -92,7 +92,7 @@ ACE-28-2 の「実装を戻してテストが落ちるか確かめる」を `git
 
 | Category | testing | Origin | PR #51 / Issue #50 |
 | Date | 2026-08-18 |
-| Helpful | 1 | Harmful | 0 |
+| Helpful | 2 | Harmful | 0 |
 | Status | active |
 
 **Insight**: 内部関数の境界（定数の網羅・閾値など）を公開 API 越しにテストするとき、**入力が手前の分岐で return されていれば、その関数は一度も呼ばれない**。テストは緑のまま、境界は何も固定されない。判定の順序がある関数では、意図した分岐へ届く入力を選べているかがテストの前提になる。
@@ -114,7 +114,7 @@ ACE-28-2 の「実装を戻してテストが落ちるか確かめる」を `git
 
 | Category | testing | Origin | PR #62 / Issue #59 |
 | Date | 2026-08-18 |
-| Helpful | 2 | Harmful | 0 |
+| Helpful | 3 | Harmful | 0 |
 | Status | active |
 
 **Insight**: 旧文言の否定アサート（`not.toContain("対応するものがありません")`）は、**他分岐に旧文言が残っている間だけ**判別力を持つ。文言そのものは `toBe` の完全一致で固定し（言い換えによる断定の再混入も検出できる）、「対象分岐に到達した」ことは message ではなく**観測可能な副作用**（gaps recorder の記録行）で固定する。
