@@ -160,54 +160,113 @@ const MAX_FACET_VALUES = 20;
  * 存在しない値で絞った結果の0行を「無い」と報告すると、確かめていないことを主張することになり
  * （CLAUDE.md 絶対ルール #1）、`gaps` に偽の欠損が記録される。
  *
+ * ## リテラルだけを見ても足りない ―― 列と演算子まで見る
+ *
+ * 値の集合だけで照合すると、次の2つが素通りする（どちらも0行になる）:
+ *
+ * | 素通りする形 | なぜ0行か |
+ * | --- | --- |
+ * | `category = '上野'` | 「上野」は実在値だが **area の**実在値。category には無い |
+ * | `category = '文化'`（実値は「区民文化財」） | 部分一致が成立するのは `LIKE` のときだけ。`=` では当たらない |
+ *
+ * なので列ごとの実在値と突き合わせ、**完全一致は `=` / `IN` に、部分一致は `LIKE` に**限る。
+ *
  * ## 通すもの
  *
- * - `dataset_id` の値そのもの（`WHERE dataset_id = '...'` は必須なので当然通る）
+ * - `dataset_id = '<この ID>'`（必須なので当然通る。別の ID は拒否）
  * - 空文字（`note` は空のことがある。本番で `answered` を返していた SQL に含まれる形）
- * - **代表エリア名**（上野・浅草・渋谷）。訊かれたエリアをこのデータセットが収録していない
- *   ときの0行は**正しい未回答**なので、ここを弾くと「別のエリアの行」を返す方へ誘導してしまう
- * - 一覧の値の一部に当たる語（「文化」と「区民文化財」）。プロンプトが明示的に許している
- *   書き方で、Issue #120 の実測でここが要ることが分かっている
+ * - `area` に対する**代表エリア名**（上野・浅草・渋谷）。訊かれたエリアをこのデータセットが
+ *   収録していないときの0行は**正しい未回答**なので、ここを弾くと「別のエリアの行」を返す方へ
+ *   誘導してしまう
  *
- * それ以外は拒否して書き直させる。直らなければ既存の縮退（キーワード実装）へ落ちるので、
- * **偽の未回答が返ることはない**。
+ * 絞ってよい列は `dataset_id` / `category` / `area` だけ。`name` や `note` に intent の語を
+ * 当てにいく形（上の1つ目）は列の時点で拒否する。**どの列の条件か読み取れないものも拒否する**
+ * （読み取れないまま通すと、検査したつもりの穴になる）。
+ *
+ * 直らなければ既存の縮退（キーワード実装）へ落ちるので、**偽の未回答が返ることはない**。
+ *
+ * 照合に使うのは `readFacets` が読んだ一覧＝**プロンプトで見せた一覧そのもの**である
+ * （`MAX_FACET_VALUES` で切り詰めた分も同じ）。見せていない値で絞られても検査を通してしまうと、
+ * 「見せた値だけで絞れ」という指示を検査で裏づけたことにならない。
  */
-function findUnknownLiterals(sql: string, entry: CatalogEntry, facets: Facets): string[] {
-  const known = [...facets.categories, ...facets.areas];
-  const unknown: string[] = [];
-  for (const literal of stringLiteralsIn(sql)) {
-    if (literal === entry.datasetId) continue;
-    // LIKE のワイルドカードを外して中身で見る（'%文化%' → '文化'）
-    const value = literal.replace(/^%+/, "").replace(/%+$/, "");
-    if (value === "") continue;
-    if ((REPRESENTATIVE_AREAS as readonly string[]).includes(value)) continue;
-    if (known.some((actual) => actual.includes(value))) continue;
-    if (!unknown.includes(value)) unknown.push(value);
+function findFilterProblems(sql: string, entry: CatalogEntry, facets: Facets): string[] {
+  const problems: string[] = [];
+  const add = (problem: string) => {
+    if (!problems.includes(problem)) problems.push(problem);
+  };
+
+  for (const use of literalUses(sql)) {
+    if (use.value === "") continue; // 空文字との比較は値を作り出していない
+    if (use.column === "dataset_id") {
+      if (use.value !== entry.datasetId) add(`dataset_id は '${entry.datasetId}' に限定してください。`);
+      continue;
+    }
+    if (use.column === "category" || use.column === "area") {
+      const actual = use.column === "area" ? [...facets.areas, ...REPRESENTATIVE_AREAS] : facets.categories;
+      const problem = judgeAgainstActual(use, actual);
+      if (problem) add(problem);
+      continue;
+    }
+    if (use.column === undefined) {
+      add(`「${use.value}」がどの列の条件なのか読み取れませんでした。列 = 値 の形で素直に書いてください。`);
+      continue;
+    }
+    add(
+      `「${use.value}」で ${use.column} を絞らないでください。` +
+        "このデータセットを選んだのは検索側で、行の中身に intent の語が入っている必要はありません。" +
+        "絞ってよい列は category と area だけです。",
+    );
   }
-  return unknown;
+  return problems;
 }
 
+/** 列の実在値と突き合わせる。完全一致は `=` / `IN`、部分一致は `LIKE` のときだけ許す。 */
+function judgeAgainstActual(use: LiteralUse, actual: string[]): string | undefined {
+  const listed = actual.length > 0 ? `「${actual.join("」「")}」` : "（1件もありません）";
+  if (use.op === "LIKE") {
+    const needle = use.value.replace(/^%+/, "").replace(/%+$/, "");
+    if (needle === "" || actual.some((value) => value.includes(needle))) return undefined;
+    return `${use.column} に「${needle}」を含む値はありません。実際に入っているのは ${listed} です。`;
+  }
+  if (actual.includes(use.value)) return undefined;
+  return (
+    `${use.column} の値は ${listed} です。「${use.value}」は完全一致しないので0行になります。` +
+    "一覧の値をそのまま書くか、部分一致させたいなら LIKE を使ってください。"
+  );
+}
+
+/** 文字列リテラルと、その直前に現れる「列 演算子」。 */
+type LiteralUse = { value: string; column?: string; op?: string };
+
 /**
- * SQL 中のシングルクォート文字列を取り出す。`''` によるエスケープを1文字として扱う。
+ * SQL 中の文字列リテラルを、直前の「列 演算子」つきで取り出す。
  *
  * **検査するのは `guardSelect` を通ったあとの文字列**（＝実際に D1 へ渡すもの）である。
  * 生成された生テキストを見て別の文字列を実行すると、その差がそのまま迂回路になる
  * （[ACE-137-1](../../docs/08-knowledge/playbook/architecture.md#ace-137-1)）。
+ *
+ * **ダブルクォートも見る。** SQLite は `"自然"` を「その名前の列が無ければ文字列」として
+ * 扱うため、`category = "自然"` は**エラーにならず0行を返す**（実測。D1 で確認したうえで
+ * `text-to-sql.test.ts` に固定した）。シングルクォートだけ見ていると、この書き方が
+ * そのまま偽の未回答になる。ただし `"name"` のような**識別子としての**引用もあるので、
+ * 直前に「列 演算子」が読み取れたときだけ値として扱う。
  */
-function stringLiteralsIn(sql: string): string[] {
-  const literals: string[] = [];
+function literalUses(sql: string): LiteralUse[] {
+  const uses: LiteralUse[] = [];
   let i = 0;
   while (i < sql.length) {
-    if (sql[i] !== "'") {
+    const quote = sql[i];
+    if (quote !== "'" && quote !== '"') {
       i++;
       continue;
     }
+    const start = i;
     i++;
     let value = "";
     while (i < sql.length) {
-      if (sql[i] === "'") {
-        if (sql[i + 1] === "'") {
-          value += "'";
+      if (sql[i] === quote) {
+        if (sql[i + 1] === quote) {
+          value += quote;
           i += 2;
           continue;
         }
@@ -217,9 +276,26 @@ function stringLiteralsIn(sql: string): string[] {
       value += sql[i];
       i++;
     }
-    literals.push(value);
+    const context = contextOf(sql.slice(0, start));
+    // ダブルクォートは「列 演算子」が読み取れたときだけ値とみなす（識別子の引用と区別する）
+    if (quote === '"' && context.column === undefined) continue;
+    uses.push({ value, ...context });
   }
-  return literals;
+  return uses;
+}
+
+/**
+ * リテラルの直前から「列 演算子」を読む。`IN ('a','b')` の2つ目以降も同じ列に結びつける。
+ * 読み取れなければ `undefined` を返し、呼び出し側が拒否する（読めないものは通さない）。
+ */
+const LITERAL_CONTEXT =
+  /([A-Za-z_][A-Za-z0-9_]*)\s*(=|<>|!=|(?:not\s+)?like|(?:not\s+)?in)\s*\(?\s*(?:(?:'(?:[^']|'')*'|"(?:[^"]|"")*")\s*,\s*)*$/i;
+
+function contextOf(before: string): { column?: string; op?: string } {
+  const matched = LITERAL_CONTEXT.exec(before);
+  if (!matched) return {};
+  const op = matched[2]!.toUpperCase().replace(/\s+/g, " ");
+  return { column: matched[1]!.toLowerCase(), op: op.endsWith("LIKE") ? "LIKE" : op };
 }
 
 /**
@@ -334,16 +410,13 @@ async function attemptTextToSql(
 
     // 実在しない値で絞っていないか（Issue #148）。**実行する前に**見る ―― 実行してしまうと
     // 0行が返り、それが「探したが無かった」という答えとして利用者にも gaps にも流れる
-    const unknown = findUnknownLiterals(guarded.sql, entry, facets);
-    if (unknown.length > 0) {
-      previousError =
-        `${unknown.map((value) => `「${value}」`).join("")}は、この dataset_id の行に実際に入っている値ではありません。` +
-        "「この dataset_id の行に実際に入っている値」の一覧にある語だけで絞るか、当てはまる値が無ければ category では絞らず" +
-        "エリアだけで絞ってください。intent の語を name や note に当てにいかないこと。";
-      console.warn("[text-to-sql] 一覧に無い値で絞る SQL を拒否しました", {
+    const problems = findFilterProblems(guarded.sql, entry, facets);
+    if (problems.length > 0) {
+      previousError = problems.join("\n");
+      console.warn("[text-to-sql] 実在しない値で絞る SQL を拒否しました", {
         attempt,
         datasetId: input.datasetId,
-        unknown,
+        problems,
         sql: guarded.sql,
       });
       continue;
