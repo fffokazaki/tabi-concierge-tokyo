@@ -27,17 +27,24 @@ Claude の宣言的コンポーネント runtime（`<x-dc>` / `<sc-if>` / `{{ }}
 
 ## 画像スロットは意図的に空にしている
 
-`.image-slots.state.json` は `{}` で固定する。**ここに写真を入れないこと。**
+`.image-slots.state.json` は `{}` で固定する。**出典を画面に表示できない画像は置かないこと。** 経緯は [Issue #222](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/222)。
 
-2026-08-23 まで、プラン画面の3枠と「あなたへ」画面の1枠に写真4点が data URI で埋め込まれていた（浅草寺／上野公園の桜／ラーメン二郎 上野店の店舗外観。最後の1点は 720×540）。**撮影者・取得元・利用許諾の記録がリポジトリに無く**、かつ本番の `/showcase/` で実際に画面へ表示されていた（2026-08-23 実測）。主催者規定の「引用は出典を明記する」（[CONSTRAINTS.md](../../docs/01-context/CONSTRAINTS.md) §3）と、本プロダクトが掲げる「根拠がなければ答えない」の両方に反する状態だったため、[Issue #222](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/222) で4点すべてを取り除いた。
+主催者規定の「引用は出典を明記する」（[CONSTRAINTS.md](https://github.com/fffokazaki/tabi-concierge-tokyo/blob/develop/docs/01-context/CONSTRAINTS.md) §3）は、**成果物の上に表示すること**を求めている。この README に書くだけでは満たせない。`image-slot.js` は対応する仕組みを既に持っている。
 
-スロットへ画像を足すときは、**先に撮影者・撮影日・利用許諾をこの README へ記録する**。記録できない画像は入れない。空のままでもプロトタイプは壊れず、枠がプレースホルダ表示になるだけである。
+- `<image-slot>` の `credit` / `credit-href` 属性に出典を書くと、画像の左下にクレジットが**表示される**（`:host([data-filled][data-credit]) .credit{display:block}`）
+- `credit` は **HTML 属性で、sidecar のフィールドではない**。authoring host から画像をドロップしただけでは付かないので、`.dc.html` 側の編集が必須
+- sidecar は **3つの `.dc.html`（日本語・英語・印刷用）が同じ1ファイルを document-relative に読む**。1点入れると3ページすべてに出るため、`credit` は3ファイル分書く
+- `@media print` と `:host-context([data-om-exporting])` ではクレジットが**隠れる**。印刷・authoring host のエクスポート経由の出力には出ない
+
+したがって画像を足すときは、**(1) `credit` / `credit-href` を3ファイルすべてに書く (2) 撮影者・撮影日・利用許諾をこの README にも記録する**。どちらかができない画像は置かない。
+
+空のままでもプロトタイプは壊れない（枠がプレースホルダ表示になるだけ。`placeholder` 属性の値が出る）。
 
 ### `uploads/` を置かない
 
-以前ここに `uploads/` があり、承認済みデザインカンプ（`Gap_Design_new.pdf` / `Gap_Design_new_jap.pdf`）と元資料（`Tourism.docx`）を **git 追跡下で公開配信していた**。PDF 2点には**上記の写真3点と同じ画像が埋め込まれている**（画像 XObject の実寸 104×55 / 104×69 / 104×78 が sidecar 側の実測値と一致。2026-08-23 実測）ため、sidecar だけを空にしても本番から写真は消えなかった。
+以前ここに `uploads/` があり、デザインカンプと元資料を git 追跡下で公開配信していた。**`public/` 配下に置いたものは、画面から到達できなくても全部そのまま配信される。** 3点は [`docs/02-design/design-canvas/`](https://github.com/fffokazaki/tabi-concierge-tokyo/tree/develop/docs/02-design/design-canvas) へ移した。プロトタイプの描画に必要な資産だけをこのディレクトリに置くこと。
 
-3点は [`docs/02-design/design-canvas/`](../../docs/02-design/design-canvas/) へ移した。**`public/` 配下に置いたものは全部そのまま配信される** —— 画面から到達できないファイルでも同じである。プロトタイプの描画に必要な資産だけをこのディレクトリに置くこと。
+> このファイル自身も `/showcase/README.md` で公開配信される（実測 200 / `text/markdown`）。**運用の経緯や内部判断を書き足さないこと。** 相対リンクもこの経路では SPA フォールバックに吸われるため、リンクは絶対URLで書く。
 
 ## 収録画面
 
