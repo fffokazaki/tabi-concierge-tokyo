@@ -1,6 +1,6 @@
 ---
 title: "DEPLOYMENT"
-version: "1.18.3"
+version: "1.18.4"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -266,6 +266,7 @@ npm run deploy  # vite build → wrangler deploy
 
 | 日時 | Version ID | 内容 | 確認 |
 | --- | --- | --- | --- |
+| 2026-08-22 | `3fbb592c-8221-4749-a31f-89b3399305db` | `search_datasets` の最後のフォールバックが、呼び出し元から実際に送られた入力に合わせて `message` の照合対象を「興味の語」・「質問文・興味の語」・「質問文の語」と言い分ける修正（#114 / PR #214・#216）。PR #214 のマージ後に Version `543a6a35-6ee7-451b-a976-7071449feb3d` を一度デプロイしたが、本番確認で query-only の LLM 成功経路が未検証と判明したため Issue を再オープンし、PR #216 で候補選定には LLM 解釈後入力を維持しつつ、文言だけを元入力から決めるよう補完した。最終デプロイ対象の統合コミットは `4d8782ceee691ffc51189acd3ec7b08df7979ae4`。`worker/` の変更なので §3 の契機に該当し、`migrations/` `data/` `scripts/` `src/` は未変更のため migrate・seed は実行していない | チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。**変更した3分岐を本番で実測** ―― `interests` のみは「興味の語」、`query + interests` は「質問文・興味の語」、query-only（`エリア指定なし。ショッピングだけ`）は LLM 分解を通ったうえで「質問文の語」を返し、すべて HTTP 200 の `unanswered(other)`。コア3操作も実測し、`aggregate_dataset` は D1 実照会で寛永寺、`get_provenance` は CC BY 4.0 の出典1件を返した。リモート D1 は datasets 10 / spots 1,645、上記未回答は `gaps` に記録済み。テスト 44ファイル・903件、typecheck・build・文書検証は PR #216 で通過 |
 | 2026-08-22 | `c607291d-c80d-45dd-a4fa-dcf6a08f5155` | 停留地へカテゴリ別イラストを表示し、`aggregate_dataset` の回答へ実データの非空 `category` を追加（#188 / PR #204）。現在の全16カテゴリ・1,645行を9種の ImageGen 製 WebP（8グループ＋将来の未知カテゴリ用）へ割り当て、角丸枠の外側を実アルファ透過にした。`worker/` `shared/` `src/` の変更なので §3 の契機に該当。`migrations/` とデータ内容は未変更のため、マイグレーション・シードは実行していない。デプロイ対象の統合コミットは `085c4073d5433c1c575dd6c09ea7342be965ba3d` | チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。**D1 主経路を実測** ―― `aggregate_dataset({datasetId:"t131067d0000000251", intent:"上野エリアの寺社を1件"})` が寛永寺と `category: "名所・史跡"` を返し、`query` は `D1 実照会:` と id の固定照会を含む。**配信物の同一性を実測** ―― 本番 `/index.html` が手元の 718 bytes と `cmp` で一致し、カテゴリ画像9ファイルも全件バイト一致。実ブラウザでは寛永寺カード内の装飾画像が `/assets/heritage-BwLfrU-A.webp`、`alt=""` で1件表示され、後続の文化観光施設・文化財にも各画像が表示された。伝播待ちは不要だった。テスト 44ファイル・899件、typecheck・build・文書検証は PR #204 で通過 |
 | 2026-08-22 | `688c5cb7-0c64-4440-9f59-cbbedec9463e` | 未回答が記録され都へのデータ公開リクエストへ還元されることの注記を、未回答・欠損の表示の脇に出す（#192 / PR #198）。**変更は `src/` と `docs/` のみ**だが、React アプリは同じ Worker に同梱されて配信されるため §3 の「`src/` を変更する PR をマージしたとき」の契機に該当する。`worker/` `shared/` `migrations/` `data/` `scripts/` は未変更のため、マイグレーション・シードは実行していない。2026-08-17 の「リクエストするボタンは出さない」判断は維持（押す操作は増やしていない） | **配信中の bundle が手元のビルドとバイト一致することで確認** ―― `curl --compressed` で取得した `/assets/index-CMI8dFSf.js`（226,884 bytes）が `dist/client/assets/index-CMI8dFSf.js` と `cmp` で完全一致し、注記の文言「答えられなかった問いは記録されます。…」を含む。`/assets/index-CP_BfR62.css` にも `.gap-escalation-note` が入っている。**実ブラウザで2ケース実測** ―― プラン画面（興味＝ラーメン・文化）で `route-panel` の並びが `data-gap-card` → `gap-escalation-note` → 停留地となり注記は1つだけ。あなたへ画面のラーメン単独では `route-empty`（`分類: insufficient_granularity`）→ `gap-escalation-note` の2要素で、**内訳が空でも注記が出ることを本番で確認**（`DataGapCard` は出ない）。**伝播待ちは不要だった**（デプロイ直後の1回目から新 bundle）。テスト 869 件（+62 は #193 のダッシュボードぶんを含む。#192 単体では +18） |
 | 2026-08-22 | `460c9237-4423-436d-aa93-e1b0942bd4a5` | 応答に載せる行を代表エリア優先で選ぶ（#174 / PR 後述）。生成 SQL が area 条件を `OR` で繋ぐと（同一入力8回で4〜6回・実測）対象エリア外の行が category だけで当たり、`rows[0]` 固定の取り出しが蔵前の行を旅程の1番目に載せていた。**プロンプトで「AND で繋げ」と頼む修正は効かなかった**（追加後も8回中6回が OR 形・Version `9df28168` で実測 → revert）。SQL は直さず `pickPreferredRow`（`worker/core/text-to-sql.ts`）が返った行から intent の代表エリア → 代表エリアいずれか → 先頭の順で選ぶ。`worker/` の変更なので §3 の契機に該当 | **AC を本番で実測** ―― キャッシュ無効（`AI_GATEWAY_CACHE_TTL="0"` を一時設定）で同一入力`{"datasetId":"t131067d0000000251","intent":"文化、家族向け、自然"}` を8回引き直し、SQL は AND 5 / OR 3 と揺れたまま**8回全部が寛永寺（上野）**。修正前は OR 形のたび初代川柳墓（蔵前）だった。測定後に TTL を 3600 へ戻して再デプロイし、焼き付く1発目も寛永寺であることを確認。テスト 773 件（+3。#153 の「別エリアの行が返る」を固定していたテストは意図的に書き換え）。**引き直し測定の途中版**（`60ee2fac` 効かないプロンプト入り・`9df28168` 同+TTL0・`e6957718`/`e39c60b9` 行選定入り・`1787a736` 一時復旧）**が本番に載った時間帯がある** ―― いずれも短時間。その後 Codex レビュー指摘（同名別エリアの取り違え・「銅鐘」実例）対応で `a9fdf7f6-3ba0-44f8-ac18-3b594bb3388d` を最終版としてデプロイ。`PREFERRED_COLUMNS` に `area` を足したため生成 SQL の SELECT に area が入るようになったことを本番応答の `query` で確認（`SELECT dataset_id, name, address, note, area FROM ...`）。名指し経路（上野の寺社を1件 → 寛永寺）も回帰なし |
@@ -509,6 +510,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.18.4] - 2026-08-22
+
+#### 追加
+
+- §3「デプロイ記録」に Issue #114 / PR #214・#216 の最終反映（Version ID `3fbb592c-8221-4749-a31f-89b3399305db`）を追記。3入力分岐、標準チェックリスト、コア3操作、リモート D1 の件数と `gaps` 記録を実測し、補完前の中間 Version が短時間載った経緯も隠さず記録した
 
 ### [1.18.3] - 2026-08-22
 
