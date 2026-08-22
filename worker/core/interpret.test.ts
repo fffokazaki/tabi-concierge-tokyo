@@ -61,6 +61,18 @@ describe("いつ LLM を呼ぶか", () => {
 });
 
 describe("分解の結果を既存の判定へ渡す", () => {
+  it("query のみなら、LLM が内部で興味を補っても質問文だけを照合した message にする", async () => {
+    const llm = scriptedLlm('{"areas":[],"interests":["ショッピング"],"rankedDatasetIds":[]}');
+
+    const output = await search({ query: "ショッピング" }, depsWith(llm));
+
+    expect(output.status).toBe("unanswered");
+    if (output.status !== "unanswered") return;
+    expect(output.message).toBe(
+      "利用中の10データセットのキーワードには、質問文の語に当たるものがありませんでした。",
+    );
+  });
+
   it("**自然文だけの呼び出しでも、答えられなかった興味を欠損として報告できる**", async () => {
     // これが本 Issue の中核。構造化入力（`interests`）を送らない呼び出しでは、
     // キーワードが1件でも当たれば `answered` になり、答えていない興味は応答のどこにも

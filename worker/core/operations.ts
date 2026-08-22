@@ -254,7 +254,7 @@ export async function searchDatasets(
   // と同じ性質の問題）。エリアだけは `resolved` の解決結果を使う — どのエリアのデータが
   // 足りないかを集計するための列で、そこは読み取れているほうが有用（`gaps.ts` の doc 参照）
   const context = { ...searchGapContext(normalized), area: searchGapContext(resolved).area };
-  return recorded(computeSearchDatasets(resolved, ranked), context, recorder);
+  return recorded(computeSearchDatasets(resolved, ranked, normalized), context, recorder);
 }
 
 /**
@@ -318,7 +318,8 @@ function searchGapContext(input: SearchDatasetsInput): GapContext {
  */
 function computeSearchDatasets(
   input: SearchDatasetsInput,
-  ranked: readonly string[] = [],
+  ranked: readonly string[],
+  sourceInput: SearchDatasetsInput,
 ): SearchDatasetsOutput {
   // 境界を通らない直接呼び出しでも壊れた値で応答を作らないよう、ここでも範囲に収める
   const limit = Math.min(Math.max(Math.trunc(input.limit ?? DEFAULT_SEARCH_LIMIT), 1), MAX_SEARCH_LIMIT);
@@ -456,9 +457,10 @@ function computeSearchDatasets(
   // 場合で、実装が知っているのは「全10件のキーワード表に当たらなかった」ことだけ。
   // `categoryMissUnanswered` と同じ判断（Issue #59）で、「対応するものが無い」とは断定しない。
   // 興味だけの呼び出し（query 省略）に「質問文の語」と書くと、存在しないものを照合したと
-  // 読めてしまうので、照合に使った入力に合わせて言い分ける（実際に行ったことだけを書く）
-  const hasQuery = Boolean(input.query?.trim());
-  const hasInterests = Boolean(input.interests?.length);
+  // 読めてしまうので、呼び出し元が送った入力に合わせて言い分ける。LLM が query から補った
+  // interests は候補選定には使うが、利用者が構造化入力を送ったかのようには書かない（Issue #114）
+  const hasQuery = Boolean(sourceInput.query?.trim());
+  const hasInterests = Boolean(sourceInput.interests?.length);
   const askedLabel =
     hasQuery && hasInterests ? "質問文・興味の語" : hasInterests ? "興味の語" : "質問文の語";
   return unansweredWith(
