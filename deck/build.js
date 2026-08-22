@@ -226,7 +226,7 @@ function closer(slide, text, o = {}) {
   const layers = [
     {
       k: "live", d: "本番URLで今動く",
-      items: "旅のプロフィール入力／プラン生成\nあなたへ／出典チップ／gaps 記録\nD1（10データセット・1,645スポット）\n/mcp でのコア3操作公開\nText-to-SQL による D1 実照会",
+      items: "旅のプロフィール入力／プラン生成\nあなたへ／出典チップ／gaps 記録\nD1（10データセット・1,645スポット）\n/mcp でのコア3操作公開\nText-to-SQL による D1 実照会\nメタデータRAG による自然文の分解",
     },
     {
       k: "spec", d: "仕様は確定、コードはこれから",
@@ -411,8 +411,8 @@ screenSlide({
   const STEP_GAP = 0.5;
   const STEP_PAD = 0.22;
   const boxes = [
-    { t: "自然文の入力", d: "プロフィールと興味\n「上野で文化と自然」", k: "live" },
-    { t: "メタデータRAG", d: "収録10件のメタデータ\nから候補を特定", k: "live" },
+    { t: "自然文の質問", d: "「上野で文化と自然」\n自由文で受け取る", k: "live" },
+    { t: "メタデータRAG", d: "収録10件のメタデータから\n候補を特定", k: "live" },
     { t: "Text-to-SQL", d: "生成SQLを封じ込めて\nD1 を実照会", k: "live" },
     { t: "出典強制", d: "根拠が取れなければ\n答えない", k: "live" },
   ];
@@ -436,14 +436,19 @@ screenSlide({
     }
   });
 
+  s.addText("メタデータRAG が動くのは自然文の質問を受けたとき（/mcp・自由文入力）。興味チップだけの呼び出しは構造化入力なので、この段を通らず3段目から入ります。", {
+    x: 0.75, y: 4.17, w: 11.8, h: 0.26, fontFace: BODY, fontSize: 9.5,
+    color: P.muted, margin: 0, valign: "middle",
+  });
+
   card(s, { x: 0.75, y: 4.45, w: 5.94, h: 2.1, fill: P.tint, stroke: P.line });
   s.addText("React → /api/* → D1、同じ3操作を /mcp でも公開", {
     x: 1.07, y: 4.68, w: 5.3, h: 0.4, fontFace: HEAD, fontSize: 14, bold: true,
     color: P.ink, margin: 0, valign: "middle",
   });
-  s.addText("React アプリは /api/* でコア3操作（search_datasets / aggregate_dataset / get_provenance）を呼びます。D1 は10データセット・1,645スポット。同じ3操作を /mcp でも公開しており、AI クライアントや翌年の参加者が旅行アプリを経由せずに呼べます。", {
-    x: 1.07, y: 5.06, w: 5.3, h: 1.02, fontFace: BODY, fontSize: 10.5,
-    color: P.muted, lineSpacing: 15, margin: 0, valign: "top",
+  s.addText("React アプリは /api/* でコア3操作（search_datasets / aggregate_dataset / get_provenance）を呼びます。同じ3操作を /mcp でも公開しており、AI クライアントや翌年の参加者が旅行アプリを経由せずに呼べます。", {
+    x: 1.07, y: 5.1, w: 5.3, h: 1.0, fontFace: BODY, fontSize: 11.5,
+    color: P.muted, lineSpacing: 17, margin: 0, valign: "top",
   });
   pill(s, 1.07, 6.14, "live");
 
@@ -456,7 +461,7 @@ screenSlide({
     x: 7.26, y: 5.14, w: 4.97, h: 1.2, fontFace: BODY, fontSize: 11.5,
     color: P.cream, lineSpacing: 18, margin: 0, valign: "top",
   });
-  s.addNotes("アーキテクチャ。自然文→メタデータRAG→Text-to-SQL→出典強制のパイプラインが全段稼働していること、出典強制が運用ルールではなく構造であることが要点（Issue #117 / #119 / #120）。メタデータRAG が見ているのは収録済みの確定10件で、9,600件は「カタログにある数」であって「検索している数」ではない（全カタログ・イン・プロンプト方式・Vectorize 不採用。worker/core/interpret.ts）。訊かれたら10件と答える。");
+  s.addNotes("アーキテクチャ。自然文→メタデータRAG→Text-to-SQL→出典強制のパイプラインが全段稼働していること、出典強制が運用ルールではなく構造であることが要点（Issue #117 / #119 / #120）。メタデータRAG が見ているのは収録済みの確定10件で、9,600件は「カタログにある数」であって「検索している数」ではない（全カタログ・イン・プロンプト方式・Vectorize 不採用。worker/core/interpret.ts）。訊かれたら10件と答える。**4段は常に直列に通るわけではない** — 興味チップを選んだ呼び出しは構造化入力なので operations.ts の interpreted() が interpretQuery を呼ばず、2段目を飛ばして3段目から入る。スライド6/7/8のキャプチャは「興味チップのみ・自由文は空」で撮っているため、いずれも2段目を通っていない。2段目が働くのは /mcp・API コンソール・チップ未選択の自由文。");
 }
 
 // ─────────────────────────────────────────── 10. データが育つループ
@@ -474,7 +479,7 @@ screenSlide({
   steps.forEach((st, i) => {
     const x = 0.75 + i * 3.02;
     const on = st.k === "live";
-    card(s, { x, y: 1.95, w: 2.78, h: 3.55, fill: on ? P.white : "FBF8F3", stroke: P.line });
+    card(s, { x, y: 1.95, w: 2.78, h: 3.0, fill: on ? P.white : "FBF8F3", stroke: P.line });
     s.addShape(pres.ShapeType.ellipse, {
       x: x + 0.26, y: 2.24, w: 0.58, h: 0.58,
       fill: { color: on ? P.brand : P.spec }, line: { color: on ? P.brand : P.spec, width: 0 },
@@ -484,24 +489,35 @@ screenSlide({
       color: P.white, align: "center", valign: "middle", margin: 0,
     });
     s.addText(st.t, {
-      x: x + 0.26, y: 3.02, w: 2.26, h: 0.65, fontFace: HEAD, fontSize: 15.5, bold: true,
+      x: x + 0.26, y: 2.95, w: 2.26, h: 0.55, fontFace: HEAD, fontSize: 15.5, bold: true,
       color: P.ink, lineSpacing: 21, margin: 0, valign: "top",
     });
     s.addText(st.d, {
-      x: x + 0.26, y: 3.74, w: 2.26, h: 1.3, fontFace: BODY, fontSize: 11,
+      x: x + 0.26, y: 3.57, w: 2.26, h: 0.9, fontFace: BODY, fontSize: 11,
       color: P.muted, lineSpacing: 16, margin: 0, valign: "top",
     });
-    pill(s, x + 0.26, 5.08, st.k);
+    pill(s, x + 0.26, 4.57, st.k);
     if (i < 3) {
       s.addText("→", {
-        x: x + 2.8, y: 3.5, w: 0.22, h: 0.5, fontFace: BODY, fontSize: 18, bold: true,
+        x: x + 2.8, y: 3.2, w: 0.22, h: 0.5, fontFace: BODY, fontSize: 18, bold: true,
         color: P.brand, align: "center", valign: "middle", margin: 0,
       });
     }
   });
 
-  closer(s, "答えられないことを記録に残すと、それは失敗ではなく、次に何を公開してほしいかの一次情報になります。", { y: 5.8, h: 1.05, size: 17 });
-  s.addNotes("gaps ループ。記録までは稼働中、都への提出プロセスは未実装であることを区別する。");
+  // 本番の /gaps ダッシュボード。ループが実際に回っていることの証拠として実物を置く。
+  // 画像は 880x534（比率 1.648）なので、高さ 1.77in なら幅 2.92in。
+  s.addImage({ path: here("img/deck-gaps.png"), x: 0.75, y: 5.08, w: 2.92, h: 1.77 });
+  card(s, { x: 3.87, y: 5.08, w: 8.68, h: 1.77, fill: P.tint, stroke: P.line });
+  s.addText("答えられないことを記録に残すと、それは失敗ではなく、次に何を公開してほしいかの一次情報になります。", {
+    x: 4.19, y: 5.26, w: 8.04, h: 0.58, fontFace: HEAD, fontSize: 15, bold: true,
+    color: P.brand, lineSpacing: 20, margin: 0, valign: "middle",
+  });
+  s.addText("左は本番の /gaps ダッシュボード。2026-08-22 時点で 46 件を記録し、理由別（粒度不足 26 / その他 18 / 対象エリア外 2）とエリア別に集計しています。都への提出プロセス自体は未実装です。", {
+    x: 4.19, y: 5.9, w: 8.04, h: 0.8, fontFace: BODY, fontSize: 11,
+    color: P.muted, lineSpacing: 16, margin: 0, valign: "top",
+  });
+  s.addNotes("gaps ループ。記録までは稼働中、都への提出プロセスは未実装であることを区別する。左下は本番 /gaps の実物（2026-08-22 時点で46件）。");
 }
 
 // ─────────────────────────────────────────── 11. 基盤の開放
@@ -713,7 +729,7 @@ screenSlide({
     color: P.gold, charSpacing: 1.2, margin: 0, valign: "middle",
   });
   s.addText("仕様書（docs/）を SSOT に、Claude Code / Codex による AI 仕様駆動開発でフルオート実装。仕様→実装→検証のループを AI が回します。", {
-    x: 1.07, y: 5.35, w: 11.16, h: 0.3, fontFace: BODY, fontSize: 11,
+    x: 1.07, y: 5.38, w: 11.16, h: 0.3, fontFace: BODY, fontSize: 11,
     color: P.dim, margin: 0, valign: "middle",
   });
 
