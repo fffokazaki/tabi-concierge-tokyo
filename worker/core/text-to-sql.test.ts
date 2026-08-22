@@ -830,11 +830,41 @@ describe("名指しされた施設が無いときは黙ってすり替える（I
     }
   });
 
-  it("代表エリアを読み取れたときは、そのエリアに行が無ければ未回答のまま", async () => {
+  it("**書き直し SQL のエリアは検証していない** ―― 代表エリアを読み取れていても別エリアの行が返る", async () => {
+    // `countRelaxed` が縛るのは「書き直させるかどうか」だけで、**返ってきた行のエリアは
+    // 誰も見ていない**。「上野の…」と訊かれていても、書き直し SQL がエリア条件を落とせば
+    // 浅草の行がそのまま答えになる（cross-model レビュー・信頼度96 の指摘を実測で確認）。
+    //
+    // したがって「すり替え先は同じエリアに限られる」とは書けない。この穴そのものは
+    // [Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152)
+    //（返る行の area を実行後に検証する）が扱う
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await seed([
+        { name: "浅草神社", area: "浅草" },
+        { name: "寛永寺", area: "上野" },
+      ]);
+      const byName =
+        `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        " AND name LIKE '%とげぬき地蔵%' LIMIT 50";
+      const llm = scriptedLlm(byName, SELECT_ALL); // 書き直しでエリア条件が付かない
+
+      const answered = expectAnswered(await aggregate(MEISHO_ID, "上野のとげぬき地蔵に行きたい", depsWith(llm)));
+
+      expect(answered.result.name, "上野を訊かれているのに浅草の行が返る").toBe("浅草神社");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("エリアについての唯一の歯止め: 読み取れた代表エリアの行が1件も無ければ書き直させない", async () => {
     // `countRelaxed` は読み取れた代表エリアを緩めない。「浅草寺」を名指しされてもこの
-    // データセットが浅草を1行も収録していなければ、上野の行を代わりに返したりはせず未回答に
-    // なる（別エリアの行で代替すると本物の出典がついた誤答になる・API.md §3.2）。
-    // **この歯止めが効くのは代表エリアを読み取れたときだけ** ―― 次のテストがその境界を示す
+    // データセットが浅草を1行も収録していなければ、書き直させずに未回答にする
+    // （別エリアの行で代替すると本物の出典がついた誤答になる・API.md §3.2）。
+    //
+    // **エリアについて保証できるのはここまで。** 行が1件でもあれば書き直させ、返ってきた
+    // 行のエリアは検証していない（上のテスト）。読み取れなければ裏取りにエリア条件すら
+    // 付かない（下のテスト）
     await seed([{ name: "寛永寺", area: "上野" }]);
     const byName =
       `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
@@ -846,14 +876,11 @@ describe("名指しされた施設が無いときは黙ってすり替える（I
   });
 
   it("**代表エリアを読み取れない intent では、すり替え先はエリアを越える**", async () => {
-    // 直前のテストの歯止めは `findRepresentativeArea` が intent から代表エリアを
-    // 拾えたときだけ成り立つ。拾えるのは「上野」「浅草」「渋谷」の部分一致だけなので
-    // （`shared/core.ts` の `REPRESENTATIVE_AREAS`）、未知の地名（巣鴨のとげぬき地蔵）や
-    // エリア無指定では `countRelaxed` にエリア条件が付かず、**データセット全体**から選ばれる。
-    //
-    // これは #153 で選んだ①の**範囲の広さ**であって、別の不具合ではない ―― ただし
-    // 「エリアは越えない」と書くと実装より強い主張になる（cross-model レビュー・信頼度96）。
-    // 訊かれたエリアが SQL から落ちる形は [Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152) が別に扱う
+    // 上の歯止めすら、`findRepresentativeArea` が intent から代表エリアを拾えたときの話。
+    // 拾えるのは「上野」「浅草」「渋谷」の部分一致だけなので（`shared/core.ts` の
+    // `REPRESENTATIVE_AREAS`）、未知の地名（巣鴨のとげぬき地蔵）やエリア無指定では
+    // `countRelaxed` にエリア条件が付かず、**データセット全体**で数える ―― 1行でもあれば
+    // 書き直させるので、訊かれた場所と無関係な行がそのまま答えになる
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       await seed([{ name: "寛永寺", area: "上野" }]);

@@ -232,9 +232,10 @@ describe("tools/list", () => {
     expect(description, "「意図に合う1件」と断定していない").not.toContain("集計意図に合う");
     expect(description, "名指しが外れたら別の行が返ることを広告している").toContain("別の行が返る");
     expect(description, "すり替えが応答に現れないことを広告している").toContain("応答に現れない");
-    // エリアの歯止めは「代表エリアを読み取れたとき」に限る。言い切ると未知の地名で
-    // 別エリアの行が返る経路を隠すことになる
-    expect(description, "エリアの歯止めが効く条件を書いている").toContain("代表エリア");
+    // エリアについても言い切らない。返る行の area は検証していないので、「同じエリアに
+    // 限られる」と広告すると、別エリアの行が返る経路（Issue #152）を隠すことになる
+    expect(description, "返る行のエリアを保証していないと書いている").toContain("保証は無い");
+    expect(description, "unanswered になる条件を書いている").toContain("代表エリア");
   });
 
   it("入力スキーマは説明を載せるが、型は主張しない", async () => {
