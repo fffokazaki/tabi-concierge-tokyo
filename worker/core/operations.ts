@@ -479,14 +479,15 @@ function computeSearchDatasets(
  * 書き漏れた経路が「照合済み」に見えてしまう（Issue #78）。
  */
 const describeQuery = (entry: CatalogEntry, sample: CatalogSample, selection: string): string =>
-  `固定データ抽出（スタブ）: data/${entry.datasetId}/data.csv（${entry.retrievedAt} 取得・全${entry.rowCount}行）のヘッダを除く ${sample.sourceRow} 行目（${selection}。intent の内容との照合はしていない）。Step 5 で Text-to-SQL に置き換える。`;
+  `固定データ抽出（スタブ）: data/${entry.datasetId}/data.csv（${entry.retrievedAt} 取得・全${entry.rowCount}行）のヘッダを除く ${sample.sourceRow} 行目（${selection}。intent の内容との照合はしていない）。Text-to-SQL が使えなかったため、縮退経路（キーワード実装）で応答した。`;
 
 /**
- * 集計・抽出。固定データから1件を返す。
+ * 集計・抽出。前段ガードの後、主経路は Text-to-SQL で D1 を実照会し、
+ * 障害・不正出力時は固定サンプル抽出へ縮退する。
  *
- * **エリアを指定されたら、そのエリアの行しか返さない。** 一致する行が無いときに先頭行へ
- * フォールバックすると、「浅草の銭湯」に上野の銭湯を実在する出典つきで返すことになる。
- * 出典が本物であるぶん誤りが見つけにくく、推測で埋めるより質が悪い（CLAUDE.md 絶対ルール #1・#2）。
+ * 縮退経路は固定サンプルを指定エリアで絞る。一方、主経路は返る行の `area` を実行後に
+ * 検証していないため、指定エリアの行だけを返すとは保証しない。エリアに関する保証と
+ * 既知の制約は API.md §3.2 を参照。
  */
 export async function aggregateDataset(
   input: AggregateDatasetInput,
@@ -502,9 +503,9 @@ export async function aggregateDataset(
  *
  * ## 縮退先が「以前の実装そのもの」であること
  *
- * `computeAggregateDataset` には**一切手を入れていない**。LLM も D1 も使えないときに
- * 返るのは、Step 5 以前とビット単位で同じ応答である。「縮退したつもりで別物を返していた」
- * という壊れ方を、コードの形として起こらなくしてある。
+ * `extractFromSamples` の抽出分岐は Step 5 以前の実装をそのまま担う。LLM も D1 も
+ * 使えないときに返るのは、同じ固定サンプル選定による応答である。「縮退したつもりで
+ * 別物を返していた」という壊れ方を、コードの形として起こらなくしてある。
  *
  * ## 失敗の分類（何を記録し、何を記録しないか）
  *
@@ -551,7 +552,7 @@ async function resolveAggregate(
 }
 
 /**
- * 対象外の地名を代表エリアより先に見るのは、`computeAggregateDataset` の判定順に揃えるため
+ * 対象外の地名を代表エリアより先に見るのは、`guardAggregate` の判定順に揃えるため
  * （検索とは違い、集計は対象エリア外を無条件で弾く）。
  */
 const aggregateGapContext = (input: AggregateDatasetInput): GapContext => ({
@@ -562,8 +563,9 @@ const aggregateGapContext = (input: AggregateDatasetInput): GapContext => ({
 /**
  * 前段ガードだけを通した結果。
  *
- * `computeAggregateDataset`（＝縮退経路）と `aggregateDataset`（＝D1 実照会）の**両方**が
- * これを使う。ガードの traversal を2箇所に書くと、片方だけ緩んでも型では気づけない
+ * `guardAggregate` の結果は、`resolveAggregate` の主経路（D1 実照会）と、その縮退先である
+ * `extractFromSamples` の**両方**に適用される。ガードの traversal を2箇所に書くと、
+ * 片方だけ緩んでも型では気づけない
  * （「ラーメンは粒度不足」のような、実データで検証済みの誠実な未回答が LLM 経路でだけ
  * 消える、という形で壊れる）。
  *

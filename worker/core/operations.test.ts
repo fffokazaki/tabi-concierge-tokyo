@@ -688,6 +688,16 @@ describe("aggregateDataset（直接呼び出し）", () => {
       expect(output.query).toContain("intent の内容との照合はしていない");
     }
   });
+
+  it("縮退経路の query は、完了済みの予定ではなく実際に使った経路を明記する（Issue #183）", async () => {
+    const output = await aggregateDataset({ datasetId: MEISHO_ID, intent: "寺社を1件" }, capturingGapRecorder(), stubDeps());
+
+    expect(output.status).toBe("answered");
+    if (output.status !== "answered") return;
+    expect(output.query).toBe(
+      "固定データ抽出（スタブ）: data/t131067d0000000251/data.csv（2026-08-16 取得・全45行）のヘッダを除く 3 行目（既知のエリア名が intent から見つからず、固定サンプルの先頭を選定。intent の内容との照合はしていない）。Text-to-SQL が使えなかったため、縮退経路（キーワード実装）で応答した。",
+    );
+  });
 });
 
 /**
