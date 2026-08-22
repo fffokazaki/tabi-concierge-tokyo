@@ -38,7 +38,9 @@ const depsWith = (llm: LlmClient): CoreDeps => ({ llm, sql: d1SqlExecutor(env.DB
 /** 生成 SQL が返しうる、実在の形をした行。 */
 const SELECT_ALL = `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'`;
 
-const seed = async (rows: { name: string; area: string | null; address?: string; note?: string }[]) => {
+const seed = async (
+  rows: { name: string; area: string | null; address?: string; note?: string; category?: string }[],
+) => {
   await env.DB.prepare(
     "INSERT OR IGNORE INTO datasets (id, no, title, publisher, license, catalog_url, resource_url, retrieved_at, update_frequency, row_count, has_spots) VALUES (?, 1, '名所・史跡', '台東区', 'CC BY 4.0', 'https://example.com', 'https://example.com/x.csv', '2026-08-16', '不定期', 45, 1)",
   )
@@ -47,9 +49,9 @@ const seed = async (rows: { name: string; area: string | null; address?: string;
   await env.DB.prepare("DELETE FROM spots").run();
   for (const [i, row] of rows.entries()) {
     await env.DB.prepare(
-      "INSERT INTO spots (dataset_id, name, category, area, address, note, source_row) VALUES (?, ?, '名所・史跡', ?, ?, ?, ?)",
+      "INSERT INTO spots (dataset_id, name, category, area, address, note, source_row) VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
-      .bind(MEISHO_ID, row.name, row.area, row.address ?? null, row.note ?? "", i + 1)
+      .bind(MEISHO_ID, row.name, row.category ?? "名所・史跡", row.area, row.address ?? null, row.note ?? "", i + 1)
       .run();
   }
 };
@@ -289,5 +291,88 @@ describe("縮退（インフラ障害・出力不正）", () => {
     } finally {
       warn.mockRestore();
     }
+  });
+});
+
+/**
+ * 生成 SQL が「この dataset_id の行に実際に入っている値」だけで絞っているかの検査
+ * （[Issue #148](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/148)）。
+ *
+ * プロンプトは以前から「上の一覧に**実際に存在する値**だけで絞ること」と頼んでいたが、
+ * **頼んでいるだけで検査していなかった**。本番（Version `c957fa38`・2026-08-22）で採取した
+ * 2つの形は、どちらも一覧に無い語で絞って0行になり、45行・123行あるデータセットについて
+ * 「当てはまる行は見つかりませんでした」という**偽の未回答**を返していた。
+ *
+ * 検査は純粋な文字列処理（LLM も D1 も要らない）なので、ここのテストがそのまま防御の証明になる。
+ */
+describe("実在しない値では絞らせない（Issue #148）", () => {
+  const BOTH_AREAS = [
+    { name: "寛永寺", area: "上野" },
+    { name: "浅草寺", area: "浅草" },
+  ];
+
+  it("intent の語を name へ LIKE で当てる SQL は実行せず、理由を添えて書き直させる", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await seed(BOTH_AREAS);
+      // 本番で実際に生成された形。興味が3件のときは出ず、4件にすると出た（Issue #148）
+      const overRestrictive =
+        `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        " AND (category IN ('名所・史跡') OR area IN ('上野', '浅草'))" +
+        " AND (name LIKE '%ラーメン%' OR name LIKE '%自然%' OR name LIKE '%文化%' OR name LIKE '%家族向け%') LIMIT 50";
+      const llm = scriptedLlm(overRestrictive, SELECT_ALL);
+
+      const output = await aggregate(MEISHO_ID, "ラーメン、自然、文化、家族向け", depsWith(llm));
+
+      expect(expectAnswered(output).result.name).toBe("寛永寺");
+      expect(llm.asked).toHaveLength(2);
+      // 拒否理由に当該の語が入る（入らないと同じ SQL を書き直してくる）
+      expect(llm.asked[1]!.user).toContain("ラーメン");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("一覧に無い category で絞る SQL も書き直させる", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await seed(BOTH_AREAS);
+      // 本番で採取したもう1つの形（都市公園・都立公園一覧は category が「公園」しか無いのに
+      // 「自然」「文化」で絞り、123行あるうち0行になった）
+      const invented =
+        `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        " AND category IN ('自然','文化') AND area = '上野' LIMIT 50";
+      const llm = scriptedLlm(invented, SELECT_ALL);
+
+      expect(expectAnswered(await aggregate(MEISHO_ID, "自然、文化", depsWith(llm))).result.name).toBe("寛永寺");
+      expect(llm.asked[1]!.user).toContain("自然");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("一覧の値の一部に当たる LIKE は通す（「文化」と「区民文化財」）", async () => {
+    // プロンプトが明示的に許している書き方（Issue #120 の実測）。ここを弾くと、
+    // 部分一致で正しく引けていた経路まで書き直しへ回して無料枠を無駄にする
+    await seed([{ name: "旧朝倉家住宅", area: "渋谷", category: "区民文化財" }]);
+    const partial =
+      `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+      " AND category LIKE '%文化%' LIMIT 50";
+    const llm = scriptedLlm(partial);
+
+    expect(expectAnswered(await aggregate(MEISHO_ID, "文化財を1件", depsWith(llm))).result.name).toBe("旧朝倉家住宅");
+    expect(llm.asked).toHaveLength(1); // 書き直させない
+  });
+
+  it("空文字との比較は通す（note は空のことがある）", async () => {
+    // 本番で `answered` を返していた SQL に含まれる形。弾くと動いていた経路が壊れる
+    await seed([{ name: "寛永寺", area: "上野" }]);
+    const withEmpty =
+      `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+      " AND (category = '名所・史跡' OR area IN ('上野', '浅草') OR note = '') LIMIT 50";
+    const llm = scriptedLlm(withEmpty);
+
+    expect(expectAnswered(await aggregate(MEISHO_ID, "上野の寺社を1件", depsWith(llm))).result.name).toBe("寛永寺");
+    expect(llm.asked).toHaveLength(1);
   });
 });

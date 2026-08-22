@@ -1,4 +1,4 @@
-import type { AggregateDatasetInput, AggregateResult } from "../../shared/core";
+import { REPRESENTATIVE_AREAS, type AggregateDatasetInput, type AggregateResult } from "../../shared/core";
 import type { CatalogEntry } from "./catalog";
 import type { CoreDeps } from "./llm";
 import { ALLOWED_TABLES, guardSelect, MAX_LIMIT } from "./sql-guard";
@@ -140,6 +140,89 @@ type Facets = { categories: string[]; areas: string[] };
 const MAX_FACET_VALUES = 20;
 
 /**
+ * 生成 SQL が「この dataset_id の行に実際に入っている値」だけで絞っているかを検査する
+ * （[Issue #148](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/148)）。
+ *
+ * **プロンプトは前から同じことを頼んでいた。頼んでいるだけで検査していなかった。**
+ * 本番（Version `c957fa38`・2026-08-22）で採取した2つの形は、どちらも一覧に無い語で絞って
+ * 0行になり、45行・123行あるデータセットについて「当てはまる行は見つかりませんでした」という
+ * **偽の未回答**を返していた:
+ *
+ * ```sql
+ * -- 名所・史跡（45行）: 興味の語を name に当てにいった
+ * ... AND (category IN ('名所・史跡') OR area IN ('上野','浅草'))
+ *     AND (name LIKE '%ラーメン%' OR name LIKE '%自然%' OR name LIKE '%文化%' OR name LIKE '%家族向け%')
+ * -- 都市公園・都立公園一覧（123行・category は「公園」だけ）: 無い値で絞った
+ * ... AND category IN ('自然','文化') AND area = '渋谷'
+ * ```
+ *
+ * 0行そのものは答えでありうる（DOMAIN.md §7）が、**それは問いが成立している場合の話**である。
+ * 存在しない値で絞った結果の0行を「無い」と報告すると、確かめていないことを主張することになり
+ * （CLAUDE.md 絶対ルール #1）、`gaps` に偽の欠損が記録される。
+ *
+ * ## 通すもの
+ *
+ * - `dataset_id` の値そのもの（`WHERE dataset_id = '...'` は必須なので当然通る）
+ * - 空文字（`note` は空のことがある。本番で `answered` を返していた SQL に含まれる形）
+ * - **代表エリア名**（上野・浅草・渋谷）。訊かれたエリアをこのデータセットが収録していない
+ *   ときの0行は**正しい未回答**なので、ここを弾くと「別のエリアの行」を返す方へ誘導してしまう
+ * - 一覧の値の一部に当たる語（「文化」と「区民文化財」）。プロンプトが明示的に許している
+ *   書き方で、Issue #120 の実測でここが要ることが分かっている
+ *
+ * それ以外は拒否して書き直させる。直らなければ既存の縮退（キーワード実装）へ落ちるので、
+ * **偽の未回答が返ることはない**。
+ */
+function findUnknownLiterals(sql: string, entry: CatalogEntry, facets: Facets): string[] {
+  const known = [...facets.categories, ...facets.areas];
+  const unknown: string[] = [];
+  for (const literal of stringLiteralsIn(sql)) {
+    if (literal === entry.datasetId) continue;
+    // LIKE のワイルドカードを外して中身で見る（'%文化%' → '文化'）
+    const value = literal.replace(/^%+/, "").replace(/%+$/, "");
+    if (value === "") continue;
+    if ((REPRESENTATIVE_AREAS as readonly string[]).includes(value)) continue;
+    if (known.some((actual) => actual.includes(value))) continue;
+    if (!unknown.includes(value)) unknown.push(value);
+  }
+  return unknown;
+}
+
+/**
+ * SQL 中のシングルクォート文字列を取り出す。`''` によるエスケープを1文字として扱う。
+ *
+ * **検査するのは `guardSelect` を通ったあとの文字列**（＝実際に D1 へ渡すもの）である。
+ * 生成された生テキストを見て別の文字列を実行すると、その差がそのまま迂回路になる
+ * （[ACE-137-1](../../docs/08-knowledge/playbook/architecture.md#ace-137-1)）。
+ */
+function stringLiteralsIn(sql: string): string[] {
+  const literals: string[] = [];
+  let i = 0;
+  while (i < sql.length) {
+    if (sql[i] !== "'") {
+      i++;
+      continue;
+    }
+    i++;
+    let value = "";
+    while (i < sql.length) {
+      if (sql[i] === "'") {
+        if (sql[i + 1] === "'") {
+          value += "'";
+          i += 2;
+          continue;
+        }
+        i++;
+        break;
+      }
+      value += sql[i];
+      i++;
+    }
+    literals.push(value);
+  }
+  return literals;
+}
+
+/**
  * `category` / `area` の実在値を D1 から読む。**LLM は使わない**（推論回数を増やさない）。
  *
  * SQL に埋める `dataset_id` は `entry.datasetId`（カタログの定数）であって、利用者入力の
@@ -245,6 +328,23 @@ async function attemptTextToSql(
         attempt,
         datasetId: input.datasetId,
         reason: guarded.reason,
+      });
+      continue;
+    }
+
+    // 実在しない値で絞っていないか（Issue #148）。**実行する前に**見る ―― 実行してしまうと
+    // 0行が返り、それが「探したが無かった」という答えとして利用者にも gaps にも流れる
+    const unknown = findUnknownLiterals(guarded.sql, entry, facets);
+    if (unknown.length > 0) {
+      previousError =
+        `${unknown.map((value) => `「${value}」`).join("")}は、この dataset_id の行に実際に入っている値ではありません。` +
+        "「この dataset_id の行に実際に入っている値」の一覧にある語だけで絞るか、当てはまる値が無ければ category では絞らず" +
+        "エリアだけで絞ってください。intent の語を name や note に当てにいかないこと。";
+      console.warn("[text-to-sql] 一覧に無い値で絞る SQL を拒否しました", {
+        attempt,
+        datasetId: input.datasetId,
+        unknown,
+        sql: guarded.sql,
       });
       continue;
     }
