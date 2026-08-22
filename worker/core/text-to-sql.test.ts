@@ -830,11 +830,11 @@ describe("名指しされた施設が無いときは黙ってすり替える（I
     }
   });
 
-  it("すり替え先は同じエリアの中だけ（エリアの行が無ければ未回答のまま）", async () => {
-    // `countRelaxed` はエリアを緩めない。「浅草寺」を名指しされてもこのデータセットが浅草を
-    // 1行も収録していなければ、上野の行を代わりに返したりはせず未回答になる ――
-    // **すり替えは「同じデータセット・同じエリアの別の行」に限られる**（別エリアの行で代替すると
-    // 本物の出典がついた誤答になる・API.md §3.2）
+  it("代表エリアを読み取れたときは、そのエリアに行が無ければ未回答のまま", async () => {
+    // `countRelaxed` は読み取れた代表エリアを緩めない。「浅草寺」を名指しされてもこの
+    // データセットが浅草を1行も収録していなければ、上野の行を代わりに返したりはせず未回答に
+    // なる（別エリアの行で代替すると本物の出典がついた誤答になる・API.md §3.2）。
+    // **この歯止めが効くのは代表エリアを読み取れたときだけ** ―― 次のテストがその境界を示す
     await seed([{ name: "寛永寺", area: "上野" }]);
     const byName =
       `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
@@ -843,5 +843,31 @@ describe("名指しされた施設が無いときは黙ってすり替える（I
 
     expectUnanswered(await aggregate(MEISHO_ID, "浅草寺に行きたい", depsWith(llm)));
     expect(llm.asked, "浅草の行が1件も無いので書き直させない").toHaveLength(1);
+  });
+
+  it("**代表エリアを読み取れない intent では、すり替え先はエリアを越える**", async () => {
+    // 直前のテストの歯止めは `findRepresentativeArea` が intent から代表エリアを
+    // 拾えたときだけ成り立つ。拾えるのは「上野」「浅草」「渋谷」の部分一致だけなので
+    // （`shared/core.ts` の `REPRESENTATIVE_AREAS`）、未知の地名（巣鴨のとげぬき地蔵）や
+    // エリア無指定では `countRelaxed` にエリア条件が付かず、**データセット全体**から選ばれる。
+    //
+    // これは #153 で選んだ①の**範囲の広さ**であって、別の不具合ではない ―― ただし
+    // 「エリアは越えない」と書くと実装より強い主張になる（cross-model レビュー・信頼度96）。
+    // 訊かれたエリアが SQL から落ちる形は [Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152) が別に扱う
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await seed([{ name: "寛永寺", area: "上野" }]);
+      const byName =
+        `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        " AND name LIKE '%とげぬき地蔵%' LIMIT 50";
+      const llm = scriptedLlm(byName, SELECT_ALL);
+
+      const answered = expectAnswered(await aggregate(MEISHO_ID, "とげぬき地蔵に行きたい", depsWith(llm)));
+
+      expect(answered.result.name, "巣鴨を訊かれても上野の行が返る（エリアの歯止めは効いていない）").toBe("寛永寺");
+      expect(llm.asked, "エリア条件が付かないので「行はある」と判定され、書き直させる").toHaveLength(2);
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
