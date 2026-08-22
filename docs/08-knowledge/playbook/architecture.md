@@ -530,7 +530,7 @@ for (const { datasetId, pending } of pendingAggregates) {
 
 | Category | architecture | Origin | PR #150 / Issue #148 |
 | Date | 2026-08-22 |
-| Helpful | 1 | Harmful | 0 |
+| Helpful | 2 | Harmful | 0 |
 | Status | active |
 
 `aggregate_dataset` のプロンプトには以前から「上の一覧に**実際に存在する値**だけで絞ること」「当てはまる category が無ければエリアだけで絞る」と書いてあった。本番で採取した生成 SQL は**どちらにも違反**していた:

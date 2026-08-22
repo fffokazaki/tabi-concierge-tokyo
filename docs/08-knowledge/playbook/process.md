@@ -131,7 +131,7 @@ GitHub の closing keyword がデフォルトブランチへのマージでの�
 
 | Category | process | Origin | PR #62 / Issue #59 |
 | Date | 2026-08-18 |
-| Helpful | 0 | Harmful | 0 |
+| Helpful | 1 | Harmful | 0 |
 | Status | active |
 
 **Insight**: 誤った言い回しの修正判断は、その言い回しが残っている**全分岐を grep で数え上げて同時に適用**しないと、取り残しが Issue を連鎖させる。判断の確立と適用範囲の確認は別の作業で、後者を省くと同じ修正を分岐の数だけ繰り返すことになる。

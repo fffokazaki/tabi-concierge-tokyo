@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.43.0"
+version: "1.44.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 121
+ace_entry_count: 122
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -352,8 +352,20 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-178-1 | 「内容は同一」と宣言した写しファイルは、マーカー以降を CI で一字一句照合しないと必ずずれる ―― マーカーの不在も違反にする | documentation-quality | [playbook/documentation-quality.md#ace-178-1](./playbook/documentation-quality.md#ace-178-1) |
 | ACE-178-2 | PR の CI が赤いときは「落ちたステップが自分の差分より前か」を先に見る ―― 直 push で入った赤は次の PR が継承する | process | [playbook/process.md#ace-178-2](./playbook/process.md#ace-178-2) |
 | ACE-178-3 | CLI の終了コードはプロセス起動でテストする ―― 比較関数が正しくてもエントリーポイントの配線が壊れれば CI は緑で素通りする | testing | [playbook/testing.md#ace-178-3](./playbook/testing.md#ace-178-3) |
+| ACE-181-1 | 縮退先が「旧実装そのもの」だと、旧実装時代の契約文書はそのまま生き残り、主経路の記述が抜けても無矛盾に見える | documentation-quality | [playbook/documentation-quality.md#ace-181-1](./playbook/documentation-quality.md#ace-181-1) |
 
 ## Changelog
+
+### [1.44.0] - 2026-08-22
+
+#### 追加
+
+- ACE-181-1: 縮退先が「旧実装そのもの」だと、旧実装時代の契約文書はそのまま生き残り、主経路の記述が抜けても無矛盾に見える（Issue #168 / PR #181）
+
+#### カウンター更新
+
+- ACE-150-1: Helpful +1（契約文書に書く保証も「プロンプトで頼んでいること」から導いてしまい、cross-model レビューで実装より強い主張として指摘された）
+- ACE-62-2: Helpful +1（同じ分類の記述が §4 と §3.2 の2箇所にあり、§4 だけ直して §3.2 が取り残されていた）
 
 ### [1.43.0] - 2026-08-22
 
