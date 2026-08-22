@@ -1,11 +1,11 @@
 ---
 title: "DEPLOYMENT"
-version: "1.19.0"
+version: "1.19.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-23"
-changeImpact: "medium"
+changeImpact: "low"
 ---
 
 # DEPLOYMENT.md - デプロイメント・運用ガイド
@@ -267,6 +267,7 @@ npm run deploy  # vite build → wrangler deploy
 
 | 日時 | Version ID | 内容 | 確認 |
 | --- | --- | --- | --- |
+| 2026-08-23 | `57ee95fe-95b9-41c1-a089-0fe30e85769a` | Jotform 3-8 へ記載する申請用操作デモ動画1本を、Worker の静的アセット `/demo/operation-demo.mp4` として公開（#131 / PR #224）。`public/` と申請物SSOT、First Stage の2シーンとの区別、`public/` のデプロイ契機を追加した。デプロイ対象の統合コミットは `901dbcee5827ec362d9032df6a5191b7380e1cfd`。`migrations/` `data/` `scripts/` `worker/` `shared/` `src/` は未変更のため、マイグレーション・シードは実行していない | Wrangler が `/demo/README.md` と `/demo/operation-demo.mp4` の2静的アセットを新規アップロード。動画URLは HTTP 200 / `video/mp4` / 1,056,224 bytes で、取得ファイルがリポジトリの SHA-256 `912e97fee190beed3317c05379a9fb28e59688fda16d01cb487135f86c84aa3b` とバイト一致。`ffprobe` で25.133秒・1600×900・30fps・H.264を再確認した。Range要求は206ではなく全体200で返る。標準チェックは health 200（`runtime: Cloudflare-Workers`）/ SPA `/` 200 / `/api/nope` 404。テスト44ファイル・903件、typecheck・build・文書検証は PR #224 で通過 |
 | 2026-08-22 | `3fbb592c-8221-4749-a31f-89b3399305db` | `search_datasets` の最後のフォールバックが、呼び出し元から実際に送られた入力に合わせて `message` の照合対象を「興味の語」・「質問文・興味の語」・「質問文の語」と言い分ける修正（#114 / PR #214・#216）。PR #214 のマージ後に Version `543a6a35-6ee7-451b-a976-7071449feb3d` を一度デプロイしたが、本番確認で query-only の LLM 成功経路が未検証と判明したため Issue を再オープンし、PR #216 で候補選定には LLM 解釈後入力を維持しつつ、文言だけを元入力から決めるよう補完した。最終デプロイ対象の統合コミットは `4d8782ceee691ffc51189acd3ec7b08df7979ae4`。`worker/` の変更なので §3 の契機に該当し、`migrations/` `data/` `scripts/` `src/` は未変更のため migrate・seed は実行していない | チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。**変更した3分岐を本番で実測** ―― `interests` のみは「興味の語」、`query + interests` は「質問文・興味の語」、query-only（`エリア指定なし。ショッピングだけ`）は LLM 分解を通ったうえで「質問文の語」を返し、すべて HTTP 200 の `unanswered(other)`。コア3操作も実測し、`aggregate_dataset` は D1 実照会で寛永寺、`get_provenance` は CC BY 4.0 の出典1件を返した。リモート D1 は datasets 10 / spots 1,645、上記未回答は `gaps` に記録済み。テスト 44ファイル・903件、typecheck・build・文書検証は PR #216 で通過 |
 | 2026-08-22 | `c607291d-c80d-45dd-a4fa-dcf6a08f5155` | 停留地へカテゴリ別イラストを表示し、`aggregate_dataset` の回答へ実データの非空 `category` を追加（#188 / PR #204）。現在の全16カテゴリ・1,645行を9種の ImageGen 製 WebP（8グループ＋将来の未知カテゴリ用）へ割り当て、角丸枠の外側を実アルファ透過にした。`worker/` `shared/` `src/` の変更なので §3 の契機に該当。`migrations/` とデータ内容は未変更のため、マイグレーション・シードは実行していない。デプロイ対象の統合コミットは `085c4073d5433c1c575dd6c09ea7342be965ba3d` | チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。**D1 主経路を実測** ―― `aggregate_dataset({datasetId:"t131067d0000000251", intent:"上野エリアの寺社を1件"})` が寛永寺と `category: "名所・史跡"` を返し、`query` は `D1 実照会:` と id の固定照会を含む。**配信物の同一性を実測** ―― 本番 `/index.html` が手元の 718 bytes と `cmp` で一致し、カテゴリ画像9ファイルも全件バイト一致。実ブラウザでは寛永寺カード内の装飾画像が `/assets/heritage-BwLfrU-A.webp`、`alt=""` で1件表示され、後続の文化観光施設・文化財にも各画像が表示された。伝播待ちは不要だった。テスト 44ファイル・899件、typecheck・build・文書検証は PR #204 で通過 |
 | 2026-08-22 | `688c5cb7-0c64-4440-9f59-cbbedec9463e` | 未回答が記録され都へのデータ公開リクエストへ還元されることの注記を、未回答・欠損の表示の脇に出す（#192 / PR #198）。**変更は `src/` と `docs/` のみ**だが、React アプリは同じ Worker に同梱されて配信されるため §3 の「`src/` を変更する PR をマージしたとき」の契機に該当する。`worker/` `shared/` `migrations/` `data/` `scripts/` は未変更のため、マイグレーション・シードは実行していない。2026-08-17 の「リクエストするボタンは出さない」判断は維持（押す操作は増やしていない） | **配信中の bundle が手元のビルドとバイト一致することで確認** ―― `curl --compressed` で取得した `/assets/index-CMI8dFSf.js`（226,884 bytes）が `dist/client/assets/index-CMI8dFSf.js` と `cmp` で完全一致し、注記の文言「答えられなかった問いは記録されます。…」を含む。`/assets/index-CP_BfR62.css` にも `.gap-escalation-note` が入っている。**実ブラウザで2ケース実測** ―― プラン画面（興味＝ラーメン・文化）で `route-panel` の並びが `data-gap-card` → `gap-escalation-note` → 停留地となり注記は1つだけ。あなたへ画面のラーメン単独では `route-empty`（`分類: insufficient_granularity`）→ `gap-escalation-note` の2要素で、**内訳が空でも注記が出ることを本番で確認**（`DataGapCard` は出ない）。**伝播待ちは不要だった**（デプロイ直後の1回目から新 bundle）。テスト 869 件（+62 は #193 のダッシュボードぶんを含む。#192 単体では +18） |
@@ -511,6 +512,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.19.1] - 2026-08-23
+
+#### 追加
+
+- §3「デプロイ記録」に、申請用操作デモ動画の公開（Version ID `57ee95fe-95b9-41c1-a089-0fe30e85769a`・[Issue #131](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/131) / [PR #224](https://github.com/fffokazaki/tabi-concierge-tokyo/pull/224)）を追加。公開MP4とリポジトリのバイト一致、形式、標準チェック、Range応答を実測した
 
 ### [1.19.0] - 2026-08-23
 
