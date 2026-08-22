@@ -113,7 +113,12 @@ export async function callCoreOperation(
    * を追い続けることになる。`signal.aborted` は締め切りが来たときにだけ true になり、
    * abort アルゴリズムの順序（aborted を立てる → イベント → reject）により、catch に
    * 入った時点では必ず反映されている。判定したいのは「こちらが打ち切ったか」であって
-   * 「例外の名前が何か」ではない
+   * 「例外の名前が何か」ではない。
+   *
+   * **この判定は両方向とも `coreOperations.test.ts` で固定してある** ―― 打ち切りを取りこぼさない
+   * 側は「応答しない呼び出しは…」「ヘッダは返ったが本文が来ないまま…」、締め切り前の失敗を
+   * timeout と名乗らない側は「fetch の失敗は network として原因を保つ」「本文の読み取り失敗は
+   * network ではなく parse」。変異（常に false／常に true）でそれぞれ落ちることを確認済み
    */
   const deadlinePassed = () => signal.aborted;
 
