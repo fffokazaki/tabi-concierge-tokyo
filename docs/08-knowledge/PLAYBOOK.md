@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.39.0"
+version: "1.40.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 113
+ace_entry_count: 116
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -344,8 +344,23 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-155-4 | 設定値の妥当性を `Number()` に任せると、書き間違いが別の値として通る | data-processing | [playbook/data-processing.md#ace-155-4](./playbook/data-processing.md#ace-155-4) |
 | ACE-167-1 | ガードが見ている条件は、結果を縛る保証ではない ―― 判定の入力か出力かを分けて読む | architecture | [playbook/architecture.md#ace-167-1](./playbook/architecture.md#ace-167-1) |
 | ACE-167-2 | 「現状維持」も決定なら、固定するテストと参照の張り替えを伴わせる | process | [playbook/process.md#ace-167-2](./playbook/process.md#ace-167-2) |
+| ACE-175-1 | 非決定的な生成は指示で従わせるより、決定的な後段で吸収する ―― 指示の効果は引き直しの実測で判定する | architecture | [playbook/architecture.md#ace-175-1](./playbook/architecture.md#ace-175-1) |
+| ACE-175-2 | name 単独の対応付けは同名レコードの実データで壊れる ―― 複合キー化し、曖昧なら「主張しない」へ倒す | data-processing | [playbook/data-processing.md#ace-175-2](./playbook/data-processing.md#ace-175-2) |
+| ACE-175-3 | AI Gateway のキャッシュは「引き直して良い結果を固定する」運用を許さない ―― skipCache は書き込みもしない | architecture | [playbook/architecture.md#ace-175-3](./playbook/architecture.md#ace-175-3) |
 
 ## Changelog
+
+### [1.40.0] - 2026-08-22
+
+#### 追加
+
+- ACE-175-1: 非決定的な生成は指示で従わせるより、決定的な後段で吸収する ―― 指示の効果は引き直しの実測で判定する（Issue #174 / PR #175）
+- ACE-175-2: name 単独の対応付けは同名レコードの実データで壊れる ―― 複合キー化し、曖昧なら「主張しない」へ倒す（Issue #174 / PR #175）
+- ACE-175-3: AI Gateway のキャッシュは「引き直して良い結果を固定する」運用を許さない ―― skipCache は書き込みもしない（Issue #174 / PR #175）
+
+#### カウンター更新
+
+- ACE-150-1: Helpful +1（プロンプトへ指示を1行足す修正が効かないことの予見と revert 判断の根拠になった。「指示は頼みであって制約ではない」の再検出）
 
 ### [1.39.0] - 2026-08-22
 
