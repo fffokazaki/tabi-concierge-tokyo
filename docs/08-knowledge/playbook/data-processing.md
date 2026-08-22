@@ -199,7 +199,7 @@ Issue #143 の実装は当初この形で、Codex のクロスモデルレビュ
 | Category | data-processing | Origin | PR #175 / Issue #174 |
 | Date | 2026-08-22 |
 | Helpful | 0 | Harmful | 0 |
-| Status | active |
+| Status | deprecated |
 
 返った行のエリアを知るために `name → area` の対応表を D1 から引いた。cross-model レビュー（信頼度97）が実データで反例を示した ―― 文化財一覧には「銅鐘」が上野・浅草・対象外に**同名で併存**する。最初の1件で代表させる近似は、浅草の銅鐘を上野として扱い、修正の目的（エリアの取り違え防止）そのものを裏切る。
 
