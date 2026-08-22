@@ -469,3 +469,178 @@ describe("障害 — unanswered と区別して表示する", () => {
     expect(screen.queryByText("該当するオープンデータがありません")).not.toBeInTheDocument();
   });
 });
+
+/**
+ * 未回答の還元（エスカレーション）の注記（Issue #192）。
+ *
+ * `GapEscalationNote.test.tsx` はコンポーネント単体を見ている。ここで確かめるのは
+ * **どの画面状態で出るか** —— とくに「内訳（`gaps`）が空の未回答」で出ること。
+ * 指摘の元になったラーメン単独がまさにその形で、`gaps.length > 0` を条件にすると
+ * この画面にだけ注記が出ない、という取り落としを固定する。
+ */
+describe("未回答の還元の注記（Issue #192）", () => {
+  const NOTE = /答えられなかった問いは記録されます/;
+
+  /** ラーメン単独。応答全体が unanswered（粒度不足）で、内訳は空で返る（本番実測 2026-08-22） */
+  const ramenOnlyStub = () =>
+    stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "unanswered",
+          reason: "insufficient_granularity",
+          message:
+            "飲食店の店舗データは「東京都内の飲食店のバリアフリー情報」（210件・バリアフリー対応店に限定）のみで、ジャンルの列を持たないため「ラーメン」の粒度では答えられません。",
+        }),
+    });
+
+  it("内訳が空の未回答でも出る（あなたへ画面・ラーメン単独）", async () => {
+    const { fetchImpl } = ramenOnlyStub();
+    render(<AppTabs options={{ fetchImpl }} />);
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+    fireEvent.click(screen.getByRole("button", { name: "あなたへ" }));
+
+    await waitFor(() => expect(screen.getByText("分類: insufficient_granularity")).toBeInTheDocument());
+    expect(screen.getByText(NOTE)).toBeInTheDocument();
+    // 内訳が無いので DataGapCard は出ない。注記はそれとは独立に出る
+    expect(screen.queryByText("答えられなかった点があります")).not.toBeInTheDocument();
+  });
+
+  it("内訳が空の未回答でも出る（プラン画面）", async () => {
+    const { fetchImpl } = ramenOnlyStub();
+    await createBriefing(fetchImpl);
+
+    await waitFor(() => expect(screen.getByText("分類: insufficient_granularity")).toBeInTheDocument());
+    expect(screen.getByText(NOTE)).toBeInTheDocument();
+  });
+
+  it("route-empty と DataGapCard が両方出ている画面でも、注記は1つだけ", async () => {
+    // `.gap-escalation-note` が二重描画されないことの固定。**未回答なら内訳が空とは限らない**
+    // ことの回帰でもある（このケースは unanswered かつ gaps 2件）
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "t", provider: "p", url: "u", matchReason: "r" }],
+          gaps: [{ status: "unanswered", reason: "other", message: "「ショッピング」に当たるものがありませんでした。" }],
+        }),
+      [AGGREGATE_PATH]: () =>
+        jsonResponse({ status: "unanswered", reason: "insufficient_granularity", message: "内容を取り出せません。" }),
+    });
+    const { container } = render(<AppTabs options={{ fetchImpl }} />);
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+
+    await waitFor(() => expect(screen.getByText("答えられなかった点があります")).toBeInTheDocument());
+    expect(screen.getByText("該当するオープンデータがありません")).toBeInTheDocument();
+    expect(container.querySelectorAll(".gap-escalation-note")).toHaveLength(1);
+  });
+
+  it("すべて答えられた画面には出さない（還元する欠損が無いため）", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    await createBriefing(fetchImpl);
+
+    await waitFor(() => expect(screen.getByText("寛永寺")).toBeInTheDocument());
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  });
+
+  /**
+   * 障害（ネットワーク断・HTTP エラー・parse 不正）では**何も記録されていない**ので、
+   * ここに「記録されます」が出れば嘘になる。`unanswered` と障害の混同はこのプロジェクトの
+   * 反復ハザード（API.md §4）なので、実装が安全なうちに固定する。
+   */
+  it("障害画面には出さない（記録されていないため）", async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new TypeError("Failed to fetch")) as unknown as typeof fetch;
+    await createBriefing(fetchImpl);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  });
+
+  /**
+   * サーバーが応答全体を `unanswered` / `other`（内訳なし）で返す経路。**渋谷×ショッピング／
+   * ナイトライフが実測でこの形**で、`gaps` テーブルにも記録されている。実装途中に検討して
+   * 棄却した `reason !== "other"` の出し分けが再導入されたら、ここが落ちる。
+   */
+  it.each([
+    ["プラン", false],
+    ["あなたへ", true],
+  ])("%s画面で、サーバーの unanswered/other（内訳なし）にも出す", async (_label, isForYou) => {
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "unanswered",
+          reason: "other",
+          message: "「ショッピング」に当たるデータセットがありませんでした。",
+        }),
+    });
+    render(<AppTabs options={{ fetchImpl }} />);
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+    if (isForYou) fireEvent.click(screen.getByRole("button", { name: "あなたへ" }));
+
+    await waitFor(() => expect(screen.getByText("分類: other")).toBeInTheDocument());
+    expect(screen.getByText(NOTE)).toBeInTheDocument();
+    expect(screen.queryByText("答えられなかった点があります")).not.toBeInTheDocument();
+  });
+
+  /**
+   * 部分成功（`ready` かつ内訳あり）。実運用でいちばん多い形なのに、他のテストは
+   * 「全部答えた」と「全部答えられなかった」しか見ていなかった（Codex のレビュー指摘）。
+   */
+  it("プラン画面の部分成功（停留地＋内訳）で、カードと注記と停留地が並ぶ", async () => {
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" }],
+          gaps: [
+            { status: "unanswered", reason: "insufficient_granularity", message: "「ラーメン」の粒度では答えられません。" },
+          ],
+        }),
+      [AGGREGATE_PATH]: () =>
+        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "所在地は台東区上野桜木1丁目14番。" }, query: "q" }),
+      [PROVENANCE_PATH]: () =>
+        jsonResponse({ status: "answered", sources: [provenanceSource(MEISHO_ID, "名所・史跡")] }),
+    });
+    const { container } = render(<AppTabs options={{ fetchImpl }} />);
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+
+    await waitFor(() => expect(screen.getByText("寛永寺")).toBeInTheDocument());
+    expect(screen.getByText("答えられなかった点があります")).toBeInTheDocument();
+    expect(container.querySelectorAll(".gap-escalation-note")).toHaveLength(1);
+    // 未回答の画面ではない（route-empty は出ない）
+    expect(container.querySelector(".route-empty")).toBeNull();
+  });
+
+  it("あなたへ画面の部分成功（レコメンド＋内訳）で、カードと注記とレコメンドが並ぶ", async () => {
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" }],
+          gaps: [
+            { status: "unanswered", reason: "insufficient_granularity", message: "「ラーメン」の粒度では答えられません。" },
+          ],
+        }),
+      [AGGREGATE_PATH]: () =>
+        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "所在地は台東区上野桜木1丁目14番。" }, query: "q" }),
+      [PROVENANCE_PATH]: () =>
+        jsonResponse({ status: "answered", sources: [provenanceSource(MEISHO_ID, "名所・史跡")] }),
+    });
+    const { container } = render(<AppTabs options={{ fetchImpl }} />);
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+    fireEvent.click(screen.getByRole("button", { name: "あなたへ" }));
+
+    await waitFor(() => expect(container.querySelector(".recommendation-card")).not.toBeNull());
+    expect(screen.getByText("答えられなかった点があります")).toBeInTheDocument();
+    expect(container.querySelectorAll(".gap-escalation-note")).toHaveLength(1);
+  });
+
+  it("あなたへ画面が全部答えられたとき（内訳なし）は出さない", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    const { container } = render(<AppTabs options={{ fetchImpl }} />);
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+    fireEvent.click(screen.getByRole("button", { name: "あなたへ" }));
+
+    await waitFor(() => expect(container.querySelector(".recommendation-card")).not.toBeNull());
+    expect(container.querySelectorAll(".gap-escalation-note")).toHaveLength(0);
+  });
+});

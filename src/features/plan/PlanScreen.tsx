@@ -1,6 +1,7 @@
 import type { DragEvent } from "react";
 import { DataGapCard } from "./components/DataGapCard";
 import { EtiquetteList } from "./components/EtiquetteList";
+import { GapEscalationNote } from "./components/GapEscalationNote";
 import { JntoReferenceNote } from "./components/JntoReferenceNote";
 import { ProvenanceChip } from "./components/ProvenanceChip";
 import { RouteStopCard } from "./components/RouteStopCard";
@@ -105,6 +106,11 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
                 data-gap-card__title（15px）が親の route-empty__title（12.5px）より大きく、
                 見出しの階層が逆転する */}
             {request.gaps.length > 0 && <DataGapCard gaps={request.gaps} />}
+            {/* 内訳（gaps）が空でも出す。サーバー応答をそのまま返す経路では内訳が付かず
+                （ラーメン単独がこの形）、そこがこの注記を最も要る画面になる。
+                「未回答なら内訳は空」ではない点と、reason で出し分けない理由は
+                GapEscalationNote の doc */}
+            <GapEscalationNote />
           </>
         )}
 
@@ -112,7 +118,13 @@ export function PlanScreen({ state }: { state: PlanScreenState }) {
 
         {request.status === "ready" && (
           <>
-            {request.gaps.length > 0 && <DataGapCard gaps={request.gaps} />}
+            {/* 同じ条件を2行に分けない。片方だけ書き換える退行が構造的に起きないようにする */}
+            {request.gaps.length > 0 && (
+              <>
+                <DataGapCard gaps={request.gaps} />
+                <GapEscalationNote />
+              </>
+            )}
 
             {orderedStops.map(({ origIdx, pos, stop, source, positionLabel, selected, isDragOver }) => (
               <div key={origIdx} className="route-stop">
