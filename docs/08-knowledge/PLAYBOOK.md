@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.38.0"
+version: "1.39.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 111
+ace_entry_count: 113
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -342,8 +342,21 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-155-2 | 生成された設定の型は、実行時にその値がある保証ではない | architecture | [playbook/architecture.md#ace-155-2](./playbook/architecture.md#ace-155-2) |
 | ACE-155-3 | 「無効」を値域の特別な値へ潰すと、無効にしたつもりのまま効き続ける | architecture | [playbook/architecture.md#ace-155-3](./playbook/architecture.md#ace-155-3) |
 | ACE-155-4 | 設定値の妥当性を `Number()` に任せると、書き間違いが別の値として通る | data-processing | [playbook/data-processing.md#ace-155-4](./playbook/data-processing.md#ace-155-4) |
+| ACE-167-1 | ガードが見ている条件は、結果を縛る保証ではない ―― 判定の入力か出力かを分けて読む | architecture | [playbook/architecture.md#ace-167-1](./playbook/architecture.md#ace-167-1) |
+| ACE-167-2 | 「現状維持」も決定なら、固定するテストと参照の張り替えを伴わせる | process | [playbook/process.md#ace-167-2](./playbook/process.md#ace-167-2) |
 
 ## Changelog
+
+### [1.39.0] - 2026-08-22
+
+#### 追加
+
+- ACE-167-1: ガードが見ている条件は、結果を縛る保証ではない ―― 判定の入力か出力かを分けて読む（Issue #153 / PR #167）
+- ACE-167-2: 「現状維持」も決定なら、固定するテストと参照の張り替えを伴わせる（Issue #153 / PR #167）
+
+#### カウンター更新
+
+- ACE-113-1: Helpful +1（「エリアを見ているから守られている」という防御の主張を、同じ PR 内で2度書いて2度覆した。偽の防波堤の型として再検出）
 
 ### [1.38.0] - 2026-08-22
 
