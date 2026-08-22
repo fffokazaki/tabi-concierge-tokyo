@@ -1,12 +1,14 @@
 ---
 title: "API_REQUIREMENTS"
-version: "1.7.1"
+version: "1.10.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-16"
 updated: "2026-08-22"
 changeImpact: "high"
 ---
+
+<!-- markdownlint-disable MD013 MD022 MD024 MD025 MD032 -->
 
 # フロントエンドが必要とするAPI要件（プラン画面）
 
@@ -41,6 +43,7 @@ changeImpact: "high"
 
 🗺️ プラン（`src/features/plan/PlanScreen.tsx`）。API.md の「フロントエンド5機能とコア操作の対応」表どおり、`search_datasets` → `aggregate_dataset` → `get_provenance` の3操作を `/api/*` 経由で使います。
 👤 旅のプロフィール（`TripSetupScreen.tsx`）はツール呼び出しなし（`Trip` はクライアント側のコンテキストとして保持するのみ）なので、本書には含めません。
+📊 データ還元ダッシュボード（`/gaps`・`src/features/gaps/GapsDashboard.tsx`）は `GET /api/gaps/summary` を使います。旅行者向け5機能とは対象ユーザーが異なるため、タブには加えず独立 URL に置きます。
 
 ---
 
@@ -130,6 +133,24 @@ changeImpact: "high"
 
 承認済みデザインカンプ（`Gap_Design_new_jap.pdf`）のうち、「このデータをリクエストする」ボタンと件数表示は、対応するサーバー側のオプトイン機構が無いため意図的に実装から外した。
 
+### 未回答の還元を画面に出す（2026-08-22・[Issue #192](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/192)）
+
+上のボタンを外した判断は維持したまま、**記録され都へのデータ公開リクエストへ還元されること自体は画面に出す**ようにした（`src/features/plan/components/GapEscalationNote.tsx`）。それまで**答えられなかったことを告げている場所（`route-empty` / `DataGapCard`）の脇には**この説明が無く、仕組みは動いているのに利用者からは「答えられません」で行き止まりに見えていた（DOMAIN.md §7 の還元ループは企画の芯の半分）。
+
+> **「画面に1文も無かった」わけではない。** プラン画面のマナー欄フォールバックには以前から「都へのデータ公開リクエストの候補として記録しています。」の一文がある（`buildPlan` が `etiquette: []` を固定で入れるため、**成功プランでは必ず描画される**）。あれはマナーという1件について per-item で現在進行形を名乗っており、下の「個別の受領証にはしない」と衝突している。本 Issue のスコープ外として [Issue #201](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/201) に分けた。
+
+| 決めたこと | 内容 |
+| --- | --- |
+| **ボタンは出さない** | 2026-08-17 の判断を維持。押す操作は増やさず、既に自動で動いている仕組みを述べるだけにする |
+| **文言** | 「答えられなかった問いは記録されます。何が足りないのかを、東京都へのデータ公開リクエストに変えていきます。」 |
+| **時制を分ける** | 「記録されます」＝実装済みの事実（D1 `gaps` は本番稼働中）／「変えていきます」＝意図（都への提出プロセスは**構想**）。`docs/first-stage-presentation.md` の発話原稿と同じ切り方にして、資料と画面で主張がずれないようにする。「提出しました」「送信しました」は書かない |
+| **集計先の画面（§4）とは独立** | 記録の集計は `/gaps` のデータ還元ダッシュボード（[Issue #193](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/193)・§4）が見せる。旅行者向け画面の注記からは**リンクしない** —— 対象ユーザーが違い（都・GovTech東京向け）、旅行者を別画面へ誘導する導線は本 Issue の範囲外。「変えていきます」が構想である点は両画面で同じ扱い |
+| **個別の受領証にはしない** | `d1GapRecorder`（`worker/core/gaps.ts`）は D1 への書き込み失敗を `console.error` に出して応答は通すため、**応答に記録の成否が載っていない**。よってフロントは目の前の1件について「記録済みです」と断定できない。この文は機構の説明。受領証にするには応答へ成否を載せる必要がある（[Issue #194](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/194)） |
+| **出す条件** | `status: "unanswered"` のとき無条件（**内訳 `gaps` が空でも出す**）／`answered` のときは `gaps.length > 0`。**画面に1つだけ**。`reason` では出し分けない（下記） |
+| **未回答のとき `gaps` が空になるのは1経路だけ** | 「未回答なら内訳は空」ではない。内訳が付かないのは**サーバー応答をそのまま返す経路**だけで（構造化欠損が `areas` の送信を要求するのに送っていないため）、ラーメン単独がこの形。一方フロント側が組み立てる未回答（候補全滅の `other`・`get_provenance` の未回答）は内訳を伴う。だから条件を `gaps.length > 0` にすると**ラーメンの画面にだけ注記が出ない** |
+
+**`reason` で出し分けない理由**（実装途中に `reason !== "other"` を検討して棄却した）: サーバーが返す `other` も `gaps` テーブルへ記録されている（渋谷×ショッピング／ナイトライフが応答全体 `unanswered` / `other` で返る実測。CLAUDE.md）ため、`other` で黙ると記録されている実在の経路で注記が消える。一方フロント側が組み立てる `other`（「候補のデータセットから…取り出せませんでした」）は、原因となった候補ごとの未回答（サーバーが記録済み）を必ず `gaps` に伴う。`reason` は応答全体を代表する1つでしかなく（[Issue #94](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/94)）、記録の有無を判別する材料にはならない。
+
 ---
 
 ## 2. `aggregate_dataset` — 集計・抽出
@@ -157,6 +178,7 @@ changeImpact: "high"
   result: {
     name: string;      // 汎用語彙。フロントエンドが Stop.place にマッピングする
     summary: string;    // 汎用語彙。フロントエンドが Stop.note にマッピングする
+    category: string;   // 選択行の分類。フロントエンドが Stop.category にマッピングする
     // その他の集計結果フィールドは要検討（例: 営業時間の生データ、混雑度など）
   };
   query: string;       // 実行したクエリ。出典に必須（API.md §4）
@@ -170,6 +192,7 @@ changeImpact: "high"
 ### 備考
 - `query`（実行クエリ）は出典に必須。省略不可（API.md §4「実行クエリの不在を理由に出典を省略してはならない」）。
 - **2026-08-17 合意**: 出力フィールド名は `place` / `note` ではなく `name` / `summary` の汎用語彙とする。API.md 設計原則4「アプリ固有の語彙を持ち込まない」（`/mcp` 経由で翌年参加者にも同じ操作を開放するため）に沿った Okazaki の逆提案に Sho が合意した。`Stop.place ← name`、`Stop.note ← summary` のマッピングはフロントエンド側の責務とする
+- **2026-08-22 追加**: `category` は固定 SQL で検証した選択行の非空分類をそのまま返す。データセット内に複数分類があるため、フロントエンドはデータセット名から推測せず `Stop.category ← category` とする（[Issue #188](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/188)）
 - **未対応**: `Stop.time`（表示用の時刻ラベル）は現在 `Scenario.schedule[position]` としてフロントエンド側で保持しており、データセット由来ではない（並べ替えても時刻が逆行しないための設計）。この集計結果に時刻情報を含める必要はありません。
 
 ---
@@ -228,10 +251,40 @@ changeImpact: "high"
 
 ## その他、実装未着手のツール（本書の対象外）
 
-API.md §3.4 に記載のある以下は、対応する画面（📷 スキャン・✨ あなたへ）自体がまだフロントエンドに実装されていないため、本書では要件化していません。実装に着手する段階で改めて要件を出します。
+API.md §3.5 に記載のある以下は、専用のコア操作として未実装です。本書では既存のコア3操作を組み合わせる画面要件だけを扱い、専用操作の実装に着手する段階で改めて要件を出します。
 
 - `recommend_spots`（仮称） — 「あなたへ」画面用
 - `report_gap`（仮称） — 未回答のデータ公開リクエスト化用
+
+---
+
+## 4. `GET /api/gaps/summary` — 還元ダッシュボード
+
+### 呼び出しタイミング
+
+`/gaps` を開いたときに1回呼び出す。結果は D1 `gaps` の現時点のスナップショットで、画面側に固定件数を持たない。
+
+### 出力
+
+```ts
+{
+  total: number;
+  byReason: Array<{ reason: UnansweredReason; count: number }>;
+  byArea: Array<{ area: string | null; count: number }>;
+  byReasonAndArea: Array<{
+    reason: UnansweredReason;
+    area: string | null;
+    count: number;
+  }>;
+}
+```
+
+- `area: null` は画面で「エリア指定なし」と表示する
+- API 入力由来の任意のエリア文字列は返さず、公開を決めた既知の地名以外は `"その他のエリア"` と表示する
+- `reason` は日本語ラベルへ変換するが、API の閉じた英語列挙値は変えない
+- `total: 0` では「未回答の記録はまだありません」と表示し、ダミーの棒グラフや件数を置かない
+- 画面に**「構想」**と、東京都・GovTech東京への提出プロセス自体は未実装である旨を明記する
+- `gaps.question` は表示にも応答型にも含めない。`gaps.area` も生値では受け取らず、既知の公開地名以外は SQL 側で `"その他のエリア"` にまとめる。利用者の自由入力を認証なしで公開しないため、画面は分類済みの集計だけを使う
 
 ---
 
@@ -246,7 +299,7 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 
 | 項目 | 決定 |
 | ---- | ---- |
-| `aggregate_dataset` の出力語彙 | `name` / `summary` の汎用語彙。`Stop.place` / `Stop.note` へのマッピングはフロントエンド側（§2 参照） |
+| `aggregate_dataset` の出力語彙 | `name` / `summary` / `category` の汎用語彙。`Stop.place` / `Stop.note` / `Stop.category` へのマッピングはフロントエンド側（§2 参照） |
 | `search_datasets` の `limit` | 既定 4・上限 10。範囲外は 400（黙って丸めない）。既定値は1ルート3〜4停留地という本書 §1 の想定に合わせた |
 | エラーレスポンスの形 | `{ error: "invalid_request" \| "not_found" \| "internal_error", message?: string }`。400 は**入力の形の違反だけ**に使い、「データが無い」は `unanswered` ＋ HTTP 200（API.md §4）。500 も JSON で返るので、画面は常に JSON として読んでよい |
 | 複数データセット横断時の `query` の対応関係 | 入力の `query` を各 source に同じ値で複写する。同じ ID を重ねても出典は1件にまとまる。知らない `datasetId` が混ざったら既知のぶんだけ返さず全体を `unanswered` にする（画面上の並べ方はフロントエンド側の決定事項として残る） |
@@ -254,6 +307,31 @@ API.md §3.4 に記載のある以下は、対応する画面（📷 スキャ�
 | `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物が返るとは限らない。** 保証は1つだけで、訊かれた代表エリアの行をそのデータセットが1行も収録していなければ `unanswered` にする（別エリアの行では埋めない）。それ以外は返る行の `area` を実行後に検証していないため、「上野の…」と訊いて浅草の行が返りうる（[Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152)）。**返ってきた `name` を「訊いたエリアの施設」として扱わないこと。** 詳細は [API.md](./API.md) §3.2 |
 
 ## Changelog
+
+### [1.10.0] - 2026-08-22
+
+#### 追加
+
+- `aggregate_dataset` の回答あり `result` に、選択行由来の必須 `category` と `Stop.category` への写像を追加（[Issue #188](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/188)）
+
+### [1.9.0] - 2026-08-22
+
+#### 変更
+
+- **未回答の還元を画面に出す方針へ変更**（[Issue #192](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/192)。§1 に同名の節を追加）。**minor は節を足したからではなく方針変更のため** ―― 未回答・欠損の表示の脇でこれまで言っていなかった「記録され都へのデータ公開リクエストへ還元される」ことを言うようになる。2026-08-17 の「リクエストするボタンは出さない」判断は維持したうえで、押す操作を伴わない注記として出す。文言の時制の切り分け（「記録されます」＝事実／「変えていきます」＝構想）と、`reason` で出し分けない理由（サーバーが返す `other` も記録されている）を根拠つきで記録した
+- 同節に、既存のマナー欄フォールバックが per-item の記録を名乗っている衝突を明記し、[Issue #201](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/201) へ分離した
+
+### [1.8.0] - 2026-08-22
+
+#### 追加
+
+- [Issue #193](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/193) のデータ還元ダッシュボードと `GET /api/gaps/summary` のフロントエンド要件を §4 に追加
+- 0件表示、`area: null` のラベル、都への提出が**構想**であることの表示、個票 `question` と任意の `area` を外へ出さない境界を確定。未知のエリアは「その他のエリア」へ集約する
+
+#### 修正
+
+- 追加候補の参照先を API.md §3.4 から §3.5 へ修正
+- 実装済みの「あなたへ」画面まで未実装と読める旧説明を、追加候補の専用コア操作が未実装という現況へ修正
 
 ### [1.7.1] - 2026-08-22
 

@@ -1,6 +1,6 @@
 ---
 title: "DEPLOYMENT"
-version: "1.18.1"
+version: "1.18.2"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -266,6 +266,7 @@ npm run deploy  # vite build → wrangler deploy
 
 | 日時 | Version ID | 内容 | 確認 |
 | --- | --- | --- | --- |
+| 2026-08-22 | `688c5cb7-0c64-4440-9f59-cbbedec9463e` | 未回答が記録され都へのデータ公開リクエストへ還元されることの注記を、未回答・欠損の表示の脇に出す（#192 / PR #198）。**変更は `src/` と `docs/` のみ**だが、React アプリは同じ Worker に同梱されて配信されるため §3 の「`src/` を変更する PR をマージしたとき」の契機に該当する。`worker/` `shared/` `migrations/` `data/` `scripts/` は未変更のため、マイグレーション・シードは実行していない。2026-08-17 の「リクエストするボタンは出さない」判断は維持（押す操作は増やしていない） | **配信中の bundle が手元のビルドとバイト一致することで確認** ―― `curl --compressed` で取得した `/assets/index-CMI8dFSf.js`（226,884 bytes）が `dist/client/assets/index-CMI8dFSf.js` と `cmp` で完全一致し、注記の文言「答えられなかった問いは記録されます。…」を含む。`/assets/index-CP_BfR62.css` にも `.gap-escalation-note` が入っている。**実ブラウザで2ケース実測** ―― プラン画面（興味＝ラーメン・文化）で `route-panel` の並びが `data-gap-card` → `gap-escalation-note` → 停留地となり注記は1つだけ。あなたへ画面のラーメン単独では `route-empty`（`分類: insufficient_granularity`）→ `gap-escalation-note` の2要素で、**内訳が空でも注記が出ることを本番で確認**（`DataGapCard` は出ない）。**伝播待ちは不要だった**（デプロイ直後の1回目から新 bundle）。テスト 869 件（+62 は #193 のダッシュボードぶんを含む。#192 単体では +18） |
 | 2026-08-22 | `460c9237-4423-436d-aa93-e1b0942bd4a5` | 応答に載せる行を代表エリア優先で選ぶ（#174 / PR 後述）。生成 SQL が area 条件を `OR` で繋ぐと（同一入力8回で4〜6回・実測）対象エリア外の行が category だけで当たり、`rows[0]` 固定の取り出しが蔵前の行を旅程の1番目に載せていた。**プロンプトで「AND で繋げ」と頼む修正は効かなかった**（追加後も8回中6回が OR 形・Version `9df28168` で実測 → revert）。SQL は直さず `pickPreferredRow`（`worker/core/text-to-sql.ts`）が返った行から intent の代表エリア → 代表エリアいずれか → 先頭の順で選ぶ。`worker/` の変更なので §3 の契機に該当 | **AC を本番で実測** ―― キャッシュ無効（`AI_GATEWAY_CACHE_TTL="0"` を一時設定）で同一入力`{"datasetId":"t131067d0000000251","intent":"文化、家族向け、自然"}` を8回引き直し、SQL は AND 5 / OR 3 と揺れたまま**8回全部が寛永寺（上野）**。修正前は OR 形のたび初代川柳墓（蔵前）だった。測定後に TTL を 3600 へ戻して再デプロイし、焼き付く1発目も寛永寺であることを確認。テスト 773 件（+3。#153 の「別エリアの行が返る」を固定していたテストは意図的に書き換え）。**引き直し測定の途中版**（`60ee2fac` 効かないプロンプト入り・`9df28168` 同+TTL0・`e6957718`/`e39c60b9` 行選定入り・`1787a736` 一時復旧）**が本番に載った時間帯がある** ―― いずれも短時間。その後 Codex レビュー指摘（同名別エリアの取り違え・「銅鐘」実例）対応で `a9fdf7f6-3ba0-44f8-ac18-3b594bb3388d` を最終版としてデプロイ。`PREFERRED_COLUMNS` に `area` を足したため生成 SQL の SELECT に area が入るようになったことを本番応答の `query` で確認（`SELECT dataset_id, name, address, note, area FROM ...`）。名指し経路（上野の寺社を1件 → 寛永寺）も回帰なし |
 | 2026-08-22 | `a17750ee-4a0d-472b-b8ee-5afa6fd5084a` | **デプロイ先アカウントの移設**（#171）。ハッカソン事務局発行の `tokyo_odh_091` へ Worker・D1 ごと移した。URL が <https://tabi-concierge-tokyo.opendata-002.workers.dev> から <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev> へ変わる。`wrangler.jsonc` の `account_id` と `d1_databases[].database_id` を同時に差し替え、新アカウントの D1（`202adb68-a563-4475-885e-5605f17d89b4`）へ **migrate ＋ seed を実行**した。コードは無変更。**旧アカウントのデプロイは提出まで残す**（ロールバック先） | チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。**新アカウントでは LLM 経路の生死を疎通で判定できない** ―― 障害時は `extractFromSamples` へ縮退して **HTTP 200 のまま旅程を返す**ため、`npx wrangler tail` を張ったうえで確認した。5リクエスト中、縮退マーカー（`[aggregate] … 縮退` / `[search] 質問の分解に失敗` / `[llm] 推論の呼び出しに失敗`）は **0件**。加えて**縮退していないことの積極的な証拠**として、`aggregate_dataset` の応答 `query` が `D1 実照会: SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = 't131067d0000000251' AND category = '名所・史跡' AND area IN ('上野') LIMIT 50` と、LLM が生成した SQL そのものであることを確認（縮退時はスタブ文言になる）。AI Gateway `default` は新アカウントで自動生成され、未作成時の `AiGatewayError: 2001` は出ていない。**データ一致を旧新で突き合わせ** ―― `datasets` 10 = 10 / `spots` 1,645 = 1,645。`gaps` は 127 → 0 だが、これは稼働中に積まれる未回答ログでシード対象外のため正常。新 D1 への書き込みも確認（`新宿の美術館に行きたい / 新宿 / 美術館 / out_of_area` が記録された）。`/mcp` の `tools/list` はコア3ツール（`search_datasets` / `aggregate_dataset` / `get_provenance`）を返す。**伝播待ちは不要だった**（新規デプロイのため旧版が存在しない） |
 | 2026-08-22 | `1e2a4be9-4f3a-4ce2-9bb6-6813f3f6bed0` | 名指しされた施設が候補データセットに無いときの扱いを、決定（①すり替える）として明文化（#153 / PR #167）。**ランタイムの挙動は変えていない** ―― 実行時に変わった値は `worker/mcp.ts` の `aggregate_dataset` の**ツール説明（`tools/list` で外部 MCP クライアントへ配る広告文）だけ**である。「集計意図に合う1件を取り出す」という言い切りをやめ、名指しが外れたら別の行が返ること・返る行が意図のエリアである保証は無いことを明示した。`worker/` の変更なので §3 の契機に該当する。`migrations/` `data/` `scripts/` `src/` は未変更のため、マイグレーション・シード・フロントの再確認は不要 | **配布中の広告文そのもので確認** ―― 本番の `/mcp` へ `tools/list` を投げ、`aggregate_dataset.description` に「返る行が意図のエリアである保証は無い」が含まれ、旧文言「集計意図に合う1件」が消えていることを確認。正常系は `/api/search-datasets {"query":"上野の文化財","limit":2}` が `answered` で文化財一覧・名所史跡を返すこと、SPA `/` が 200 を返すことを確認。**すり替えの挙動そのものは本番で実測していない** ―― この PR は挙動を変えていないため、確認対象は「広告文が反映されたこと」である |
@@ -507,6 +508,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.18.2] - 2026-08-22
+
+#### 追加
+
+- §3 デプロイ記録に `688c5cb7-0c64-4440-9f59-cbbedec9463e` を追加（[Issue #192](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/192) / [PR #198](https://github.com/fffokazaki/tabi-concierge-tokyo/pull/198)）。未回答の還元を画面に出した回。**`src/` と `docs/` だけの変更**なので `src/` 行の契機に該当する。確認は bundle のバイト一致に加え、**内訳が空の未回答（あなたへ画面のラーメン単独）で注記が出ることを本番の実ブラウザで実測**した ―― この経路はテストでは固定できても、条件を `gaps.length > 0` に書き換えると本番でだけ静かに消える
 
 ### [1.18.1] - 2026-08-22
 

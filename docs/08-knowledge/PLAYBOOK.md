@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.46.0"
+version: "1.47.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 126
+ace_entry_count: 128
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -357,8 +357,17 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-191-1 | TDD は「ガードが効いていない瞬間」を必ず作る ―― 実プロセスを起動するテストの宛先を本番既定にしない | testing | [playbook/testing.md#ace-191-1](./playbook/testing.md#ace-191-1) |
 | ACE-191-2 | 復旧の確認を COUNT で済ませない ―― AUTOINCREMENT は DELETE で戻らないので再シードで id が変わる | testing | [playbook/testing.md#ace-191-2](./playbook/testing.md#ace-191-2) |
 | ACE-191-3 | 値を返すスクリプトでは、ゲート系なら「検査が無効化」で済む失敗が「0 件」に化ける | architecture | [playbook/architecture.md#ace-191-3](./playbook/architecture.md#ace-191-3) |
+| ACE-200-1 | 集計軸が任意入力由来なら個票と同じ機密値として扱い、SQL 境界で公開分類へ丸める | architecture | [playbook/architecture.md#ace-200-1](./playbook/architecture.md#ace-200-1) |
+| ACE-200-2 | プライバシー境界テストは機密値らしいセンチネルを実 DB へ入れ、集計整合と非露出を同時に固定する | testing | [playbook/testing.md#ace-200-2](./playbook/testing.md#ace-200-2) |
 
 ## Changelog
+
+### [1.47.0] - 2026-08-22
+
+#### 追加
+
+- ACE-200-1: 集計軸が任意入力由来なら個票と同じ機密値として扱い、SQL 境界で公開分類へ丸める（Issue #193 / PR #200）
+- ACE-200-2: プライバシー境界テストは機密値らしいセンチネルを実 DB へ入れ、集計整合と非露出を同時に固定する（Issue #193 / PR #200）
 
 ### [1.46.0] - 2026-08-22
 

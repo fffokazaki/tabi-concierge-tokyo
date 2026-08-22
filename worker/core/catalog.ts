@@ -41,6 +41,8 @@ export type CatalogSample = {
   readonly area: RepresentativeArea;
   /** 原本の名称列の値をそのまま使う */
   readonly name: string;
+  /** 原本行を `scripts/seed.ts` と同じ規則で写した分類。 */
+  readonly category: string;
   /**
    * 原本の他の列（所在地・営業時間など）から組み立てた説明。
    * 原本に無い情報を足さないだけでなく、**原本にある留保（「公演等で変化あり」等）も落とさない**。
@@ -111,6 +113,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "上野",
         name: "寛永寺",
+        category: "名所・史跡",
         summary: "所在地は台東区上野桜木1丁目14番。台東区が名所・史跡として公開している45件のうちの1件。",
         sourceCells: ["上野桜木1丁目14番"],
         sourceRow: 3,
@@ -118,6 +121,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "浅草",
         name: "浅草寺",
+        category: "名所・史跡",
         summary: "所在地は台東区浅草2-3-1。同じ所在地の行として浅草神社も収録されている。",
         sourceCells: ["浅草2-3-1"],
         sourceRow: 27,
@@ -141,6 +145,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "上野",
         name: "国立西洋美術館",
+        category: "美術館",
         summary: "所在地は上野公園7番7号、電話番号は03-5777-8600。台東区の文化観光施設一覧に美術館として収録。",
         sourceCells: ["上野公園7番7号", "03-5777-8600"],
         sourceRow: 4,
@@ -148,6 +153,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "浅草",
         name: "浅草文化観光センター",
+        category: "観光",
         summary: "所在地は雷門2丁目18番9号、電話番号は03-3842-5566。台東区の文化観光施設一覧に観光として収録。",
         sourceCells: ["雷門2丁目18番9号", "03-3842-5566"],
         sourceRow: 3,
@@ -170,6 +176,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "上野",
         name: "絹本著色元三大師画像",
+        category: "区指定文化財",
         summary:
           "寛永寺が所有する区指定文化財（美術工芸品）。所在地は東京都台東区上野桜木1丁目、文化財指定日は1988-03-31。",
         sourceCells: ["区指定文化財", "美術工芸品", "寛永寺", "東京都台東区上野桜木1丁目", "1988-03-31"],
@@ -178,6 +185,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "浅草",
         name: "絹本著色親鸞上人絵伝",
+        category: "区民文化財",
         summary:
           "東本願寺が所有する区民文化財（美術工芸品）。所在地は東京都台東区西浅草1丁目、文化財指定日は1989-02-20。",
         sourceCells: ["区民文化財", "美術工芸品", "東本願寺", "東京都台東区西浅草1丁目", "1989-02-20"],
@@ -201,6 +209,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "上野",
         name: "上野公園大黒天横",
+        category: "公衆トイレ",
         summary: "所在地は東京都台東区上野公園10-17前。２４時間利用可能で、乳幼児用設備の設置あり。",
         sourceCells: ["東京都台東区上野公園10-17前", "２４時間利用可能"],
         sourceRow: 1,
@@ -208,6 +217,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "浅草",
         name: "下水ポンプ場脇",
+        category: "公衆トイレ",
         summary: "所在地は東京都台東区浅草5-73-11。２４時間利用可能で、乳幼児用設備の設置あり。",
         sourceCells: ["東京都台東区浅草5-73-11", "２４時間利用可能"],
         sourceRow: 15,
@@ -230,6 +240,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "上野",
         name: "東西(鶯谷駅経由・日医大回りルート)2上野駅入谷口",
+        category: "「東西めぐりん（鶯谷駅経由・日医大回りルート）」停留所",
         summary: "大分類は「東西めぐりん（鶯谷駅経由・日医大回りルート）」停留所。座標つきで収録。",
         sourceCells: ["「東西めぐりん（鶯谷駅経由・日医大回りルート）」停留所"],
         sourceRow: 10,
@@ -237,6 +248,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "浅草",
         name: "東西(鶯谷駅経由・日医大回りルート)27西浅草三丁目",
+        category: "「東西めぐりん（鶯谷駅経由・日医大回りルート）」停留所",
         summary: "大分類は「東西めぐりん（鶯谷駅経由・日医大回りルート）」停留所。座標つきで収録。",
         sourceCells: ["「東西めぐりん（鶯谷駅経由・日医大回りルート）」停留所"],
         sourceRow: 20,
@@ -259,6 +271,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "上野",
         name: "燕湯",
+        category: "銭湯",
         summary: "住所は東京都台東区上野3-14-5。営業は6:00から20:00、定休日は月・火、入浴料金（基本）は500円。",
         sourceCells: ["東京都台東区上野3-14-5", "6:00", "20:00", "月・火", "500"],
         sourceRow: 10,
@@ -266,6 +279,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "浅草",
         name: "アクアプレイス旭",
+        category: "銭湯",
         summary: "住所は東京都台東区浅草5-10-5。営業は15:00から0:00、定休日は火、入浴料金（基本）は500円。",
         sourceCells: ["東京都台東区浅草5-10-5", "15:00", "0:00", "火", "500"],
         sourceRow: 1,
@@ -288,6 +302,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "浅草",
         name: "浅草東武ﾎﾃﾙ",
+        category: "旅館・ホテル営業",
         summary: "所在地は浅草一丁目1番15号。営業形態は旅館・ホテル営業、許可番号は30台台健生環き第109号。",
         sourceCells: ["浅草一丁目1番15号", "旅館・ホテル営業", "30台台健生環き第109号"],
         sourceRow: 4,
@@ -295,6 +310,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "上野",
         name: "ﾎﾃﾙ ﾕﾅｲﾃｯﾄﾞ",
+        category: "旅館・ホテル営業",
         summary: "所在地は池之端一丁目1番4号。営業形態は旅館・ホテル営業、許可番号は63台下健衛環き第1号。",
         sourceCells: ["池之端一丁目1番4号", "旅館・ホテル営業", "63台下健衛環き第1号"],
         sourceRow: 163,
@@ -318,6 +334,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "上野",
         name: "フォレスティーユ精養軒",
+        category: "飲食店",
         summary:
           "住所は東京都台東区上野公園5-45 東京文化会館内。営業時間は11:00~17:00 (LO16:30)または11:00~19:00(LO18:30) 文化会館の公演等で変化あり。車椅子での移動が可能で、英語等外国語のメニューあり。",
         sourceCells: [
@@ -329,6 +346,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "浅草",
         name: "一頭買焼肉 玄 浅草本店",
+        category: "飲食店",
         summary:
           "住所は東京都台東区浅草1-42-4 ヒューリック浅草一丁目ビル 2F。営業時間はランチ11:45~15:00(LO14:30)ディナー16:30~22:15(LO21:45)土・日・祝16:30~21:50(LO21:15)。車椅子での移動が可能で、英語等外国語のメニューあり。",
         sourceCells: [
@@ -375,6 +393,7 @@ export const CATALOG: readonly CatalogEntry[] = [
       {
         area: "渋谷",
         name: "恵比寿東公園",
+        category: "公園",
         summary: "所在地は渋谷区恵比寿1-2-16。渋谷区が公開する都市公園・都立公園一覧123件のうちの1件。",
         sourceCells: ["渋谷区恵比寿1-2-16"],
         sourceRow: 1,

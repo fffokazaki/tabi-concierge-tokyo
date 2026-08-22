@@ -1,6 +1,6 @@
 ---
 title: "MCP"
-version: "1.1.1"
+version: "1.1.2"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-16"
@@ -30,7 +30,7 @@ changeImpact: "low"
 | `aggregate_dataset` | 集計 | [API.md §3.2](./API.md) |
 | `get_provenance` | 出典取得 | [API.md §3.3](./API.md) |
 
-追加候補（`recommend_spots` / `report_gap`）も API.md §3.4 に従う。
+追加候補（`recommend_spots` / `report_gap`）も API.md §3.5 に従う。
 
 ## 3. 応答の共通仕様
 
@@ -131,6 +131,12 @@ curl -s -o /dev/null -w '%{http_code}\n' $U/mcp
 ```
 
 ## Changelog
+
+### [1.1.2] - 2026-08-22
+
+#### 修正
+
+- 集計 API の追加で移動した「追加候補」の参照先を API.md §3.4 から §3.5 へ修正
 
 ### [1.1.1] - 2026-08-22
 

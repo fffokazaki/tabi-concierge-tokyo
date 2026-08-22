@@ -15,6 +15,209 @@
   font-family: "Karla", system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
 }
 
+/* Issue #193: 都・GovTech東京向けの還元ダッシュボード。旅行者向けタブとは別の /gaps 画面。 */
+.gaps-dashboard {
+  width: min(100% - 32px, 960px);
+  margin: 0 auto;
+  padding: 40px 0 64px;
+  color: var(--ink, #17211b);
+}
+
+.gaps-dashboard__header {
+  margin-bottom: 28px;
+}
+
+.gaps-dashboard__back {
+  display: inline-block;
+  margin-bottom: 28px;
+  color: inherit;
+  font-size: 0.88rem;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+.gaps-dashboard h1 {
+  margin: 8px 0 12px;
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+}
+
+.gaps-dashboard__lead {
+  max-width: 680px;
+  margin: 0;
+  color: #536158;
+  font-size: 1.04rem;
+  line-height: 1.8;
+}
+
+.gaps-dashboard__concept {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-top: 24px;
+  padding: 16px 18px;
+  border: 1px solid #d6c779;
+  border-radius: 16px;
+  background: #fff9d9;
+  line-height: 1.7;
+}
+
+.gaps-dashboard__concept strong {
+  flex: 0 0 auto;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #f1dc72;
+  font-size: 0.8rem;
+}
+
+.gaps-dashboard__total-card,
+.gaps-dashboard__card,
+.gaps-dashboard__empty,
+.gaps-dashboard__error {
+  border: 1px solid #dfe7e1;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 12px 36px rgba(23, 33, 27, 0.06);
+}
+
+.gaps-dashboard__total-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 0 12px;
+  margin-bottom: 20px;
+  padding: 24px 28px;
+}
+
+.gaps-dashboard__total {
+  color: #246b4a;
+  font-size: clamp(3rem, 8vw, 5rem);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.gaps-dashboard__total-card > span:not(.gaps-dashboard__total) {
+  font-size: 1.12rem;
+  font-weight: 700;
+}
+
+.gaps-dashboard__total-card small {
+  grid-column: 2;
+  color: #6b766f;
+}
+
+.gaps-dashboard__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.gaps-dashboard__card {
+  padding: 24px;
+}
+
+.gaps-dashboard__card h2 {
+  margin: 0 0 20px;
+  font-size: 1.08rem;
+}
+
+.gaps-dashboard__breakdown {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gaps-dashboard__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 7px;
+}
+
+.gaps-dashboard__bar {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf2ee;
+}
+
+.gaps-dashboard__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #5aa477;
+}
+
+.gaps-dashboard__table-wrap {
+  overflow-x: auto;
+}
+
+.gaps-dashboard table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.gaps-dashboard th,
+.gaps-dashboard td {
+  padding: 13px 10px;
+  border-bottom: 1px solid #edf1ee;
+  text-align: left;
+}
+
+.gaps-dashboard th:last-child,
+.gaps-dashboard td:last-child {
+  text-align: right;
+}
+
+.gaps-dashboard__privacy {
+  margin: 20px 4px 0;
+  color: #68736c;
+  font-size: 0.84rem;
+  line-height: 1.7;
+}
+
+.gaps-dashboard__empty,
+.gaps-dashboard__error {
+  padding: 32px;
+}
+
+.gaps-dashboard__empty p {
+  margin-bottom: 0;
+}
+
+.gaps-dashboard__error {
+  display: grid;
+  gap: 6px;
+  color: #8b2f2f;
+}
+
+@media (max-width: 640px) {
+  .gaps-dashboard {
+    width: min(100% - 24px, 960px);
+    padding-top: 24px;
+  }
+
+  .gaps-dashboard__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gaps-dashboard__concept {
+    display: grid;
+  }
+
+  .gaps-dashboard__total-card {
+    grid-template-columns: 1fr;
+  }
+
+  .gaps-dashboard__total-card small {
+    grid-column: 1;
+  }
+}
+
 * { box-sizing: border-box; }
 
 body {
@@ -179,7 +382,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .stop-card--selected { border-color: var(--accent); background: var(--accent-soft); }
 .stop-card--drag-over { border-color: var(--accent); background: var(--accent-tint); }
 .stop-card__handle { width: 14px; padding-top: 5px; flex-shrink: 0; cursor: grab; color: var(--muted); }
-.stop-card__thumb { width: 52px; height: 52px; flex-shrink: 0; border-radius: 10px; background: var(--border); }
+.stop-card__thumb { width: 52px; height: 52px; flex-shrink: 0; border-radius: 10px; overflow: hidden; background: var(--border); }
+.stop-card__thumb--illustrated { background: transparent; }
+.stop-card__thumb-image { display: block; width: 100%; height: 100%; object-fit: contain; }
 .stop-card__body { flex: 1; min-width: 0; }
 .stop-card__time { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.3px; }
 .stop-card__place { font-family: "Lora", Georgia, "Yu Mincho", serif; font-size: 15px; font-weight: 600; color: var(--ink); margin: 2px 0 0; }
@@ -192,6 +397,20 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .data-gap-card__list { margin: 0; padding-left: 1.1em; font-size: 12.5px; line-height: 1.6; color: oklch(40% 0.02 75); }
 .data-gap-card__list li { margin-bottom: 4px; }
 .data-gap-card__list li:last-child { margin-bottom: 0; }
+
+/* 未回答が記録され、都へのデータ公開リクエストへ還元されることの注記（Issue #192）。
+   枠のある3つ（.provenance-chip＝出典・アクセント色 / .jnto-reference-note＝参考・実線枠 /
+   .data-gap-card＝答えられなかった内容・破線枠）とは、枠も背景も持たせないことで区別する。
+
+   ただし**同じパネル内の .route-status（12px・muted・枠なし）と .route-hidden-note（同）とは
+   見た目がほぼ同じ**で、ready 分岐では主張の違う muted 段落が縦に3種類並ぶ。区別は
+   11px という一段小さい字とアイコンの有無だけで付けている（枠を足すと上の3つと衝突する）。
+   ここを触るときは、その3種類を並べて見ること。
+
+   前の要素の margin-bottom（route-empty 14px / data-gap-card 16px）が間隔になるので、
+   負のマージンや :has() は使わない。 */
+.gap-escalation-note { display: flex; align-items: flex-start; gap: 7px; margin: 0 0 16px; font-size: 11px; line-height: 1.6; color: var(--muted); }
+.gap-escalation-note__icon { width: 12px; height: 12px; flex-shrink: 0; margin-top: 3px; }
 
 .route-divider { border-top: 1px solid var(--border); margin: 6px 0 14px; }
 .route-panel__section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }

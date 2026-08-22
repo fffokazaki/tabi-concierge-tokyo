@@ -36,6 +36,13 @@ const readMeta = (datasetId: string): Meta =>
 const readRows = (datasetId: string): string[][] =>
   parseCsv(readFileSync(`data/${datasetId}/data.csv`, "utf-8")).slice(1);
 
+const DEFAULT_CATEGORY_BY_DATASET: Readonly<Record<string, string>> = {
+  t131067d0000000249: "公衆トイレ",
+  t131067d0000000256: "銭湯",
+  t000012d0000000063: "飲食店",
+  t131130d2025000003: "公園",
+};
+
 describe("カタログのメタ情報", () => {
   it.each(CATALOG)("$title は data/<id>/meta.json の実測値と一致する", (entry) => {
     const meta = readMeta(entry.datasetId);
@@ -87,6 +94,17 @@ describe("固定データの集計結果", () => {
     expect(row, `${entry.datasetId} に ${sample.sourceRow} 行目が無い`).toBeDefined();
     // 名称の列位置はデータセットごとに違うため、行のどこかに完全一致で現れることを見る
     expect(row).toContain(sample.name);
+  });
+
+  it.each(samples)("「$sample.name」の category は原本行または明示した既定値と一致する", ({ entry, sample }) => {
+    const row = readRows(entry.datasetId)[sample.sourceRow - 1];
+
+    expect(sample.category).not.toBe("");
+    if (!row.includes(sample.category)) {
+      expect(DEFAULT_CATEGORY_BY_DATASET[entry.datasetId], `${sample.name}: 分類列にも既定値表にも無い`).toBe(
+        sample.category,
+      );
+    }
   });
 
   it.each(samples)("「$sample.name」の summary は原本のセル値だけで書かれている", ({ entry, sample }) => {

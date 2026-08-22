@@ -1,4 +1,5 @@
 import type { DragEvent, KeyboardEvent } from "react";
+import { resolveCategoryIllustration } from "../categoryIllustrations";
 import type { Stop } from "../types";
 
 type RouteStopCardProps = {
@@ -16,6 +17,7 @@ type RouteStopCardProps = {
 
 export function RouteStopCard({ stop, time, selected, isDragOver, onSelect, onDragStart, onDragOver, onDrop, onDragEnd }: RouteStopCardProps) {
   const modifier = isDragOver ? " stop-card--drag-over" : selected ? " stop-card--selected" : "";
+  const illustration = resolveCategoryIllustration(stop.category);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -48,7 +50,14 @@ export function RouteStopCard({ stop, time, selected, isDragOver, onSelect, onDr
           <circle cx="7.5" cy="13.5" r="1.4" fill="currentColor" />
         </svg>
       </div>
-      <div className="stop-card__thumb" aria-hidden="true" />
+      <div
+        className={`stop-card__thumb${illustration.kind === "unassigned" ? "" : " stop-card__thumb--illustrated"}`}
+        aria-hidden="true"
+      >
+        {illustration.kind === "unassigned" ? null : (
+          <img className="stop-card__thumb-image" src={illustration.src} alt="" />
+        )}
+      </div>
       <div className="stop-card__body">
         <div className="stop-card__time">{time}</div>
         <div className="stop-card__place">{stop.place}</div>

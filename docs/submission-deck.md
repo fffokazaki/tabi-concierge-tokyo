@@ -1,12 +1,14 @@
 ---
 title: "submission-deck"
-version: "1.7.0"
+version: "1.8.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-21"
 updated: "2026-08-22"
 changeImpact: "medium"
 ---
+
+<!-- markdownlint-disable MD013 MD024 MD025 -->
 
 # 提出資料｜16:9・14枚構成
 
@@ -89,7 +91,8 @@ changeImpact: "medium"
 ## 5. 提出前チェックリスト
 
 - [ ] **必須4項目の充足** — ①②③④が全て資料内に存在することを指差し確認
-- [x] **キャプチャ3点**（1600×900px・スライド6/7/8）を本番URLから取得。プロフィール入力から実際に操作して撮る — 2026-08-22 取得済み。**取得元は移設前の旧URL <https://tabi-concierge-tokyo.opendata-002.workers.dev>（Version `712c2277`）**で、現在の本番は <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev>（[Issue #171](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/171) で移設）。**画像自体の差し替えは不要と確定** — [Issue #172](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/172)（2026-08-22）。根拠は2つ: (1) キャプチャはビューポートのみでアドレスバーが写っていない (2) **新本番で3画面とも同一操作を再現し、表示内容がキャプチャと一致することを実測**（スライド6: 寛永寺／上野観光連盟／上野公園大黒天横の3停留地・説明文・出典まで一致。スライド7: 文化チップの寛永寺＋旧東京音楽学校奏楽堂・JNTO文言まで一致。スライド8: ラーメン `insufficient_granularity` の文言一致）。この一致は [Issue #174](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/174) の行選定修正が前提 — 修正前の新本番は約50%で蔵前の停留地が混ざっていた（[Issue #126](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/126) にコメント）。**操作条件は「興味チップのみ・自由文は空」**（[Issue #143](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/143) の決定。自由文が空だと `search_datasets` が LLM 分解を通らず候補選定が決定的になる）。スライド6は**ラーメンを外した「文化・家族向け・自然」**で撮る — 入れたままだと未回答バナーが出て、スライド8の山を先に撃つ
+- [ ] **スライド6のキャプチャを撮り直す**（1600×900px・現本番URL）。2026-08-22 に取得した旧キャプチャは、[Issue #188](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/188) のカテゴリイラスト追加後のプラン画面と見た目が一致しないため使用しない。操作条件は従来どおり、興味チップのみ・自由文は空、ラーメンを外した「文化・家族向け・自然」とする
+- [x] **スライド7/8のキャプチャ**は2026-08-22取得済みのものを維持する。Issue #188 の対象はプラン画面の停留地カードだけで、「あなたへ」画面と未回答表示は変更しない
 - [ ] **タブバーの見え方を確認** — スキャン・周辺は `AppTabs.tsx` の `INACTIVE_TABS` で disabled 表示。キャプチャだけを見る審査員はスライド4の凡例を見ないため、「未完成に見える」ならキャプチャ内かキャプション側に「スキャン・周辺はデザイン構想」と明示する。**見え方の確認は済み**（2026-08-22・薄いグレーのラベルで「壊れている」ようには見えないが、キャプチャ単体では「まだ作っていない」と読める）。**キャプション側に置く方針**で、記載は資料作成（[Issue #127](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/127)）で行うため未チェックのまま残す
 - [ ] **カタログURL の生存確認** — 確定10件を提出直前に再確認（[DATABASE.md](02-design/DATABASE.md) §3）
 - [ ] **スライド11 の OSS 記述の確認** — OSS 化の対象は**コンシェルジュ（`worker/` `shared/` `scripts/` `migrations/`）のみ**で、旅行アプリ `src/` は含まない。切り出しの実施は提出後〜Final Stage（[Issue #129](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/129)）のため、提出資料には「公開予定」と書く
@@ -106,7 +109,7 @@ changeImpact: "medium"
 
 ## Changelog
 
-### [1.7.0] - 2026-08-22
+### [1.8.0] - 2026-08-22
 
 #### 追加
 
@@ -114,6 +117,13 @@ changeImpact: "medium"
   - スライド13の「30分→3分」を v1.6.0 の確定文言（体験・操作一巡に基づく目安）へ差し替え。v1.3.0 当時の「企画時の推定値・未実測」が残っていた
   - スライド12にデータセットIDの列を追加し、カタログURL をテンプレートから解決可能な形へ。件数の説明を実データに合わせて修正（列の合計 1,667 と注記の「合計 1,645」が 22 件ズレていた。差は No.9 の統計表で、`spots` へは取り込んでいない）
   - スライド14の URL を移設前の `opendata-002` から現行の `tokyo-odh-091` へ差し替え（旧アカウントのデプロイは提出までのロールバック先・[DEPLOYMENT.md](05-operations/DEPLOYMENT.md)）
+- **`deck/img/deck-plan.png` は Issue #188 の反映後の画面ではない。** 直上の 1.7.0 が定めたスライド6の撮り直しは、本書のチェックリストだけでなく `deck/img/deck-plan.png` の差し替えも意味する（`build.js` はこのファイル名を固定参照しているため、同じ名前で上書きすれば足りる）
+
+### [1.7.0] - 2026-08-22
+
+#### 変更
+
+- Issue #188 でスライド6のプラン画面にカテゴリイラストが加わるため、旧キャプチャを不一致として撮り直し必須へ変更。対象外のスライド7/8は取得済みのまま維持
 
 ### [1.6.0] - 2026-08-22
 

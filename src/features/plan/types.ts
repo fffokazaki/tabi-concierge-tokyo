@@ -68,6 +68,8 @@ export type EtiquetteTip = {
 export type Stop = {
   place: string;
   note: string;
+  /** `aggregate_dataset` が選んだ D1 行の分類。見た目から推測しない。 */
+  category: string;
   etiquette: EtiquetteTip[];
 };
 
