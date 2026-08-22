@@ -768,3 +768,133 @@ describe("0行は緩めた問いでも0行のときだけ「無かった」と�
     }
   });
 });
+
+/**
+ * 名指しされた施設が候補データセットに無いときの扱い
+ * （[Issue #153](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/153) の決定）。
+ *
+ * 上の「実在しない値では絞らせない（Issue #148）」が固定しているのは**逆側**である ――
+ * 興味の語を `name` に当てにいって0行になった SQL を「無かった」と報告させない
+ * （「intent の語を name へ当てにいく SQL は0行になり、書き直させる（偽の未回答にしない）」・
+ * 「本当に行が無いときは未回答のまま（正しい0行は壊さない）」）。
+ *
+ * 同じ機械が、名指し（「浅草寺に行きたい」）の0行では**別の施設へのすり替え**を生む。
+ * リテラルだけを見て興味の語と施設名を区別する決定的な方法が無いため、#153 は
+ * **偽の未回答を残すより実在する行を返す**方を選んだ。ここが固定するのはその決定であって、
+ * 「すり替えが望ましい」ではない。伝える形の設計は
+ * [#166](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/166) で扱う。
+ *
+ * **挙動を変えるときはこのテストを意図的に書き換えること。**
+ */
+describe("名指しされた施設が無いときは黙ってすり替える（Issue #153 の決定）", () => {
+  it("同じエリアに行があるときは、未回答にせず別の施設を返す", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      // 「浅草寺」は収録していないが、浅草の行そのものはある
+      await seed([
+        { name: "浅草神社", area: "浅草" },
+        { name: "寛永寺", area: "上野" },
+      ]);
+      const byName =
+        `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        " AND name LIKE '%浅草寺%' LIMIT 50";
+      const relaxed =
+        `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        " AND area = '浅草' LIMIT 50";
+      const llm = scriptedLlm(byName, relaxed);
+      const recorder = capturingGapRecorder();
+
+      const output = await aggregateDataset(
+        { datasetId: MEISHO_ID, intent: "浅草寺に行きたい" },
+        recorder,
+        depsWith(llm),
+      );
+
+      const answered = expectAnswered(output);
+      expect(answered.result.name, "名指しは外れたが、選ばれたデータセットの実在する行を返す").toBe("浅草神社");
+      expect(llm.asked, "0行のまま返さず、絞り込みを緩めて書き直させる").toHaveLength(2);
+
+      // 答えを返しているので**欠損ではない**。ここで gaps に積むと、DOMAIN.md §7 の
+      // 「答えられなかったことの一次情報」という定義を壊し、偽の欠損を自分で足すことになる
+      expect(recorder.records, "答えているので gaps には積まない（Issue #151 の偽の欠損を増やさない）").toHaveLength(
+        0,
+      );
+
+      // **すり替えは応答から読み取れない。** `query` に載るのは書き直した後の SQL なので、
+      // 「浅草寺」という語は応答のどこにも残らない ―― これは記録漏れではなく上の決定の帰結で、
+      // #166 が解こうとしている残りの問題そのものである
+      expect(answered.query, "書き直した後の SQL が載るので名指しの語は残らない").not.toContain("浅草寺");
+      expect(JSON.stringify(answered), "応答のどこにも名指しの語は残らない").not.toContain("浅草寺");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("**書き直し SQL のエリアは検証していない** ―― 代表エリアを読み取れていても別エリアの行が返る", async () => {
+    // `countRelaxed` が縛るのは「書き直させるかどうか」だけで、**返ってきた行のエリアは
+    // 誰も見ていない**。「上野の…」と訊かれていても、書き直し SQL がエリア条件を落とせば
+    // 浅草の行がそのまま答えになる（cross-model レビュー・信頼度96 の指摘を実測で確認）。
+    //
+    // したがって「すり替え先は同じエリアに限られる」とは書けない。この穴そのものは
+    // [Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152)
+    //（返る行の area を実行後に検証する）が扱う
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await seed([
+        { name: "浅草神社", area: "浅草" },
+        { name: "寛永寺", area: "上野" },
+      ]);
+      const byName =
+        `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        " AND name LIKE '%とげぬき地蔵%' LIMIT 50";
+      const llm = scriptedLlm(byName, SELECT_ALL); // 書き直しでエリア条件が付かない
+
+      const answered = expectAnswered(await aggregate(MEISHO_ID, "上野のとげぬき地蔵に行きたい", depsWith(llm)));
+
+      expect(answered.result.name, "上野を訊かれているのに浅草の行が返る").toBe("浅草神社");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("エリアについての唯一の歯止め: 読み取れた代表エリアの行が1件も無ければ書き直させない", async () => {
+    // `countRelaxed` は読み取れた代表エリアを緩めない。「浅草寺」を名指しされてもこの
+    // データセットが浅草を1行も収録していなければ、書き直させずに未回答にする
+    // （別エリアの行で代替すると本物の出典がついた誤答になる・API.md §3.2）。
+    //
+    // **エリアについて保証できるのはここまで。** 行が1件でもあれば書き直させ、返ってきた
+    // 行のエリアは検証していない（上のテスト）。読み取れなければ裏取りにエリア条件すら
+    // 付かない（下のテスト）
+    await seed([{ name: "寛永寺", area: "上野" }]);
+    const byName =
+      `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+      " AND name LIKE '%浅草寺%' LIMIT 50";
+    const llm = scriptedLlm(byName);
+
+    expectUnanswered(await aggregate(MEISHO_ID, "浅草寺に行きたい", depsWith(llm)));
+    expect(llm.asked, "浅草の行が1件も無いので書き直させない").toHaveLength(1);
+  });
+
+  it("**代表エリアを読み取れない intent では、すり替え先はエリアを越える**", async () => {
+    // 上の歯止めすら、`findRepresentativeArea` が intent から代表エリアを拾えたときの話。
+    // 拾えるのは「上野」「浅草」「渋谷」の部分一致だけなので（`shared/core.ts` の
+    // `REPRESENTATIVE_AREAS`）、未知の地名（巣鴨のとげぬき地蔵）やエリア無指定では
+    // `countRelaxed` にエリア条件が付かず、**データセット全体**で数える ―― 1行でもあれば
+    // 書き直させるので、訊かれた場所と無関係な行がそのまま答えになる
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await seed([{ name: "寛永寺", area: "上野" }]);
+      const byName =
+        `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}'` +
+        " AND name LIKE '%とげぬき地蔵%' LIMIT 50";
+      const llm = scriptedLlm(byName, SELECT_ALL);
+
+      const answered = expectAnswered(await aggregate(MEISHO_ID, "とげぬき地蔵に行きたい", depsWith(llm)));
+
+      expect(answered.result.name, "巣鴨を訊かれても上野の行が返る（エリアの歯止めは効いていない）").toBe("寛永寺");
+      expect(llm.asked, "エリア条件が付かないので「行はある」と判定され、書き直させる").toHaveLength(2);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});

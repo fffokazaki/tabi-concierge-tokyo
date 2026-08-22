@@ -221,6 +221,23 @@ describe("tools/list", () => {
     }
   });
 
+  it("aggregate_dataset の広告は「意図に合う1件」と言い切らない（Issue #153 の決定）", async () => {
+    // 名指しされた施設が無ければ別の行が返る（#153 で①を選んだ）。広告で言い切ると、
+    // 返った行が意図に一致していると MCP クライアントに誤認させる。**説明が空でないこと
+    // だけを見ている上の検査では、以前の言い切り文言へ戻っても落ちない**
+    // （cross-model レビュー・test-analysis の指摘）
+    const aggregate = (await listTools()).find((tool) => tool.name === "aggregate_dataset");
+    const description = aggregate?.description ?? "";
+
+    expect(description, "「意図に合う1件」と断定していない").not.toContain("集計意図に合う");
+    expect(description, "名指しが外れたら別の行が返ることを広告している").toContain("別の行が返る");
+    expect(description, "すり替えが応答に現れないことを広告している").toContain("応答に現れない");
+    // エリアについても言い切らない。返る行の area は検証していないので、「同じエリアに
+    // 限られる」と広告すると、別エリアの行が返る経路（Issue #152）を隠すことになる
+    expect(description, "返る行のエリアを保証していないと書いている").toContain("保証は無い");
+    expect(description, "unanswered になる条件を書いている").toContain("代表エリア");
+  });
+
   it("入力スキーマは説明を載せるが、型は主張しない", async () => {
     // 検査の実体は parse.ts にある（mcp.ts の doc 参照）。ここに忠実な型を書くと
     // API.md §3・shared/core.ts に続く3つ目の定義になり、黙って食い違う。
