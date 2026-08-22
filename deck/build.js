@@ -1,5 +1,5 @@
 // 旅コンシェルジュTOKYO — 提出資料（16:9・14枚）
-// 文言の SSOT: docs/submission-deck.md v1.10.0 / docs/02-design/DATABASE.md §2
+// 文言の SSOT: docs/submission-deck.md v1.11.0 / docs/02-design/DATABASE.md §2
 //
 // 縦のリズム: kicker 0.24 / title 0.55–1.55 / 本文 1.95–6.85 / 下マージン 0.65
 const pptxgen = require("pptxgenjs");
@@ -117,7 +117,7 @@ function closer(slide, text, o = {}) {
     x: 0.9, y: 4.05, w: 7.2, h: 0.5, fontFace: BODY, fontSize: 21, bold: true,
     color: P.white, margin: 0, valign: "middle",
   });
-  s.addText("会話から東京都オープンデータカタログへ到達する、訪日観光客向けAI旅行ガイド。\n根拠がなければ答えない、を設計の中心に置いています。", {
+  s.addText("会話から東京都オープンデータカタログへ到達する、訪日外国人向けAI旅行ガイド。\n根拠がなければ答えない、を設計の中心に置いています。", {
     x: 0.9, y: 4.65, w: 7.2, h: 0.9, fontFace: BODY, fontSize: 13,
     color: "C9BBAA", lineSpacing: 22, margin: 0, valign: "top",
   });
@@ -178,10 +178,10 @@ function closer(slide, text, o = {}) {
 {
   const s = lightSlide();
   kicker(s, "課題 ①  利用者側");
-  title(s, "旅行者は、壁の前で立ち止まる。");
+  title(s, "訪日外国人は、文化・マナーに迷う。");
 
   const steps = [
-    { n: "1", t: "文化・マナーで迷う", d: "参拝の作法、銭湯の入り方、公共交通での振る舞い。訪日観光客が旅先で実際に困る場面です。" },
+    { n: "1", t: "文化・マナーで迷う", d: "参拝の作法、銭湯の入り方、公共交通での振る舞い。訪日外国人が旅先で迷いやすい場面です。" },
     { n: "2", t: "答えは公共データの中にある", d: "施設情報も、文化財の由来も、東京都オープンデータカタログにすでに公開されています。" },
     { n: "3", t: "しかし到達する手段がない", d: "カタログを開き、データセットを探し、CSV を読む。旅先の数分でできることではありません。" },
   ];
@@ -403,65 +403,94 @@ screenSlide({
 // ─────────────────────────────────────────── 9. 仕組み
 {
   const s = lightSlide();
-  kicker(s, "仕組み ②");
-  title(s, "出典強制を、アーキテクチャで担保する。");
+  kicker(s, "仕組み ②  AI × OPEN DATA");
+  title(s, "AIでつくり、AIで届ける。");
 
-  // 4段 + 矢印3本で本文幅 11.8 に収める（STEP_W * 4 + STEP_GAP * 3 = 11.8）
-  const STEP_W = 2.575;
-  const STEP_GAP = 0.5;
-  const STEP_PAD = 0.22;
-  const boxes = [
-    { t: "自然文の質問", d: "「上野で文化と自然」\n自由文で受け取る", k: "live" },
-    { t: "メタデータRAG", d: "収録10件のメタデータから\n候補を特定", k: "live" },
-    { t: "Text-to-SQL", d: "生成SQLを封じ込めて\nD1 を実照会", k: "live" },
-    { t: "出典強制", d: "根拠が取れなければ\n答えない", k: "live" },
-  ];
-  boxes.forEach((b, i) => {
-    const x = 0.75 + i * (STEP_W + STEP_GAP);
-    card(s, { x, y: 1.95, w: STEP_W, h: 2.2, fill: P.white, stroke: P.line });
-    s.addText(b.t, {
-      x: x + STEP_PAD, y: 2.18, w: STEP_W - STEP_PAD * 2, h: 0.4, fontFace: HEAD, fontSize: 14.5,
-      bold: true, color: P.ink, margin: 0, valign: "middle",
-    });
-    s.addText(b.d, {
-      x: x + STEP_PAD, y: 2.66, w: STEP_W - STEP_PAD * 2, h: 0.9, fontFace: BODY, fontSize: 10.5,
-      color: P.muted, lineSpacing: 16, margin: 0, valign: "top",
-    });
-    pill(s, x + STEP_PAD, 3.62, b.k);
-    if (i < boxes.length - 1) {
-      s.addText("→", {
-        x: x + STEP_W, y: 2.8, w: STEP_GAP, h: 0.5, fontFace: BODY, fontSize: 20, bold: true,
-        color: P.brand, align: "center", valign: "middle", margin: 0,
+  const FLOW_X = 3.65;
+  const FLOW_W = 1.85;
+  const FLOW_GAP = 0.38;
+  const addFlow = (items, y, dark = false) => {
+    items.forEach((item, i) => {
+      const x = FLOW_X + i * (FLOW_W + FLOW_GAP);
+      card(s, {
+        x, y, w: FLOW_W, h: 0.82,
+        fill: dark ? P.card : P.white,
+        stroke: dark ? P.cardLine : P.line,
       });
-    }
-  });
+      s.addText(item, {
+        x: x + 0.12, y: y + 0.1, w: FLOW_W - 0.24, h: 0.62,
+        fontFace: BODY, fontSize: 10.5, bold: true,
+        color: dark ? P.cream : P.ink,
+        align: "center", valign: "middle", margin: 0, lineSpacing: 15,
+      });
+      if (i < items.length - 1) {
+        s.addText("→", {
+          x: x + FLOW_W, y: y + 0.16, w: FLOW_GAP, h: 0.5,
+          fontFace: BODY, fontSize: 17, bold: true,
+          color: dark ? P.gold : P.brand,
+          align: "center", valign: "middle", margin: 0,
+        });
+      }
+    });
+  };
 
-  s.addText("メタデータRAG が動くのは自然文の質問を受けたとき（/mcp・自由文入力）。興味チップだけの呼び出しは構造化入力なので、この段を通らず3段目から入ります。", {
-    x: 0.75, y: 4.17, w: 11.8, h: 0.26, fontFace: BODY, fontSize: 9.5,
-    color: P.muted, margin: 0, valign: "middle",
+  // 上段: 開発時に使うAI。
+  card(s, { x: 0.75, y: 1.75, w: 11.8, h: 1.62, fill: P.tint, stroke: P.line });
+  s.addText("つくるAI", {
+    x: 1.07, y: 1.98, w: 2.2, h: 0.38, fontFace: HEAD, fontSize: 18, bold: true,
+    color: P.brand, margin: 0, valign: "middle",
   });
-
-  card(s, { x: 0.75, y: 4.45, w: 5.94, h: 2.1, fill: P.tint, stroke: P.line });
-  s.addText("React → /api/* → D1、同じ3操作を /mcp でも公開", {
-    x: 1.07, y: 4.68, w: 5.3, h: 0.4, fontFace: HEAD, fontSize: 14, bold: true,
+  s.addText("AI仕様駆動開発", {
+    x: 1.07, y: 2.41, w: 2.2, h: 0.3, fontFace: BODY, fontSize: 11.5, bold: true,
     color: P.ink, margin: 0, valign: "middle",
   });
-  s.addText("React アプリは /api/* でコア3操作（search_datasets / aggregate_dataset / get_provenance）を呼びます。同じ3操作を /mcp でも公開しており、AI クライアントや翌年の参加者が旅行アプリを経由せずに呼べます。", {
-    x: 1.07, y: 5.1, w: 5.3, h: 1.0, fontFace: BODY, fontSize: 11.5,
-    color: P.muted, lineSpacing: 17, margin: 0, valign: "top",
-  });
-  pill(s, 1.07, 6.14, "live");
+  pill(s, 1.07, 2.82, "live");
+  addFlow(["docs/\nSSOT", "Claude Code\n/ Codex", "実装", "検証"], 2.14);
 
-  card(s, { x: 6.94, y: 4.45, w: 5.61, h: 2.1, fill: P.espresso, stroke: P.espresso });
-  s.addText("出典が取れない回答は生成しない", {
-    x: 7.26, y: 4.68, w: 4.97, h: 0.4, fontFace: HEAD, fontSize: 16, bold: true,
+  // 下段: 利用者の質問を旅の答えへ変えるAI。
+  card(s, { x: 0.75, y: 3.62, w: 11.8, h: 2.58, fill: P.espresso, stroke: P.espresso });
+  s.addText("届けるAI", {
+    x: 1.07, y: 3.88, w: 2.2, h: 0.38, fontFace: HEAD, fontSize: 18, bold: true,
     color: P.gold, margin: 0, valign: "middle",
   });
-  s.addText("回答は必ずデータセットに紐づきます。紐づけられない問いは未回答として理由つきで返すため、CC BY 4.0 の表示義務が運用ではなく構造で満たされます。", {
-    x: 7.26, y: 5.14, w: 4.97, h: 1.2, fontFace: BODY, fontSize: 11.5,
-    color: P.cream, lineSpacing: 18, margin: 0, valign: "top",
+  s.addText("訪日外国人の質問から\n旅の答えへ", {
+    x: 1.07, y: 4.32, w: 2.2, h: 0.62, fontFace: BODY, fontSize: 11.5, bold: true,
+    color: P.cream, margin: 0, valign: "top", lineSpacing: 17,
   });
-  s.addNotes("アーキテクチャ。自然文→メタデータRAG→Text-to-SQL→出典強制のパイプラインが全段稼働していること、出典強制が運用ルールではなく構造であることが要点（Issue #117 / #119 / #120）。メタデータRAG が見ているのは収録済みの確定10件で、9,600件は「カタログにある数」であって「検索している数」ではない（全カタログ・イン・プロンプト方式・Vectorize 不採用。worker/core/interpret.ts）。訊かれたら10件と答える。**4段は常に直列に通るわけではない** — 興味チップを選んだ呼び出しは構造化入力なので operations.ts の interpreted() が interpretQuery を呼ばず、2段目を飛ばして3段目から入る。スライド6/7/8のキャプチャは「興味チップのみ・自由文は空」で撮っているため、いずれも2段目を通っていない。2段目が働くのは /mcp・API コンソール・チップ未選択の自由文。");
+  pill(s, 1.07, 5.05, "live");
+  s.addShape(pres.ShapeType.roundRect, {
+    x: 1.07, y: 5.43, w: 1.34, h: 0.28,
+    fill: { color: P.spec }, rectRadius: 0.14, line: { color: P.spec, width: 0 },
+  });
+  s.addText("多言語対応予定", {
+    x: 1.07, y: 5.43, w: 1.34, h: 0.28,
+    fontFace: BODY, fontSize: 9, bold: true, color: P.white,
+    align: "center", valign: "middle", margin: 0,
+  });
+  addFlow(["自然文の質問\n多言語へ展開予定", "メタデータ\nRAG", "Text-to-SQL\nD1実照会", "出典つき旅程\n＋マナー"], 4.12, true);
+  s.addText("マナーは JNTO 等の「参考」として、東京都オープンデータの「出典」と区別して表示", {
+    x: FLOW_X, y: 5.16, w: 8.75, h: 0.3, fontFace: BODY, fontSize: 10.5,
+    color: P.dim, margin: 0, valign: "middle",
+  });
+  s.addShape(pres.ShapeType.roundRect, {
+    x: FLOW_X, y: 5.56, w: 0.68, h: 0.28,
+    fill: { color: P.concept }, rectRadius: 0.14, line: { color: P.concept, width: 0 },
+  });
+  s.addText("参考", {
+    x: FLOW_X, y: 5.56, w: 0.68, h: 0.28,
+    fontFace: BODY, fontSize: 9, bold: true, color: P.white,
+    align: "center", valign: "middle", margin: 0,
+  });
+  s.addText("自然文入力でメタデータRAGを使用。興味チップだけの構造化入力はRAGを飛ばします。", {
+    x: FLOW_X + 0.84, y: 5.56, w: 7.91, h: 0.28, fontFace: BODY, fontSize: 9.5,
+    color: P.dim, margin: 0, valign: "middle",
+  });
+
+  s.addText("同じコア3操作を /api/* と /mcp で公開中。出典が取れない回答は生成しません。", {
+    x: 0.75, y: 6.43, w: 11.8, h: 0.35, fontFace: BODY, fontSize: 11.5, bold: true,
+    color: P.brand, align: "center", margin: 0, valign: "middle",
+  });
+  s.addNotes("つくるAIと届けるAIを分けて説明する。上段は docs/ をSSOTとするAI仕様駆動開発。下段は自然文→メタデータRAG→Text-to-SQL→出典つき旅程・マナー。メタデータRAGが見るのは収録済み10件で、9,600件全件ではない。興味チップだけの構造化入力はRAGを飛ばす。多言語は対応予定で、実装・動作検証は未実施。マナーはADR-012によりJNTO等の参考情報としてオープンデータの出典と区別する。\n\n[Sources]\n- https://github.com/fffokazaki/tabi-concierge-tokyo/issues/117\n- https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119\n- https://github.com/fffokazaki/tabi-concierge-tokyo/issues/120\n- docs/02-design/API.md §3.1\n- docs/06-reference/DECISIONS.md ADR-012");
 }
 
 // ─────────────────────────────────────────── 10. データが育つループ
@@ -524,7 +553,7 @@ screenSlide({
 {
   const s = lightSlide();
   kicker(s, "プロダクト ②  基盤の開放");
-  title(s, "旅行アプリは、最初のクライアントにすぎない。");
+  title(s, "旅行アプリは、最初のクライアントにすぎない。", { size: 30 });
 
   card(s, { x: 0.75, y: 1.95, w: 5.8, h: 2.35, fill: P.white, stroke: P.line });
   s.addText("MCP サーバーとして公開", {
@@ -705,7 +734,7 @@ screenSlide({
   ];
   team.forEach((m, idx) => {
     const x = 0.75 + idx * 4.05;
-    card(s, { x, y: 2.0, w: 3.75, h: 2.85, fill: P.card, stroke: P.cardLine });
+    card(s, { x, y: 2.0, w: 3.75, h: 3.0, fill: P.card, stroke: P.cardLine });
     s.addShape(pres.ShapeType.ellipse, {
       x: x + 0.32, y: 2.32, w: 0.74, h: 0.74, fill: { color: P.gold }, line: { color: P.gold, width: 0 },
     });
@@ -723,25 +752,15 @@ screenSlide({
     });
   });
 
-  card(s, { x: 0.75, y: 4.98, w: 11.8, h: 0.74, fill: P.card, stroke: P.cardLine });
-  s.addText("開発スタイル", {
-    x: 1.07, y: 5.09, w: 1.7, h: 0.28, fontFace: BODY, fontSize: 10, bold: true,
-    color: P.gold, charSpacing: 1.2, margin: 0, valign: "middle",
-  });
-  s.addText("仕様書（docs/）を SSOT に、Claude Code / Codex による AI 仕様駆動開発でフルオート実装。仕様→実装→検証のループを AI が回します。", {
-    x: 1.07, y: 5.38, w: 11.16, h: 0.3, fontFace: BODY, fontSize: 11,
-    color: P.dim, margin: 0, valign: "middle",
-  });
-
   s.addText("9,600のオープンデータを、旅の相棒に。", {
-    x: 0.75, y: 5.9, w: 11.8, h: 0.55, fontFace: HEAD, fontSize: 24, bold: true,
+    x: 0.75, y: 5.55, w: 11.8, h: 0.6, fontFace: HEAD, fontSize: 24, bold: true,
     color: P.gold, margin: 0, valign: "middle",
   });
   s.addText("https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev", {
-    x: 0.75, y: 6.48, w: 11.8, h: 0.32, fontFace: BODY, fontSize: 12,
+    x: 0.75, y: 6.22, w: 11.8, h: 0.35, fontFace: BODY, fontSize: 12,
     color: "9E9184", margin: 0, valign: "middle",
   });
-  s.addNotes("チーム紹介。役割分担と開発スタイル（AI 仕様駆動開発）を載せる。");
+  s.addNotes("チーム紹介。役割分担のみを載せる。AI仕様駆動開発はスライド9へ集約。");
 }
 
 pres.writeFile({ fileName: here("tabi-concierge-tokyo-submission.pptx") }).then((f) => console.log("wrote", f));
