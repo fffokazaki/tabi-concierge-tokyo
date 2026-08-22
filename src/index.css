@@ -194,9 +194,14 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .data-gap-card__list li:last-child { margin-bottom: 0; }
 
 /* 未回答が記録され、都へのデータ公開リクエストへ還元されることの注記（Issue #192）。
-   意味の違う4つが見た目で混ざらないよう、ここだけ枠も背景も持たせない
-   —— .provenance-chip（出典・アクセント色）/ .jnto-reference-note（参考・実線枠）/
-   .data-gap-card（答えられなかった内容・破線枠）/ これ（システムの挙動の説明・素の muted）。
+   枠のある3つ（.provenance-chip＝出典・アクセント色 / .jnto-reference-note＝参考・実線枠 /
+   .data-gap-card＝答えられなかった内容・破線枠）とは、枠も背景も持たせないことで区別する。
+
+   ただし**同じパネル内の .route-status（12px・muted・枠なし）と .route-hidden-note（同）とは
+   見た目がほぼ同じ**で、ready 分岐では主張の違う muted 段落が縦に3種類並ぶ。区別は
+   11px という一段小さい字とアイコンの有無だけで付けている（枠を足すと上の3つと衝突する）。
+   ここを触るときは、その3種類を並べて見ること。
+
    前の要素の margin-bottom（route-empty 14px / data-gap-card 16px）が間隔になるので、
    負のマージンや :has() は使わない。 */
 .gap-escalation-note { display: flex; align-items: flex-start; gap: 7px; margin: 0 0 16px; font-size: 11px; line-height: 1.6; color: var(--muted); }

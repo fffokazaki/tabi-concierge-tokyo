@@ -21,15 +21,37 @@ describe("GapEscalationNote", () => {
     ).toBeInTheDocument();
   });
 
-  it("ボタンを描画しない（実在しないオプトイン申請を示唆しないため・2026-08-17 の決定）", () => {
-    render(<GapEscalationNote />);
+  /**
+   * 2026-08-17 の「押す操作を増やさない」決定の回帰。**`button` 要素だけを見ては足りない** ——
+   * リンクや `role="button"` を足しても、実在しないオプトイン申請を示唆することは同じなので、
+   * 押せるもの全体を禁止する（この観点は Codex のレビュー指摘で足した）。
+   */
+  it("押せる要素を1つも描画しない（実在しないオプトイン申請を示唆しないため）", () => {
+    const { container } = render(<GapEscalationNote />);
 
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(container.querySelector('a, button, input, [role="button"], [role="link"]')).toBeNull();
   });
 
   it("「送信」「提出」「受け付け」を名乗らない（都への提出プロセスは構想）", () => {
     const { container } = render(<GapEscalationNote />);
 
     expect(container.textContent).not.toMatch(/送信|提出|受け付け/);
+  });
+
+  /** doc が明言している「ライブリージョンにしない」の固定。`role="status"` を足すと
+   *  `route-empty` / `DataGapCard` と重ねて読み上げられる。 */
+  it("ライブリージョンにしない", () => {
+    render(<GapEscalationNote />);
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("装飾アイコンは支援技術へ露出させない", () => {
+    const { container } = render(<GapEscalationNote />);
+
+    expect(container.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
   });
 });

@@ -514,7 +514,8 @@ describe("未回答の還元の注記（Issue #192）", () => {
   });
 
   it("route-empty と DataGapCard が両方出ている画面でも、注記は1つだけ", async () => {
-    // 二重に出すと、同じ主張が画面に2回並ぶ（Issue #107 で message の名乗りを外したのと同じ問題）
+    // `.gap-escalation-note` が二重描画されないことの固定。**未回答なら内訳が空とは限らない**
+    // ことの回帰でもある（このケースは unanswered かつ gaps 2件）
     const { fetchImpl } = stubFetch({
       [SEARCH_PATH]: () =>
         jsonResponse({
@@ -539,5 +540,107 @@ describe("未回答の還元の注記（Issue #192）", () => {
 
     await waitFor(() => expect(screen.getByText("寛永寺")).toBeInTheDocument());
     expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  });
+
+  /**
+   * 障害（ネットワーク断・HTTP エラー・parse 不正）では**何も記録されていない**ので、
+   * ここに「記録されます」が出れば嘘になる。`unanswered` と障害の混同はこのプロジェクトの
+   * 反復ハザード（API.md §4）なので、実装が安全なうちに固定する。
+   */
+  it("障害画面には出さない（記録されていないため）", async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new TypeError("Failed to fetch")) as unknown as typeof fetch;
+    await createBriefing(fetchImpl);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  });
+
+  /**
+   * サーバーが応答全体を `unanswered` / `other`（内訳なし）で返す経路。**渋谷×ショッピング／
+   * ナイトライフが実測でこの形**で、`gaps` テーブルにも記録されている。実装途中に検討して
+   * 棄却した `reason !== "other"` の出し分けが再導入されたら、ここが落ちる。
+   */
+  it.each([
+    ["プラン", false],
+    ["あなたへ", true],
+  ])("%s画面で、サーバーの unanswered/other（内訳なし）にも出す", async (_label, isForYou) => {
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "unanswered",
+          reason: "other",
+          message: "「ショッピング」に当たるデータセットがありませんでした。",
+        }),
+    });
+    render(<AppTabs options={{ fetchImpl }} />);
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+    if (isForYou) fireEvent.click(screen.getByRole("button", { name: "あなたへ" }));
+
+    await waitFor(() => expect(screen.getByText("分類: other")).toBeInTheDocument());
+    expect(screen.getByText(NOTE)).toBeInTheDocument();
+    expect(screen.queryByText("答えられなかった点があります")).not.toBeInTheDocument();
+  });
+
+  /**
+   * 部分成功（`ready` かつ内訳あり）。実運用でいちばん多い形なのに、他のテストは
+   * 「全部答えた」と「全部答えられなかった」しか見ていなかった（Codex のレビュー指摘）。
+   */
+  it("プラン画面の部分成功（停留地＋内訳）で、カードと注記と停留地が並ぶ", async () => {
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" }],
+          gaps: [
+            { status: "unanswered", reason: "insufficient_granularity", message: "「ラーメン」の粒度では答えられません。" },
+          ],
+        }),
+      [AGGREGATE_PATH]: () =>
+        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "所在地は台東区上野桜木1丁目14番。" }, query: "q" }),
+      [PROVENANCE_PATH]: () =>
+        jsonResponse({ status: "answered", sources: [provenanceSource(MEISHO_ID, "名所・史跡")] }),
+    });
+    const { container } = render(<AppTabs options={{ fetchImpl }} />);
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+
+    await waitFor(() => expect(screen.getByText("寛永寺")).toBeInTheDocument());
+    expect(screen.getByText("答えられなかった点があります")).toBeInTheDocument();
+    expect(container.querySelectorAll(".gap-escalation-note")).toHaveLength(1);
+    // 未回答の画面ではない（route-empty は出ない）
+    expect(container.querySelector(".route-empty")).toBeNull();
+  });
+
+  it("あなたへ画面の部分成功（レコメンド＋内訳）で、カードと注記とレコメンドが並ぶ", async () => {
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: () =>
+        jsonResponse({
+          status: "answered",
+          candidates: [{ datasetId: MEISHO_ID, title: "名所・史跡", provider: "台東区", url: "u", matchReason: "r" }],
+          gaps: [
+            { status: "unanswered", reason: "insufficient_granularity", message: "「ラーメン」の粒度では答えられません。" },
+          ],
+        }),
+      [AGGREGATE_PATH]: () =>
+        jsonResponse({ status: "answered", result: { name: "寛永寺", summary: "所在地は台東区上野桜木1丁目14番。" }, query: "q" }),
+      [PROVENANCE_PATH]: () =>
+        jsonResponse({ status: "answered", sources: [provenanceSource(MEISHO_ID, "名所・史跡")] }),
+    });
+    const { container } = render(<AppTabs options={{ fetchImpl }} />);
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+    fireEvent.click(screen.getByRole("button", { name: "あなたへ" }));
+
+    await waitFor(() => expect(container.querySelector(".recommendation-card")).not.toBeNull());
+    expect(screen.getByText("答えられなかった点があります")).toBeInTheDocument();
+    expect(container.querySelectorAll(".gap-escalation-note")).toHaveLength(1);
+  });
+
+  it("あなたへ画面が全部答えられたとき（内訳なし）は出さない", async () => {
+    const { fetchImpl } = stubSuccessfulPlan();
+    const { container } = render(<AppTabs options={{ fetchImpl }} />);
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+    fireEvent.click(screen.getByRole("button", { name: "あなたへ" }));
+
+    await waitFor(() => expect(container.querySelector(".recommendation-card")).not.toBeNull());
+    expect(container.querySelectorAll(".gap-escalation-note")).toHaveLength(0);
   });
 });
