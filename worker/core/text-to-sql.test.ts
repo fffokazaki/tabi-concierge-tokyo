@@ -127,6 +127,115 @@ describe("実照会", () => {
   });
 });
 
+/**
+ * 説明文に載せる `note` の選別（[Issue #144](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/144)）。
+ *
+ * ここで使う `note` は**すべて本番 D1 の実値**（2026-08-22 に全10データセットを走査して確認した）。
+ * 「それらしい形」を作ってテストすると、実データに無い形だけを守ることになる。
+ *
+ * 本番で `note` が空でないのは6データセットで、管理用メタデータを含むのは
+ * 台東区文化財一覧（`t131067d0000000393`・190行）だけだった。残る5つは営業時間・電話番号・
+ * 料金・男女別といった、旅程で読みたい情報しか持たない。
+ */
+describe("説明文に載せる note の選別", () => {
+  it("管理用メタデータの要素を落とす（最終確認日・座標精度）", async () => {
+    // 台東区文化財一覧の実値。3要素目だけが管理者向けで、1・2要素目は旅程で意味を持つ
+    await seed([
+      {
+        name: "絹本著色元三大師画像",
+        area: "上野",
+        address: "東京都台東区上野桜木1丁目",
+        note: "美術工芸品 / 所有: 寛永寺 / 最終確認日2024-01-09・座標精度：小字・丁目代表点",
+      },
+    ]);
+    const llm = scriptedLlm(SELECT_ALL);
+
+    const answered = expectAnswered(await aggregate(MEISHO_ID, "上野の寺社を1件", depsWith(llm)));
+
+    expect(answered.result.summary).not.toContain("最終確認日");
+    expect(answered.result.summary).not.toContain("座標精度");
+    // 落とすのは管理用の要素だけ。文化財の種別と所有者は残す
+    expect(answered.result.summary).toContain("美術工芸品");
+    expect(answered.result.summary).toContain("所有: 寛永寺");
+  });
+
+  it("区切りの中に「・」があっても要素ごと落とせる", async () => {
+    // 「座標精度：小字・丁目代表点」の値に「・」が入る。要素の区切りは " / " だけで、
+    // 「・」で分けると値の途中で切れて「小字」だけが残る
+    await seed([
+      { name: "旧吉田屋酒店", area: "上野", note: "建造物 / 最終確認日2024-01-09・座標精度：大字・町代表点" },
+    ]);
+    const llm = scriptedLlm(SELECT_ALL);
+
+    const answered = expectAnswered(await aggregate(MEISHO_ID, "上野の寺社を1件", depsWith(llm)));
+
+    expect(answered.result.summary).not.toContain("小字");
+    expect(answered.result.summary).not.toContain("大字");
+    expect(answered.result.summary).not.toContain("代表点");
+    expect(answered.result.summary).toContain("建造物");
+  });
+
+  it("利用者に有用な note は残す（電話番号）", async () => {
+    // 台東区文化観光施設（t131067d0000000236）の実値
+    await seed([{ name: "下町風俗資料館", area: "上野", note: "TEL 03-3824-1988" }]);
+    const llm = scriptedLlm(SELECT_ALL);
+
+    expect(expectAnswered(await aggregate(MEISHO_ID, "上野の寺社を1件", depsWith(llm))).result.summary).toContain(
+      "TEL 03-3824-1988",
+    );
+  });
+
+  it("原本にある留保を落とさない（営業時間・定休・料金）", async () => {
+    // 台東区銭湯一覧（t131067d0000000256）の実値。「定休 第2・4月、1月1日は休業」は
+    // 利用者が読むべき留保であって、管理用メタデータではない
+    await seed([
+      { name: "曙湯", area: "浅草", note: "15:30〜23:00 / 定休 第2・4月、1月1日は休業 / 料金 500" },
+    ]);
+    const llm = scriptedLlm(SELECT_ALL);
+
+    const summary = expectAnswered(await aggregate(MEISHO_ID, "浅草の銭湯を1件", depsWith(llm))).result.summary;
+
+    expect(summary).toContain("15:30〜23:00");
+    expect(summary).toContain("定休 第2・4月、1月1日は休業");
+    expect(summary).toContain("料金 500");
+  });
+
+  it("要素がすべて管理用なら note ごと落とし、埋め草を足さない", async () => {
+    // 本番の実データにこの形は無い（文化財一覧は必ず種別を1要素目に持つ）。
+    // 落とした結果が空になったとき「情報なし」のような一文を足すと、データに無いことを
+    // 述べたことになる ―― 短くなるだけでよい（「材料が無い列は書かずに短く畳む」と同じ扱い）
+    await seed([
+      { name: "名前だけの行", area: "上野", note: "最終確認日2024-01-09・座標精度：番地号一致" },
+    ]);
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const llm = scriptedLlm(SELECT_ALL);
+
+    const summary = expectAnswered(await aggregate(MEISHO_ID, "上野の寺社を1件", depsWith(llm))).result.summary;
+
+    expect(summary).not.toContain("最終確認日");
+    expect(summary).toBe("台東区が名所・史跡として公開している45件のうちの1件。");
+    spy.mockRestore();
+  });
+
+  it("要素をすべて落としたら警告を出す（区切りの前提が崩れたことに気づける）", async () => {
+    // 落とす判定は区切りが `" / "` であることに乗っている。本番の実データでは
+    // `note` に `/` を含む370行すべてが空白付きの区切りだった（2026-08-22 実測）が、
+    // 再取り込みで表記が変われば note 全体が1要素になり、管理用キーを1つ含むだけで
+    // **有用な要素ごと消える**。応答は返るので画面からは気づけない ―― ログには出す
+    await seed([
+      { name: "旧吉田屋酒店", area: "上野", note: "建造物/所有: 台東区教育委員会/最終確認日2024-01-09" },
+    ]);
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const llm = scriptedLlm(SELECT_ALL);
+
+    const summary = expectAnswered(await aggregate(MEISHO_ID, "上野の寺社を1件", depsWith(llm))).result.summary;
+
+    expect(summary).not.toContain("最終確認日");
+    expect(spy).toHaveBeenCalledWith("[text-to-sql] note の要素をすべて落としました", expect.anything());
+    spy.mockRestore();
+  });
+});
+
 describe("0行は障害ではなく答え", () => {
   it("other として返し、断定しない述語を使う", async () => {
     await seed([{ name: "寛永寺", area: "上野" }]);

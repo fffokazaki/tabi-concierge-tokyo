@@ -461,12 +461,54 @@ export type TextToSqlOutcome =
  * **足りない材料は書かない。** `address` が NULL のときに「所在地は不明」のような一文を
  * 足すと、データに無いことを述べたことになる（絶対ルール #1）。短い要約になるだけでよい。
  */
+/**
+ * 説明文に載せない `note` の要素を見分ける語（[Issue #144](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/144)）。
+ *
+ * **落とす語を明示的に列挙する。** 「読みにくそうな部分を削る」形の正規表現にすると、原本にある
+ * 留保（銭湯の「定休 第2・4月、1月1日は休業」など）まで巻き込む。`catalog.ts` の `CatalogSample`
+ * に書いた「原本の留保を落とさない」方針は、実データへ切り替えた後もそのまま効いている。
+ *
+ * この一覧は**本番 D1 の全10データセットを走査して決めた**（2026-08-22）。`note` が空でないのは
+ * 6データセットで、管理者向けの値を持つのは台東区文化財一覧（`t131067d0000000393`・190行）だけ。
+ * 残る5つは営業時間・電話番号・料金・男女別など、旅程で読みたい情報しか持たない。
+ *
+ * **`所有:` は落とさない。** 「所有: 寛永寺」は文化財がどこにあるかを示していて、旅程の読み手に
+ * 意味がある。管理用メタデータと呼べるのは、原本の更新管理に属する2語だけである。
+ */
+const ADMIN_NOTE_KEYS = ["最終確認日", "座標精度"] as const;
+
+/** `note` の要素区切り。実データは `note` を持つ6データセットすべてがこの形。 */
+const NOTE_SEPARATOR = " / ";
+
+/**
+ * 管理用メタデータを含む要素を落とす。
+ *
+ * **要素ごと落とす。** `座標精度：小字・丁目代表点` は値の中に「・」を持つので、区切り文字として
+ * 「・」まで使うと値の途中で切れ、「小字」だけが説明文に残る。
+ *
+ * すべての要素が落ちたら空文字を返す。呼び出し側（`toResult`）が空の `note` を一文ごと省くので、
+ * 「情報なし」のような埋め草は入らない ―― データに無いことを述べない（絶対ルール #1）。
+ */
+function presentableNote(note: string, entry: CatalogEntry): string {
+  const kept = note.split(NOTE_SEPARATOR).filter((part) => !ADMIN_NOTE_KEYS.some((key) => part.includes(key)));
+
+  // **区切りの前提が崩れたことに気づけるようにする。** 実データは `note` に `/` を含む370行
+  // すべてが空白付きの区切りだった（2026-08-22 実測）が、再取り込みで表記が変われば note 全体が
+  // 1要素になり、管理用キーを1つ含むだけで有用な要素ごと消える。**応答は返るので画面からは
+  // 気づけない** ―― `llm.ts` の縮退ログと同じ理由でここを黙らせない
+  if (note !== "" && kept.length === 0) {
+    console.warn("[text-to-sql] note の要素をすべて落としました", { datasetId: entry.datasetId, note });
+  }
+
+  return kept.join(NOTE_SEPARATOR).trim();
+}
+
 function toResult(row: Record<string, unknown>, entry: CatalogEntry): AggregateResult | undefined {
   const name = typeof row["name"] === "string" ? row["name"].trim() : "";
   if (name === "") return undefined;
 
   const address = typeof row["address"] === "string" ? row["address"].trim() : "";
-  const note = typeof row["note"] === "string" ? row["note"].trim() : "";
+  const note = presentableNote(typeof row["note"] === "string" ? row["note"].trim() : "", entry);
 
   const parts = [
     address === "" ? undefined : `所在地は${address}。`,
