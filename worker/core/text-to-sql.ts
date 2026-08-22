@@ -59,8 +59,14 @@ const REQUIRED_COLUMNS = ["dataset_id", "name"] as const;
  *
  * 実モデルは「必ず含める」と書いた列だけを選ぶ（実測 — `dataset_id, name` しか書かなかった）。
  * 要約から所在地が落ちるだけで応答としては成立するので、必須にはせずここで頼む。
+ *
+ * `area` は要約には使わない ―― 行の選定（`pickPreferredRow`・Issue #174）が行自身の値を
+ * 読めるようにするための列である。SELECT に含まれていれば名前からの引き直しが不要になり、
+ * 同名で別エリアの行（文化財一覧の「銅鐘」が上野・浅草に併存する実例）でも取り違えない。
+ * 必須にはしない ―― 書き直しを強制すると、欠けただけの正常な SQL まで推論をやり直させ、
+ * 無料枠を消費する（縮退リスクも増える）。
  */
-const PREFERRED_COLUMNS = ["address", "note"] as const;
+const PREFERRED_COLUMNS = ["address", "note", "area"] as const;
 
 const SYSTEM_PROMPT = [
   "あなたは SQLite の SELECT 文だけを書くアシスタントです。",
@@ -407,8 +413,8 @@ function contextOf(before: string): { column?: string; op?: string } {
  * | 状況 | 何が起きるか |
  * | --- | --- |
  * | 読み取れた代表エリアの行が0件 | 書き直させず未回答（**唯一の歯止め**） |
- * | 読み取れた代表エリアの行が1件以上 | 書き直させる。書き直し SQL がエリア条件を落とせば**別エリアの行が答えになる**（「上野の…」に浅草の行） |
- * | 代表エリアを読み取れない（未知の地名・無指定） | `areaClause` が空。データセット全体で数えるので、訊かれた場所と無関係な行が答えになる |
+ * | 読み取れた代表エリアの行が1件以上 | 書き直させる。書き直し SQL がエリア条件を落としても、**返った行の中に訊かれたエリアの行があれば** `pickPreferredRow`（Issue #174）がそちらを選ぶ。無ければ別エリアの行が答えになる |
+ * | 代表エリアを読み取れない（未知の地名・無指定） | `areaClause` が空。データセット全体で数えるので、訊かれた場所と無関係な行が答えになる（`pickPreferredRow` は代表エリアの行を優先するが、訊かれた場所そのものは知りようがない） |
  *
  * `findRepresentativeArea` が拾うのは「上野」「浅草」「渋谷」の部分一致だけである
  * （`shared/core.ts` の `REPRESENTATIVE_AREAS`）。**「すり替えはエリアを越えない」と書くと
@@ -547,6 +553,100 @@ function presentableNote(note: string, entry: CatalogEntry): string {
   return kept.join(NOTE_SEPARATOR).trim();
 }
 
+/**
+ * 実行結果から応答に載せる1行を選ぶ（[Issue #174](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/174)）。
+ *
+ * 生成 SQL は area 条件を `AND` で繋いだり `OR` で繋いだりに割れる（本番実測 2026-08-22:
+ * 同一入力8回で AND 4 / OR 4。プロンプトで「AND で繋げ」と頼む修正は**効かなかった** ――
+ * 追加後も8回中6回が OR 形・Version `9df28168`）。`OR` 形は area 条件が実質効かず、対象エリア外の
+ * 行（area が NULL）が category だけで当たる。`rows[0]` 固定の取り出しはそれをそのまま
+ * 旅程に載せていた（「文化、家族向け、自然」で蔵前の初代川柳墓が1番目に出た）。
+ *
+ * そこで **SQL は直さず、返ってきた行の側で選ぶ**: intent に代表エリアが載っていればその
+ * エリアの行 → 無ければ代表エリアいずれかの行 → それも無ければ従来どおり先頭。SQL に触らない
+ * ので0行化・書き直し・縮退は起きず、LLM の揺れに依存しない。
+ *
+ * 行のエリアは3段で読む: (1) 行自身の `area` 列（`PREFERRED_COLUMNS` に入れたので生成 SQL が
+ * SELECT していれば最も確実）→ (2) `(name, address)` の複合キーで D1 から引き直す
+ * （`countRelaxed` と同じく LLM を使わない決定的な照会）→ (3) name 単独。ただし同名で別エリアの
+ * 行がある場合（文化財一覧の「銅鐘」が上野・浅草に併存する実例 ―― cross-model レビューの指摘）は
+ * **どのエリアとも主張しない**（undefined）。取り違えて選ぶくらいなら選定から外す。
+ * **照会に失敗したら従来どおり先頭を返す**（選定の失敗で応答まで壊さない。ただし黙らない ――
+ * console.warn に残す）。
+ *
+ * 代表エリアの行が1件も無いとき先頭を返すのは従来挙動の維持である。ここで未回答に倒すと
+ * 「行はあるのに無いと言う」＝偽の未回答（Issue #148 の逆流）になる。返る行のエリアを検証して
+ * 利用者に伝える話は [Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152) が扱う。
+ */
+async function pickPreferredRow(
+  rows: Record<string, unknown>[],
+  input: AggregateDatasetInput,
+  entry: CatalogEntry,
+  deps: CoreDeps,
+): Promise<Record<string, unknown>> {
+  const first = rows[0]!;
+  if (rows.length === 1) return first;
+
+  // 行自身が area を持っていれば照会は不要（全行に無い場合だけ引き直す）
+  const direct = (row: Record<string, unknown>): string | undefined =>
+    typeof row["area"] === "string" ? row["area"] : undefined;
+  const needsLookup = rows.some((row) => direct(row) === undefined);
+
+  const byNameAddress = new Map<string, string>();
+  const byName = new Map<string, Set<string>>();
+  if (needsLookup) {
+    const escapedId = entry.datasetId.replace(/'/g, "''");
+    const lookup = await deps.sql.select(
+      `SELECT name, area, address FROM spots WHERE dataset_id = '${escapedId}' AND area IS NOT NULL`,
+    );
+    if (!lookup.ok) {
+      console.warn("[text-to-sql] 行の選定用の area 照会に失敗したため先頭の行を返します", {
+        datasetId: entry.datasetId,
+        cause: lookup.cause,
+      });
+      return first;
+    }
+    for (const row of lookup.rows) {
+      const name = row["name"];
+      const area = row["area"];
+      if (typeof name !== "string" || typeof area !== "string") continue;
+      const address = row["address"];
+      if (typeof address === "string" && address !== "") {
+        byNameAddress.set(`${name}\u0000${address}`, area);
+      }
+      const areas = byName.get(name) ?? new Set<string>();
+      areas.add(area);
+      byName.set(name, areas);
+    }
+  }
+
+  const areaOf = (row: Record<string, unknown>): string | undefined => {
+    const own = direct(row);
+    if (own !== undefined) return own;
+    const name = row["name"];
+    if (typeof name !== "string") return undefined;
+    const address = row["address"];
+    if (typeof address === "string" && address !== "") {
+      const exact = byNameAddress.get(`${name}\u0000${address}`);
+      if (exact !== undefined) return exact;
+    }
+    const areas = byName.get(name);
+    // 同名で別エリアの行がある名前は、どのエリアとも主張しない（取り違え防止）
+    return areas !== undefined && areas.size === 1 ? [...areas][0] : undefined;
+  };
+
+  const intended = findRepresentativeArea(input.intent);
+  if (intended) {
+    const hit = rows.find((row) => areaOf(row) === intended);
+    if (hit) return hit;
+  }
+  const representative = rows.find((row) => {
+    const area = areaOf(row);
+    return area !== undefined && (REPRESENTATIVE_AREAS as readonly string[]).includes(area);
+  });
+  return representative ?? first;
+}
+
 function toResult(row: Record<string, unknown>, entry: CatalogEntry): AggregateResult | undefined {
   const name = typeof row["name"] === "string" ? row["name"].trim() : "";
   if (name === "") return undefined;
@@ -675,7 +775,7 @@ async function attemptTextToSql(
       return { kind: "empty", sql: guarded.sql };
     }
 
-    const result = toResult(executed.rows[0]!, entry);
+    const result = toResult(await pickPreferredRow(executed.rows, input, entry, deps), entry);
     if (!result) {
       previousError = `SELECT する列に ${REQUIRED_COLUMNS.join(" と ")} を含めてください`;
       console.warn("[text-to-sql] 返った行から応答を組み立てられませんでした", { attempt, sql: guarded.sql });

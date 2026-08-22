@@ -1,6 +1,6 @@
 ---
 title: "DEPLOYMENT"
-version: "1.17.0"
+version: "1.18.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -266,6 +266,7 @@ npm run deploy  # vite build → wrangler deploy
 
 | 日時 | Version ID | 内容 | 確認 |
 | --- | --- | --- | --- |
+| 2026-08-22 | `460c9237-4423-436d-aa93-e1b0942bd4a5` | 応答に載せる行を代表エリア優先で選ぶ（#174 / PR 後述）。生成 SQL が area 条件を `OR` で繋ぐと（同一入力8回で4〜6回・実測）対象エリア外の行が category だけで当たり、`rows[0]` 固定の取り出しが蔵前の行を旅程の1番目に載せていた。**プロンプトで「AND で繋げ」と頼む修正は効かなかった**（追加後も8回中6回が OR 形・Version `9df28168` で実測 → revert）。SQL は直さず `pickPreferredRow`（`worker/core/text-to-sql.ts`）が返った行から intent の代表エリア → 代表エリアいずれか → 先頭の順で選ぶ。`worker/` の変更なので §3 の契機に該当 | **AC を本番で実測** ―― キャッシュ無効（`AI_GATEWAY_CACHE_TTL="0"` を一時設定）で同一入力`{"datasetId":"t131067d0000000251","intent":"文化、家族向け、自然"}` を8回引き直し、SQL は AND 5 / OR 3 と揺れたまま**8回全部が寛永寺（上野）**。修正前は OR 形のたび初代川柳墓（蔵前）だった。測定後に TTL を 3600 へ戻して再デプロイし、焼き付く1発目も寛永寺であることを確認。テスト 773 件（+3。#153 の「別エリアの行が返る」を固定していたテストは意図的に書き換え）。**引き直し測定の途中版**（`60ee2fac` 効かないプロンプト入り・`9df28168` 同+TTL0・`e6957718`/`e39c60b9` 行選定入り・`1787a736` 一時復旧）**が本番に載った時間帯がある** ―― いずれも短時間。その後 Codex レビュー指摘（同名別エリアの取り違え・「銅鐘」実例）対応で `a9fdf7f6-3ba0-44f8-ac18-3b594bb3388d` を最終版としてデプロイ。`PREFERRED_COLUMNS` に `area` を足したため生成 SQL の SELECT に area が入るようになったことを本番応答の `query` で確認（`SELECT dataset_id, name, address, note, area FROM ...`）。名指し経路（上野の寺社を1件 → 寛永寺）も回帰なし |
 | 2026-08-22 | `a17750ee-4a0d-472b-b8ee-5afa6fd5084a` | **デプロイ先アカウントの移設**（#171）。ハッカソン事務局発行の `tokyo_odh_091` へ Worker・D1 ごと移した。URL が <https://tabi-concierge-tokyo.opendata-002.workers.dev> から <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev> へ変わる。`wrangler.jsonc` の `account_id` と `d1_databases[].database_id` を同時に差し替え、新アカウントの D1（`202adb68-a563-4475-885e-5605f17d89b4`）へ **migrate ＋ seed を実行**した。コードは無変更。**旧アカウントのデプロイは提出まで残す**（ロールバック先） | チェックリスト全項目 OK（health の `runtime` = `Cloudflare-Workers` / SPA `/` 200 / `/showcase/` 200 / `/api/nope` 404）。**新アカウントでは LLM 経路の生死を疎通で判定できない** ―― 障害時は `extractFromSamples` へ縮退して **HTTP 200 のまま旅程を返す**ため、`npx wrangler tail` を張ったうえで確認した。5リクエスト中、縮退マーカー（`[aggregate] … 縮退` / `[search] 質問の分解に失敗` / `[llm] 推論の呼び出しに失敗`）は **0件**。加えて**縮退していないことの積極的な証拠**として、`aggregate_dataset` の応答 `query` が `D1 実照会: SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = 't131067d0000000251' AND category = '名所・史跡' AND area IN ('上野') LIMIT 50` と、LLM が生成した SQL そのものであることを確認（縮退時はスタブ文言になる）。AI Gateway `default` は新アカウントで自動生成され、未作成時の `AiGatewayError: 2001` は出ていない。**データ一致を旧新で突き合わせ** ―― `datasets` 10 = 10 / `spots` 1,645 = 1,645。`gaps` は 127 → 0 だが、これは稼働中に積まれる未回答ログでシード対象外のため正常。新 D1 への書き込みも確認（`新宿の美術館に行きたい / 新宿 / 美術館 / out_of_area` が記録された）。`/mcp` の `tools/list` はコア3ツール（`search_datasets` / `aggregate_dataset` / `get_provenance`）を返す。**伝播待ちは不要だった**（新規デプロイのため旧版が存在しない） |
 | 2026-08-22 | `1e2a4be9-4f3a-4ce2-9bb6-6813f3f6bed0` | 名指しされた施設が候補データセットに無いときの扱いを、決定（①すり替える）として明文化（#153 / PR #167）。**ランタイムの挙動は変えていない** ―― 実行時に変わった値は `worker/mcp.ts` の `aggregate_dataset` の**ツール説明（`tools/list` で外部 MCP クライアントへ配る広告文）だけ**である。「集計意図に合う1件を取り出す」という言い切りをやめ、名指しが外れたら別の行が返ること・返る行が意図のエリアである保証は無いことを明示した。`worker/` の変更なので §3 の契機に該当する。`migrations/` `data/` `scripts/` `src/` は未変更のため、マイグレーション・シード・フロントの再確認は不要 | **配布中の広告文そのもので確認** ―― 本番の `/mcp` へ `tools/list` を投げ、`aggregate_dataset.description` に「返る行が意図のエリアである保証は無い」が含まれ、旧文言「集計意図に合う1件」が消えていることを確認。正常系は `/api/search-datasets {"query":"上野の文化財","limit":2}` が `answered` で文化財一覧・名所史跡を返すこと、SPA `/` が 200 を返すことを確認。**すり替えの挙動そのものは本番で実測していない** ―― この PR は挙動を変えていないため、確認対象は「広告文が反映されたこと」である |
 | 2026-08-22 | `c2efd7b1-5b71-40ba-a16d-b9a1bf18b0c5` | コア3操作の呼び出しにタイムアウト（既定 6000ms）を追加し、応答なしを `network` ではなく `timeout` として分類（#146 / PR #163）。**変更は 100% `src/`** ―― 本 PR で §3 の契機テーブルに `src/` の行を足すまで、この症状は「マージしただけでは本番で直らない」状態だった（#164）。`worker/` `shared/` `migrations/` `data/` `scripts/` は未変更のため、マイグレーション・シードは不要 | **配信中の bundle が手元のビルドとバイト一致することで確認** — `curl --compressed` で取得した `/assets/index-v_gVxkjl.js`（221,328 bytes）が `dist/client/assets/index-v_gVxkjl.js` と `cmp` で完全一致。タイムアウト時の文言（プラン・あなたへの「応答がありませんでした」×4、`◯◯ms 以内に応答がありませんでした` ×2）が bundle 内に存在する。**開発コンソール（ApiConsole）の文言は本番 bundle に無いのが正しい** ―― `App.tsx` の `import.meta.env.DEV` ガードで本番ビルドからは落ちるため、`でタイムアウト` が0件でも欠落ではない。正常系は `search_datasets({query:"上野の文化財",limit:3})` が `answered` で文化財一覧・名所史跡を返すことを確認。**タイムアウト自体の本番実測は行っていない** ―― 6秒を超える応答を意図的に作れないため（この行は「反映されたこと」の確認であって、打ち切り挙動の実測ではない） |
@@ -507,6 +508,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.18.0] - 2026-08-22
+
+#### 追加
+
+- §3 デプロイ記録に `460c9237-4423-436d-aa93-e1b0942bd4a5` を追加（[Issue #174](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/174)）。対象エリア外の行が旅程に混ざる不具合を、SQL ではなく行の選定側（`pickPreferredRow`）で修正した回。**プロンプトへ指示を足す修正は効かないことを実測してから捨てた**（8回中6回が OR 形のまま）。測定のため `AI_GATEWAY_CACHE_TTL="0"` の一時版が本番に載った時間帯があることも記録した
 
 ### [1.17.0] - 2026-08-22
 
