@@ -72,6 +72,13 @@ PowerPoint で開くこと。
 **規定は変更不可**（[../docs/01-context/CONSTRAINTS.md](../docs/01-context/CONSTRAINTS.md) §7）
 （[../docs/01-context/CONSTRAINTS.md](../docs/01-context/CONSTRAINTS.md)）。
 
+## 申請用の操作デモ動画
+
+Jotform 3-8 に記載する動画は [`../public/demo/operation-demo.mp4`](../public/demo/operation-demo.mp4) の1本。
+First Stage資料の #3・#4 は、この完成版に含まれる2つのシーンを2分資料へ配置する指示であり、
+申請動画が2本あるという意味ではない。形式とハッシュは隣接する
+[`public/demo/README.md`](../public/demo/README.md) を正とする。
+
 ## 画像
 
 `img/` の 3 枚はアプリの実画面キャプチャ。差し替えるときはファイル名を変えず同じ場所へ置く

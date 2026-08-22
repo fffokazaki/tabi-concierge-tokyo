@@ -1,11 +1,11 @@
 ---
 title: "DEPLOYMENT"
-version: "1.18.4"
+version: "1.19.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-22"
-changeImpact: "low"
+updated: "2026-08-23"
+changeImpact: "medium"
 ---
 
 # DEPLOYMENT.md - デプロイメント・運用ガイド
@@ -84,7 +84,7 @@ Git Flow ベースの軽量フロー。PoC 段階のため Issue 起票と ACE �
 6. **レビュー対応** - 指摘への対応内容をコメントで残す
 7. **マージ** - Squash 推奨。**`Closes #N` は発火する**（このリポジトリのデフォルトブランチが `develop` のため。ADR-009）。手動クローズは不要
 8. **クリーンアップ** - ブランチ削除、`git fetch --prune`
-9. **デプロイ** - `worker/` `shared/` `migrations/` `src/` `wrangler.jsonc` `data/` `scripts/` を変更したときは §3「いつデプロイするか」に従って反映する（**対象は §3 の契機テーブルが正**。ここの列挙はその写しなので、片方だけ増やさない）
+9. **デプロイ** - `worker/` `shared/` `migrations/` `src/` `public/` `wrangler.jsonc` `data/` `scripts/` を変更したときは §3「いつデプロイするか」に従って反映する（**対象は §3 の契機テーブルが正**。ここの列挙はその写しなので、片方だけ増やさない）
 10. **ナレッジ体系化（ACE）** - **任意**。メンテナ環境では必須運用 ← ACE Playbook: `deployment/ace-cycle.md`
 
 ### メンテナ環境のフル運用（参考）
@@ -251,6 +251,7 @@ npm run deploy  # vite build → wrangler deploy
 | **`migrations/` を変更する PR をマージしたとき** | `npm run db:migrate` → `npm run deploy` |
 | **`wrangler.jsonc` のバインディング・`vars` を変更する PR をマージしたとき** | `npm run cf-typegen` → `npm run deploy`（バインディングは deploy でしか本番へ渡らない） |
 | **`src/` を変更する PR をマージしたとき** | `npm run deploy` |
+| **`public/` を変更する PR をマージしたとき** | `npm run deploy`（Vite が Worker の静的アセットへ同梱する） |
 | **`data/` または `scripts/` を変更してデータの中身が変わるとき** | `npm run db:seed` |
 | 提出直前（2026-08-23） | 3つすべて＋下記の確認 |
 
@@ -510,6 +511,12 @@ PRマージ後のブランチ切り替え忘れを防ぐため、セッション
 ---
 
 ## Changelog
+
+### [1.19.0] - 2026-08-23
+
+#### 追加
+
+- §1 の主要ステップと §3「いつデプロイするか」に、`public/` の変更を `npm run deploy` の契機として追加。Vite が `public/` を Worker の静的アセットへ同梱するため、マージだけでは申請用動画などの公開ファイルが本番へ反映されない
 
 ### [1.18.4] - 2026-08-22
 

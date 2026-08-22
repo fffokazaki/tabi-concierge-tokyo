@@ -1,10 +1,10 @@
 ---
 title: "first-stage-presentation"
-version: "2.1.3"
+version: "2.1.4"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-22"
+updated: "2026-08-23"
 changeImpact: "low"
 ---
 
@@ -66,6 +66,7 @@ v1.0（2026-08-15）の台本は、その後1週間の実装と乖離した。�
 
 ## 4. 収録メモ
 
+- **Jotform 3-8 に提出する操作動画は1本**（[`public/demo/operation-demo.mp4`](../public/demo/operation-demo.mp4)・25.133秒・無音）。下記の #3・#4 は、その1本に含まれる2つのデモシーンを First Stage の2分資料へ配置する指示であり、申請動画が2本あるという意味ではない
 - **動画埋め込みは #3 と #4**。素材は**本番アプリの画面収録**（<https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev>）。`public/showcase/` は使わない（使う場合のみ `fonts.googleapis.com` 依存でオフライン時に崩れるため事前のネットワーク確認が必要）
 - **BGM は使用しない**（主催者規定）。音声合成を使う場合は合理的理由が要る（[CONSTRAINTS.md](01-context/CONSTRAINTS.md) §3）
 - **尺の実測はスライド単位で行う。** 全体で 1:55 に収まっても、1枚ずつの尺がずれていると収録時に映像と音がずれる。超えた枚だけ削る（R-01）
@@ -73,6 +74,12 @@ v1.0（2026-08-15）の台本は、その後1週間の実装と乖離した。�
 - 提出用キャプチャ（1600×900px・1〜3点）は[提出資料側](submission-deck.md) §5 のチェックリストで管理する
 
 ## Changelog
+
+### [2.1.4] - 2026-08-23
+
+#### 変更
+
+- Jotform 3-8 の申請用操作動画は1本であり、#3・#4 はその中の2シーンを First Stage資料へ配置する指示であることを明記。完成版は [`public/demo/operation-demo.mp4`](../public/demo/operation-demo.mp4) で管理する
 
 ### [2.1.3] - 2026-08-22
 
