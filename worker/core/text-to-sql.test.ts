@@ -207,12 +207,32 @@ describe("説明文に載せる note の選別", () => {
     await seed([
       { name: "名前だけの行", area: "上野", note: "最終確認日2024-01-09・座標精度：番地号一致" },
     ]);
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const llm = scriptedLlm(SELECT_ALL);
 
     const summary = expectAnswered(await aggregate(MEISHO_ID, "上野の寺社を1件", depsWith(llm))).result.summary;
 
     expect(summary).not.toContain("最終確認日");
     expect(summary).toBe("台東区が名所・史跡として公開している45件のうちの1件。");
+    spy.mockRestore();
+  });
+
+  it("要素をすべて落としたら警告を出す（区切りの前提が崩れたことに気づける）", async () => {
+    // 落とす判定は区切りが `" / "` であることに乗っている。本番の実データでは
+    // `note` に `/` を含む370行すべてが空白付きの区切りだった（2026-08-22 実測）が、
+    // 再取り込みで表記が変われば note 全体が1要素になり、管理用キーを1つ含むだけで
+    // **有用な要素ごと消える**。応答は返るので画面からは気づけない ―― ログには出す
+    await seed([
+      { name: "旧吉田屋酒店", area: "上野", note: "建造物/所有: 台東区教育委員会/最終確認日2024-01-09" },
+    ]);
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const llm = scriptedLlm(SELECT_ALL);
+
+    const summary = expectAnswered(await aggregate(MEISHO_ID, "上野の寺社を1件", depsWith(llm))).result.summary;
+
+    expect(summary).not.toContain("最終確認日");
+    expect(spy).toHaveBeenCalledWith("[text-to-sql] note の要素をすべて落としました", expect.anything());
+    spy.mockRestore();
   });
 });
 

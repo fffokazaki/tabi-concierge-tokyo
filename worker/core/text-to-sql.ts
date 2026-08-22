@@ -489,12 +489,18 @@ const NOTE_SEPARATOR = " / ";
  * すべての要素が落ちたら空文字を返す。呼び出し側（`toResult`）が空の `note` を一文ごと省くので、
  * 「情報なし」のような埋め草は入らない ―― データに無いことを述べない（絶対ルール #1）。
  */
-function presentableNote(note: string): string {
-  return note
-    .split(NOTE_SEPARATOR)
-    .filter((part) => !ADMIN_NOTE_KEYS.some((key) => part.includes(key)))
-    .join(NOTE_SEPARATOR)
-    .trim();
+function presentableNote(note: string, entry: CatalogEntry): string {
+  const kept = note.split(NOTE_SEPARATOR).filter((part) => !ADMIN_NOTE_KEYS.some((key) => part.includes(key)));
+
+  // **区切りの前提が崩れたことに気づけるようにする。** 実データは `note` に `/` を含む370行
+  // すべてが空白付きの区切りだった（2026-08-22 実測）が、再取り込みで表記が変われば note 全体が
+  // 1要素になり、管理用キーを1つ含むだけで有用な要素ごと消える。**応答は返るので画面からは
+  // 気づけない** ―― `llm.ts` の縮退ログと同じ理由でここを黙らせない
+  if (note !== "" && kept.length === 0) {
+    console.warn("[text-to-sql] note の要素をすべて落としました", { datasetId: entry.datasetId, note });
+  }
+
+  return kept.join(NOTE_SEPARATOR).trim();
 }
 
 function toResult(row: Record<string, unknown>, entry: CatalogEntry): AggregateResult | undefined {
@@ -502,7 +508,7 @@ function toResult(row: Record<string, unknown>, entry: CatalogEntry): AggregateR
   if (name === "") return undefined;
 
   const address = typeof row["address"] === "string" ? row["address"].trim() : "";
-  const note = presentableNote(typeof row["note"] === "string" ? row["note"].trim() : "");
+  const note = presentableNote(typeof row["note"] === "string" ? row["note"].trim() : "", entry);
 
   const parts = [
     address === "" ? undefined : `所在地は${address}。`,
