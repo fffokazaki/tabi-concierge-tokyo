@@ -1,5 +1,5 @@
 // 旅コンシェルジュTOKYO — 提出資料（16:9・14枚）
-// 文言の SSOT: docs/submission-deck.md v1.11.0 / docs/02-design/DATABASE.md §2
+// 文言の SSOT: docs/submission-deck.md v1.20.0 / docs/02-design/DATABASE.md §2
 //
 // 縦のリズム: kicker 0.24 / title 0.55–1.55 / 本文 1.95–6.85 / 下マージン 0.65
 const pptxgen = require("pptxgenjs");
@@ -30,6 +30,7 @@ const P = {
 };
 const HEAD = "Yu Mincho";
 const BODY = "Yu Gothic";
+const PAGE_TOTAL = 14;
 
 const pres = new pptxgen();
 pres.layout = "LAYOUT_WIDE";
@@ -75,8 +76,9 @@ function title(slide, text, opts = {}) {
   });
 }
 
-function kicker(slide, text, dark) {
-  slide.addText(text, {
+function kicker(slide, page, text, dark) {
+  const pageText = String(page).padStart(2, "0");
+  slide.addText(`${pageText} / ${PAGE_TOTAL}   ${text}`, {
     x: 0.75, y: 0.24, w: 11.8, h: 0.3,
     fontFace: BODY, fontSize: 12, bold: true, color: dark ? P.gold : P.brand,
     charSpacing: 1.5, align: "left", valign: "middle", margin: 0,
@@ -105,8 +107,8 @@ function closer(slide, text, o = {}) {
 // ─────────────────────────────────────────── 1. 表紙
 {
   const s = darkSlide();
-  s.addText("東京都知事杯オープンデータ・ハッカソン 2026", {
-    x: 0.9, y: 1.15, w: 7.2, h: 0.32, fontFace: BODY, fontSize: 12, bold: true,
+  s.addText("01 / 14   東京都知事杯オープンデータ・ハッカソン 2026", {
+    x: 0.9, y: 0.38, w: 7.2, h: 0.32, fontFace: BODY, fontSize: 12, bold: true,
     color: P.gold, charSpacing: 1.5, margin: 0, valign: "middle",
   });
   s.addText("9,600のオープンデータを、\n旅の相棒に。", {
@@ -117,22 +119,29 @@ function closer(slide, text, o = {}) {
     x: 0.9, y: 4.05, w: 7.2, h: 0.5, fontFace: BODY, fontSize: 21, bold: true,
     color: P.white, margin: 0, valign: "middle",
   });
+  s.addText([
+    { text: "Powered by ", options: { color: "C9BBAA" } },
+    { text: "オープンデータ・コンシェルジュ", options: { color: P.gold, bold: true } },
+  ], {
+    x: 0.9, y: 4.5, w: 7.2, h: 0.3, fontFace: BODY, fontSize: 11.5,
+    margin: 0, valign: "middle",
+  });
   s.addText("会話から東京都オープンデータカタログへ到達する、訪日外国人向けAI旅行ガイド。\n根拠がなければ答えない、を設計の中心に置いています。", {
-    x: 0.9, y: 4.65, w: 7.2, h: 0.9, fontFace: BODY, fontSize: 13,
+    x: 0.9, y: 4.92, w: 7.2, h: 0.9, fontFace: BODY, fontSize: 13,
     color: "C9BBAA", lineSpacing: 22, margin: 0, valign: "top",
   });
   s.addText("チームshiwata", {
-    x: 0.9, y: 5.85, w: 7.2, h: 0.35, fontFace: BODY, fontSize: 13, bold: true,
+    x: 0.9, y: 6.1, w: 7.2, h: 0.35, fontFace: BODY, fontSize: 13, bold: true,
     color: P.gold, margin: 0, valign: "middle",
   });
   s.addImage({ path: here("img/deck-plan.png"), x: 9.25, y: 0.85, w: 3.18, h: 5.79 });
-  s.addNotes("表紙。数字は9,600・200PV/日・30分→3分の3つに絞る。");
+  s.addNotes("表紙。旅コンシェルジュTOKYOが、オープンデータ・コンシェルジュを基盤として動く2層構造を Powered by で示す。数字は9,600・200PV/日・30分→3分の3つに絞る。");
 }
 
 // ─────────────────────────────────────────── 2. 課題A
 {
   const s = lightSlide();
-  kicker(s, "課題 ①  データ側");
+  kicker(s, 2, "課題｜データ側");
   title(s, "公開されている。しかし、届いていない。");
 
   const stats = [
@@ -177,13 +186,13 @@ function closer(slide, text, o = {}) {
 // ─────────────────────────────────────────── 3. 課題B
 {
   const s = lightSlide();
-  kicker(s, "課題 ①  利用者側");
+  kicker(s, 3, "課題｜利用者側");
   title(s, "訪日外国人は、文化・マナーに迷う。");
 
   const steps = [
     { n: "1", t: "文化・マナーで迷う", d: "参拝の作法、銭湯の入り方、公共交通での振る舞い。訪日外国人が旅先で迷いやすい場面です。" },
     { n: "2", t: "答えは公共データの中にある", d: "施設情報も、文化財の由来も、東京都オープンデータカタログにすでに公開されています。" },
-    { n: "3", t: "しかし到達する手段がない", d: "カタログを開き、データセットを探し、CSV を読む。旅先の数分でできることではありません。" },
+    { n: "3", t: "しかし到達する手段がない", d: "カタログを開き、データセットを探す。\nCSVを読む。旅先の数分ではできません。" },
   ];
   steps.forEach((st, i) => {
     const x = 0.75 + i * 4.05;
@@ -212,9 +221,9 @@ function closer(slide, text, o = {}) {
 // ─────────────────────────────────────────── 4. 解決策 + 3層凡例
 {
   const s = darkSlide();
-  kicker(s, "解決策 ①", true);
+  kicker(s, 4, "解決策｜会話で届ける", true);
   title(s, "会話から、9,600件への入口をつくる。", { color: P.cream });
-  s.addText("そのうえで「根拠がなければ答えない」を設計の中心に置きます。回答は必ず出典のあるデータセットに紐づき、紐づけられないときは答えを作りません。", {
+  s.addText("そのうえで「根拠がなければ答えない」を設計の中心に置きます。\n回答は必ず出典のあるデータセットに紐づき、紐づけられないときは答えを作りません。", {
     x: 0.75, y: 1.62, w: 11.8, h: 0.6, fontFace: BODY, fontSize: 13.5,
     color: "C9BBAA", lineSpacing: 21, margin: 0, valign: "top",
   });
@@ -258,41 +267,46 @@ function closer(slide, text, o = {}) {
   s.addNotes("3層凡例。以降の全スライドでバッジを繰り返す。");
 }
 
-// ─────────────────────────────────────────── 5. プロダクト全体像
+// ─────────────────────────────────────────── 5. サービス全体像
 {
   const s = lightSlide();
-  kicker(s, "プロダクト ②");
-  title(s, "5画面のうち、3画面が実データで動く。");
+  kicker(s, 5, "プロダクト｜サービス全体像");
+  title(s, "旅の準備から現地まで、AIエージェントが伴走。");
 
   const screens = [
-    { t: "旅のプロフィール", d: "同行者・日数・興味・ペース・予算を入力", k: "live" },
-    { t: "プラン", d: "出典つきの旅程を生成。マナーの解説を添える", k: "live" },
-    { t: "あなたへ", d: "興味から出典つきでレコメンド", k: "live" },
-    { t: "スキャン", d: "かざして調べる", k: "concept" },
-    { t: "周辺", d: "近くを探す", k: "concept" },
+    { t: "旅のプロフィール", image: here("img/deck-profile.png"), sourceW: 480, k: "live" },
+    { t: "プラン", image: here("img/deck-plan.png"), sourceW: 480, k: "live" },
+    { t: "あなたへ", image: here("img/deck-foryou.png"), sourceW: 480, k: "live" },
+    { t: "スキャン", image: here("img/deck-scan-showcase.png"), sourceW: 402, k: "concept" },
+    { t: "周辺", image: here("img/deck-nearby-showcase.png"), sourceW: 402, k: "concept" },
   ];
   screens.forEach((sc, i) => {
     const x = 0.75 + i * 2.42;
     const on = sc.k === "live";
     card(s, {
-      x, y: 1.95, w: 2.2, h: 3.35,
+      x, y: 1.82, w: 2.2, h: 4.42,
       fill: on ? P.white : "F6F4F1", stroke: on ? P.line : "E8E4DF",
     });
     s.addText(sc.t, {
-      x: x + 0.22, y: 2.2, w: 1.76, h: 0.62, fontFace: HEAD, fontSize: 15.5, bold: true,
-      color: on ? P.ink : P.concept, lineSpacing: 21, margin: 0, valign: "top",
+      x: x + 0.18, y: 2.02, w: 1.84, h: 0.38, fontFace: HEAD, fontSize: 14, bold: true,
+      color: on ? P.ink : P.concept, margin: 0, valign: "middle", align: "center",
     });
-    s.addText(sc.d, {
-      x: x + 0.22, y: 2.9, w: 1.76, h: 1.5, fontFace: BODY, fontSize: 11,
-      color: on ? P.muted : P.concept, lineSpacing: 16, margin: 0, valign: "top",
+    pill(s, x + (2.2 - LAYER[sc.k].w) / 2, 2.45, sc.k);
+
+    const imageH = 3.02;
+    const imageW = imageH * sc.sourceW / 874;
+    const imageX = x + (2.2 - imageW) / 2;
+    s.addShape(pres.ShapeType.rect, {
+      x: imageX - 0.03, y: 2.84, w: imageW + 0.06, h: imageH + 0.06,
+      fill: { color: P.white }, line: { color: on ? P.line : "DDD8D1", width: 0.7 },
     });
-    pill(s, x + 0.22, 4.72, sc.k);
+    s.addImage({ path: sc.image, x: imageX, y: 2.87, w: imageW, h: imageH });
   });
 
-  closer(s, "動く3画面はすべて本番URLの実データに接続しています。残る2画面は画面デザインのみで、実装していないことを資料上で区別します。", {
-    y: 5.6, h: 1.15, face: BODY, size: 13.5, bold: false, color: P.ink,
+  closer(s, "実データ接続：旅のプロフィール／プラン／あなたへ　｜　showcase のモックデータ：スキャン／周辺", {
+    y: 6.4, h: 0.58, face: BODY, size: 12, bold: true, color: P.ink,
   });
-  s.addNotes("5画面の内訳。実装済みと構想を最初に区別して示す。");
+  s.addNotes("5画面の内訳。旅のプロフィールは現行実装のローカル画面、プラン・あなたへは本番URLの実操作キャプチャ（2026-08-22）。スキャン・周辺は public/showcase/Japanese version.dc.html のデザインプロトタイプで、画面内はモックデータ。実装済みと構想を層バッジで区別して示す。");
 }
 
 // ─────────────────────────────────────────── 6・7. 動く画面
@@ -303,7 +317,7 @@ const SCROLL_CAPTION = "キャプチャは本番URLを実際に操作して取�
 
 function screenSlide(o) {
   const s = lightSlide();
-  kicker(s, o.kicker);
+  kicker(s, o.page, o.kicker);
   title(s, o.title, { w: 7.6 });
 
   const imgX = o.imageRight ? 9.05 : 0.75;
@@ -332,7 +346,8 @@ function screenSlide(o) {
 }
 
 screenSlide({
-  kicker: "動く画面 ①  ②",
+  page: 6,
+  kicker: "プロダクト｜出典つき旅程",
   title: "すべての提案に、出典が付く。",
   image: here("img/deck-plan.png"),
   imageRight: true,
@@ -346,28 +361,30 @@ screenSlide({
 });
 
 screenSlide({
-  kicker: "動く画面 ②  ②",
-  title: "興味から、出典つきで薦める。",
+  page: 7,
+  kicker: "プロダクト｜訪日外国人向け",
+  title: "日本のマナーまで、旅先で案内。",
   image: here("img/deck-foryou.png"),
   imageRight: false,
   points: [
-    { t: "興味チップを選ぶとレコメンドが変わる", d: "「文化」を選ぶと、その興味に答えられるデータセットから候補を選びます。" },
-    { t: "1件ずつに出典とライセンスが付く", d: "プラン画面と同じ出典チップが、レコメンドカードにも必ず付きます。" },
-    { t: "マナーの参考情報は出典と区別して表示", d: "JNTO の参考情報は「参考」として、オープンデータの出典とは見た目もラベルも分けています。" },
+    { t: "興味に合う観光地を、出典つきで提案", d: "「文化」を選ぶと、その興味に答えられるオープンデータから候補を選びます。" },
+    { t: "日本独自のマナーも、同じ画面でわかる", d: "参拝・銭湯・飲食店など、訪日外国人が迷いやすい作法をレコメンド内で確認できます。" },
+    { t: "出典と「参考」を、正直に分ける", d: "観光情報にはオープンデータの出典、マナーには JNTO 等の参考を明確に表示します。" },
   ],
   caption: SCROLL_CAPTION,
-  notes: "あなたへ画面。出典（オープンデータ）と参考（JNTO）を混ぜていないことが要点。",
+  notes: "あなたへ画面。訪日外国人が迷いやすい日本のマナーを、観光地のレコメンドと同じ画面で確認できることを訴求する。観光情報の出典（オープンデータ）と、マナーの参考（JNTO 等）は混ぜずに表示する。\n\n[Sources]\n- docs/06-reference/DECISIONS.md ADR-012",
 });
 
-// ─────────────────────────────────────────── 8. 【山】答えられないときは、答えません
+// ─────────────────────────────────────────── 8. 答えられないものを、オープンデータの要望へ
 {
   const s = darkSlide();
-  kicker(s, "プロダクト ②  この資料の山", true);
+  kicker(s, 8, "プロダクト｜答えられない場合", true);
   title(s, "答えられないときは、答えません", { color: P.cream, w: 8.0 });
 
   s.addImage({ path: here("img/deck-ramen.png"), x: 9.05, y: 1.62, w: 2.86, h: 5.21 });
 
   pill(s, 0.75, 1.72, "live");
+  pill(s, 1.83, 1.72, "spec");
   s.addText("このケースでは 粒度不足 と判定し、理由とともに返します", {
     x: 0.75, y: 2.25, w: 7.9, h: 0.5, fontFace: HEAD, fontSize: 20, bold: true,
     color: P.gold, margin: 0, valign: "middle",
@@ -388,7 +405,7 @@ screenSlide({
     x: 1.07, y: 5.02, w: 7.26, h: 0.4, fontFace: HEAD, fontSize: 16, bold: true,
     color: P.cream, margin: 0, valign: "middle",
   });
-  s.addText("ジャンル列を持たないデータに「ラーメン」を尋ねられたとき、それらしい店を返すことはできます。返しません。判定の理由を分類つきで返し、答えられなかった問いとして記録します。", {
+  s.addText("それらしい店は返しません。理由を分類して未回答として記録します。\n現在はここまで稼働中。将来は「このデータをオープンデータとして用意してほしい」という東京都への要望案へ整えます。", {
     x: 1.07, y: 5.44, w: 7.26, h: 0.8, fontFace: BODY, fontSize: 11.5,
     color: P.dim, lineSpacing: 17, margin: 0, valign: "top",
   });
@@ -397,13 +414,13 @@ screenSlide({
     x: 0.75, y: 6.5, w: 7.9, h: 0.45, fontFace: BODY, fontSize: 10,
     color: "9E9184", lineSpacing: 14, margin: 0, valign: "top",
   });
-  s.addNotes("山。文言は submission-deck.md §3 で固定。一般化した断定を足さないこと。");
+  s.addNotes("答えられないものを、オープンデータの要望へつなげる構想。未回答の記録・分類は稼働中、東京都への公開リクエスト案への変換は設計済み・未実装。文言は submission-deck.md §3 で固定。一般化した断定を足さないこと。");
 }
 
 // ─────────────────────────────────────────── 9. 仕組み
 {
   const s = lightSlide();
-  kicker(s, "仕組み ②  AI × OPEN DATA");
+  kicker(s, 9, "仕組み｜AI × OPEN DATA");
   title(s, "AIでつくり、AIで届ける。");
 
   const FLOW_X = 3.65;
@@ -440,12 +457,12 @@ screenSlide({
     x: 1.07, y: 1.98, w: 2.2, h: 0.38, fontFace: HEAD, fontSize: 18, bold: true,
     color: P.brand, margin: 0, valign: "middle",
   });
-  s.addText("AI仕様駆動開発", {
-    x: 1.07, y: 2.41, w: 2.2, h: 0.3, fontFace: BODY, fontSize: 11.5, bold: true,
-    color: P.ink, margin: 0, valign: "middle",
+  s.addText("AI仕様駆動開発\nClaude Code / Codex", {
+    x: 1.07, y: 2.38, w: 2.2, h: 0.48, fontFace: BODY, fontSize: 10.5, bold: true,
+    color: P.ink, margin: 0, valign: "top", lineSpacing: 14,
   });
-  pill(s, 1.07, 2.82, "live");
-  addFlow(["docs/\nSSOT", "Claude Code\n/ Codex", "実装", "検証"], 2.14);
+  pill(s, 1.07, 2.92, "live");
+  addFlow(["人＋AIで\n仕様を考える", "docs/\nSSOT", "AIが\n実装・検証", "人が\n動作確認"], 2.14);
 
   // 下段: 利用者の質問を旅の答えへ変えるAI。
   card(s, { x: 0.75, y: 3.62, w: 11.8, h: 2.58, fill: P.espresso, stroke: P.espresso });
@@ -490,20 +507,20 @@ screenSlide({
     x: 0.75, y: 6.43, w: 11.8, h: 0.35, fontFace: BODY, fontSize: 11.5, bold: true,
     color: P.brand, align: "center", margin: 0, valign: "middle",
   });
-  s.addNotes("つくるAIと届けるAIを分けて説明する。上段は docs/ をSSOTとするAI仕様駆動開発。下段は自然文→メタデータRAG→Text-to-SQL→出典つき旅程・マナー。メタデータRAGが見るのは収録済み10件で、9,600件全件ではない。興味チップだけの構造化入力はRAGを飛ばす。多言語は対応予定で、実装・動作検証は未実施。マナーはADR-012によりJNTO等の参考情報としてオープンデータの出典と区別する。\n\n[Sources]\n- https://github.com/fffokazaki/tabi-concierge-tokyo/issues/117\n- https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119\n- https://github.com/fffokazaki/tabi-concierge-tokyo/issues/120\n- docs/02-design/API.md §3.1\n- docs/06-reference/DECISIONS.md ADR-012");
+  s.addNotes("つくるAIと届けるAIを分けて説明する。上段は、人がAIと一緒に仕様を考えて意図を決め、docs/ をSSOTとして Claude Code / Codex が実装と機械検証を進め、最後に人が実際の動きを確認するAI仕様駆動開発。下段は自然文→メタデータRAG→Text-to-SQL→出典つき旅程・マナー。メタデータRAGが見るのは収録済み10件で、9,600件全件ではない。興味チップだけの構造化入力はRAGを飛ばす。多言語は対応予定で、実装・動作検証は未実施。マナーはADR-012によりJNTO等の参考情報としてオープンデータの出典と区別する。\n\n[Sources]\n- https://github.com/fffokazaki/tabi-concierge-tokyo/issues/117\n- https://github.com/fffokazaki/tabi-concierge-tokyo/issues/119\n- https://github.com/fffokazaki/tabi-concierge-tokyo/issues/120\n- docs/02-design/API.md §3.1\n- docs/06-reference/DECISIONS.md ADR-012");
 }
 
 // ─────────────────────────────────────────── 10. データが育つループ
 {
   const s = lightSlide();
-  kicker(s, "仕組み ②  自己改善");
-  title(s, "答えられなかった問いが、次のデータになる。");
+  kicker(s, 10, "仕組み｜AIエージェント");
+  title(s, "2つのAIエージェントが、旅とデータ改善をつなぐ。", { size: 30 });
 
   const steps = [
-    { n: "1", t: "未回答が出る", d: "出典を付けられない問いは、答えを作らずに未回答として返します。", k: "live" },
-    { n: "2", t: "gaps に記録する", d: "問い・エリア・理由分類を本番 D1 に記録します。実際に行が増えています。", k: "live" },
-    { n: "3", t: "分類して束ねる", d: "データ未公開・粒度不足・対象エリア外などに分けて集計します。", k: "live" },
-    { n: "4", t: "都へ公開リクエスト", d: "何が足りないかを、東京都へのデータ公開リクエストに変えていきます。", k: "spec" },
+    { n: "1", t: "旅を支援する", d: "旅コンシェルジュAIが、\n出典つきで案内。\n根拠がなければ答えません。", k: "live" },
+    { n: "2", t: "不足を記録する", d: "データ側のAIエージェントが、\n問い・エリア・理由を\n本番D1の gaps に記録します。", k: "live" },
+    { n: "3", t: "分類して束ねる", d: "データ未公開・粒度不足・\n対象エリア外などに分類。\n足りないデータを集計します。", k: "live" },
+    { n: "4", t: "要望案を自動生成", d: "不足データを東京都への\n公開リクエスト案に整え、\n提出へつなげる予定です。", k: "spec" },
   ];
   steps.forEach((st, i) => {
     const x = 0.75 + i * 3.02;
@@ -538,21 +555,21 @@ screenSlide({
   // 画像は 880x534（比率 1.648）なので、高さ 1.77in なら幅 2.92in。
   s.addImage({ path: here("img/deck-gaps.png"), x: 0.75, y: 5.08, w: 2.92, h: 1.77 });
   card(s, { x: 3.87, y: 5.08, w: 8.68, h: 1.77, fill: P.tint, stroke: P.line });
-  s.addText("答えられないことを記録に残すと、それは失敗ではなく、次に何を公開してほしいかの一次情報になります。", {
+  s.addText("旅のサポートから、足りないオープンデータの改善まで。\n2つのAIエージェントが一つの循環として動きます。", {
     x: 4.19, y: 5.26, w: 8.04, h: 0.58, fontFace: HEAD, fontSize: 15, bold: true,
     color: P.brand, lineSpacing: 20, margin: 0, valign: "middle",
   });
-  s.addText("左は本番の /gaps ダッシュボード。2026-08-22 時点で 46 件を記録し、理由別（粒度不足 26 / その他 18 / 対象エリア外 2）とエリア別に集計しています。稼働中のカウンターなので、使われるたびに増えます。都への提出プロセス自体は未実装です。", {
+  s.addText("左は本番の /gaps ダッシュボード。未回答の記録・分類は稼働中です。\n公開リクエスト案の自動生成・提出は設計済み・未実装。すべてをAIでつなぐ目指す姿を示しています。", {
     x: 4.19, y: 5.9, w: 8.04, h: 0.8, fontFace: BODY, fontSize: 11,
     color: P.muted, lineSpacing: 16, margin: 0, valign: "top",
   });
-  s.addNotes("gaps ループ。記録までは稼働中、都への提出プロセスは未実装であることを区別する。左下は本番 /gaps の実物（2026-08-22 時点で46件）。");
+  s.addNotes("2つのAIエージェントによる循環。旅コンシェルジュは出典つきで旅行を支援。オープンデータ・コンシェルジュは未回答を gaps に記録し、理由別に分類する。記録・分類までは稼働中。東京都への公開リクエスト案の自動生成・提出は設計済み・未実装であることを区別する。左下は本番 /gaps の実物（2026-08-22 時点で46件）。\n\n[Sources]\n- docs/02-design/DOMAIN.md §7–8\n- docs/02-design/DATABASE.md 既知のデータ欠損\n- docs/06-reference/DECISIONS.md ADR-008");
 }
 
 // ─────────────────────────────────────────── 11. 基盤の開放
 {
   const s = lightSlide();
-  kicker(s, "プロダクト ②  基盤の開放");
+  kicker(s, 11, "基盤｜MCP・OSS");
   title(s, "旅行アプリは、最初のクライアントにすぎない。", { size: 30 });
 
   card(s, { x: 0.75, y: 1.95, w: 5.8, h: 2.35, fill: P.white, stroke: P.line });
@@ -560,7 +577,7 @@ screenSlide({
     x: 1.07, y: 2.18, w: 5.16, h: 0.4, fontFace: HEAD, fontSize: 17, bold: true,
     color: P.ink, margin: 0, valign: "middle",
   });
-  s.addText("オープンデータ・コンシェルジュのコア3操作を /mcp で公開しています。AI クライアントや翌年の参加者が、この旅行アプリを経由せずに同じ操作を呼べます。", {
+  s.addText("オープンデータ・コンシェルジュのコア3操作を\n/mcp で公開しています。\nAIクライアントや翌年の参加者も、旅行アプリを経由せず同じ操作を呼び出せます。", {
     x: 1.07, y: 2.64, w: 5.16, h: 1.0, fontFace: BODY, fontSize: 11.5,
     color: P.muted, lineSpacing: 17, margin: 0, valign: "top",
   });
@@ -571,7 +588,7 @@ screenSlide({
     x: 7.07, y: 2.18, w: 5.16, h: 0.4, fontFace: HEAD, fontSize: 17, bold: true,
     color: P.ink, margin: 0, valign: "middle",
   });
-  s.addText("コンシェルジュ（バックエンド）を独立したリポジトリへ切り出し、MIT ライセンスで公開する予定です。旅行アプリのフロントエンドは対象に含めません。", {
+  s.addText("コンシェルジュ（バックエンド）を独立した\nリポジトリへ切り出し、MITライセンスで公開予定です。\n旅行アプリのフロントエンドは対象外です。", {
     x: 7.07, y: 2.64, w: 5.16, h: 1.0, fontFace: BODY, fontSize: 11.5,
     color: P.muted, lineSpacing: 17, margin: 0, valign: "top",
   });
@@ -603,7 +620,7 @@ screenSlide({
 // ─────────────────────────────────────────── 12. 利用オープンデータ10件
 {
   const s = lightSlide();
-  kicker(s, "利用オープンデータ ③");
+  kicker(s, 12, "データ｜利用オープンデータ");
   title(s, "利用オープンデータ 10件");
   s.addText("全件 CC BY 4.0 ／ 2026-08-16 取得 ／ カタログAPI（package_show）で実体を検証済み", {
     x: 0.75, y: 1.4, w: 11.8, h: 0.32, fontFace: BODY, fontSize: 11.5,
@@ -670,7 +687,7 @@ screenSlide({
 // ─────────────────────────────────────────── 13. インパクト／KPI
 {
   const s = lightSlide();
-  kicker(s, "インパクト ①");
+  kicker(s, 13, "インパクト｜期待する変化");
   title(s, "何が変わるか。");
 
   const kpis = [
@@ -715,7 +732,7 @@ screenSlide({
     });
   });
 
-  closer(s, "「約30分 → 約3分」は統制された比較計測ではありません。30分は開発メンバーの初回探索体験、3分は操作一巡の目安で、通しの計測は行っていないため「実測」とは書いていません。", {
+  closer(s, "「約30分→約3分」は統制比較ではありません。\n30分は初回探索体験、3分は操作一巡の目安で、通し計測は未実施です。", {
     y: 5.85, h: 1.0, fill: P.espresso, face: BODY, size: 12.5, bold: false, color: P.cream,
   });
   s.addNotes("KPI。30分→3分は体験・操作一巡に基づく目安であることをスライド上で明示する。「実測」とは書かない（Issue #130 / submission-deck.md v1.6.0 §1）。");
@@ -724,30 +741,54 @@ screenSlide({
 // ─────────────────────────────────────────── 14. チーム紹介
 {
   const s = darkSlide();
-  kicker(s, "チーム紹介 ④", true);
+  kicker(s, 14, "チーム｜メンバー紹介", true);
   title(s, "チームshiwata", { color: P.cream });
 
   const team = [
-    { n: "shiwata", i: "S", r: "発起人／プレゼンター" },
-    { n: "sho gamoh", i: "G", r: "本サービスの発案者／\nフロントエンド担当" },
-    { n: "フトシ", i: "F", r: "オープンデータ・コンシェルジュ発案者／\nバックエンド・クラウド・AI駆動開発支援" },
+    {
+      n: "shiwata", i: "S", r: "発起人／プレゼンター\n証券会社勤務のアラフィフ",
+      image: here("img/team-shiwata-avatar.png"),
+      sizing: { type: "cover", w: 1.12, h: 1.12 },
+    },
+    {
+      n: "sho gamoh", i: "G", r: "本サービスの発案者／フロントエンド担当\n18-year-old creator",
+      image: here("img/team-sho-avatar.png"),
+      sizing: { type: "cover", w: 1.12, h: 1.12 },
+    },
+    {
+      n: "フトシ", i: "F", r: "オープンデータ・コンシェルジュ発案者\nバックエンド・クラウド・AI駆動開発支援",
+      image: here("img/team-futoshi.png"),
+      sizing: { type: "cover", w: 1.12, h: 1.12 },
+    },
   ];
   team.forEach((m, idx) => {
     const x = 0.75 + idx * 4.05;
     card(s, { x, y: 2.0, w: 3.75, h: 3.0, fill: P.card, stroke: P.cardLine });
-    s.addShape(pres.ShapeType.ellipse, {
-      x: x + 0.32, y: 2.32, w: 0.74, h: 0.74, fill: { color: P.gold }, line: { color: P.gold, width: 0 },
-    });
-    s.addText(m.i, {
-      x: x + 0.32, y: 2.32, w: 0.74, h: 0.74, fontFace: HEAD, fontSize: 24, bold: true,
-      color: P.espresso, align: "center", valign: "middle", margin: 0,
-    });
+    if (m.image) {
+      s.addShape(pres.ShapeType.ellipse, {
+        x: x + 0.3, y: 2.2, w: 1.16, h: 1.16,
+        fill: { color: P.gold }, line: { color: P.gold, width: 0 },
+      });
+      s.addImage({
+        path: m.image, x: x + 0.32, y: 2.22, w: 1.12, h: 1.12,
+        sizing: m.sizing, rounding: true,
+      });
+    } else {
+      s.addShape(pres.ShapeType.ellipse, {
+        x: x + 0.32, y: 2.22, w: 1.12, h: 1.12,
+        fill: { color: P.gold }, line: { color: P.gold, width: 0 },
+      });
+      s.addText(m.i, {
+        x: x + 0.32, y: 2.22, w: 1.12, h: 1.12, fontFace: HEAD, fontSize: 26, bold: true,
+        color: P.espresso, align: "center", valign: "middle", margin: 0,
+      });
+    }
     s.addText(m.n, {
-      x: x + 0.32, y: 3.28, w: 3.11, h: 0.45, fontFace: HEAD, fontSize: 19, bold: true,
+      x: x + 0.32, y: 3.52, w: 3.11, h: 0.45, fontFace: HEAD, fontSize: 19, bold: true,
       color: P.cream, margin: 0, valign: "middle",
     });
     s.addText(m.r, {
-      x: x + 0.32, y: 3.82, w: 3.11, h: 0.95, fontFace: BODY, fontSize: 11.5,
+      x: x + 0.32, y: 4.02, w: 3.11, h: 0.78, fontFace: BODY, fontSize: 11.5,
       color: P.dim, lineSpacing: 18, margin: 0, valign: "top",
     });
   });
@@ -760,7 +801,7 @@ screenSlide({
     x: 0.75, y: 6.22, w: 11.8, h: 0.35, fontFace: BODY, fontSize: 12,
     color: "9E9184", margin: 0, valign: "middle",
   });
-  s.addNotes("チーム紹介。役割分担のみを載せる。AI仕様駆動開発はスライド9へ集約。");
+  s.addNotes("チーム紹介。役割分担のみを載せる。AI仕様駆動開発はスライド9へ集約。3名のポートレートは本人提供画像を使用。shiwataの横長イラストとsho gamohの写真は imagegen で顔〜肩が中心の円形アバターへ加工。\n\n[Sources]\n- User-provided shiwata illustration, edited with imagegen (2026-08-22)\n- User-provided sho gamoh photo, edited with imagegen (2026-08-22)\n- User-provided Futoshi illustration (2026-08-22)");
 }
 
 pres.writeFile({ fileName: here("tabi-concierge-tokyo-submission.pptx") }).then((f) => console.log("wrote", f));
