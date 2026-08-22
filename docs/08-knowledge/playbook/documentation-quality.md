@@ -380,7 +380,7 @@ CLAUDE.md / AGENTS.md のように「このファイルは単独で完結して�
 
 | Category | documentation-quality | Origin | PR #181 / Issue #168 |
 | Date | 2026-08-22 |
-| Helpful | 0 | Harmful | 0 |
+| Helpful | 1 | Harmful | 0 |
 | Status | active |
 
 主経路を差し替えても縮退先が旧実装のままなら、旧実装時代に書いた契約文書は「縮退経路の記述」としては依然として正しい。だから読み直しても嘘には見えず、**主経路の記述が丸ごと欠けていることだけが検出されない**。API.md §3.2 は Text-to-SQL へ差し替えた後も「そのデータセットが当該エリアを収録していなければ `data_not_published`」と書き続けていたが、それを返すのは縮退経路（`areaNotPublishedUnanswered`）だけで、主経路の0行は `other` だった ―― 同じ事実に、最も強い分類と弱い分類が経路で分かれていた。
