@@ -830,14 +830,16 @@ describe("名指しされた施設が無いときは黙ってすり替える（I
     }
   });
 
-  it("**書き直し SQL のエリアは検証していない** ―― 代表エリアを読み取れていても別エリアの行が返る", async () => {
-    // `countRelaxed` が縛るのは「書き直させるかどうか」だけで、**返ってきた行のエリアは
-    // 誰も見ていない**。「上野の…」と訊かれていても、書き直し SQL がエリア条件を落とせば
-    // 浅草の行がそのまま答えになる（cross-model レビュー・信頼度96 の指摘を実測で確認）。
+  it("書き直し SQL がエリア条件を落としても、行の選定が訊かれたエリアへ寄せる", async () => {
+    // `countRelaxed` が縛るのは「書き直させるかどうか」だけで、書き直し SQL 自体のエリアは
+    // 今も検証していない。かつてはそのまま「上野を訊かれているのに浅草の行が返る」を仕様として
+    // このテストが固定していた（cross-model レビュー・信頼度96 の指摘を実測で確認した回）。
     //
-    // したがって「すり替え先は同じエリアに限られる」とは書けない。この穴そのものは
-    // [Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152)
-    //（返る行の area を実行後に検証する）が扱う
+    // Issue #174 の行選定（`pickPreferredRow`）がこの穴の**出口側**を塞いだ ―― SQL が
+    // エリア条件を落として複数エリアの行を返しても、intent の代表エリアの行を選ぶ。
+    // ただし塞がるのは「返った行の中に訊かれたエリアの行がある」場合だけで、SQL の検証
+    // そのもの・利用者への通知は引き続き
+    // [Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152) が扱う
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       await seed([
@@ -851,7 +853,7 @@ describe("名指しされた施設が無いときは黙ってすり替える（I
 
       const answered = expectAnswered(await aggregate(MEISHO_ID, "上野のとげぬき地蔵に行きたい", depsWith(llm)));
 
-      expect(answered.result.name, "上野を訊かれているのに浅草の行が返る").toBe("浅草神社");
+      expect(answered.result.name, "先頭（浅草）ではなく訊かれた上野の行").toBe("寛永寺");
     } finally {
       warn.mockRestore();
     }
@@ -896,5 +898,58 @@ describe("名指しされた施設が無いときは黙ってすり替える（I
     } finally {
       warn.mockRestore();
     }
+  });
+});
+
+/**
+ * ## 返す行の選び方（Issue #174）
+ *
+ * 生成 SQL が area 条件を `OR` で繋ぐと（本番実測: 同一入力8回で4〜6回）、対象エリア外の行
+ * （area が NULL）が category だけで当たり、`rows[0]` 固定の取り出しがそれを旅程に載せていた。
+ * プロンプトで「AND で繋げ」と頼む修正は効かなかった（追加後も 8回中6回が OR 形・Version
+ * `9df28168` 実測）ため、**SQL は直さず、返ってきた行の側で選ぶ**。
+ *
+ * 選び方: intent に代表エリアが載っていればそのエリアの行 → 無ければ代表エリアいずれかの行
+ * → それも無ければ従来どおり先頭。SQL に触らないので0行化・書き直し・縮退は起きない。
+ */
+describe("返す行は代表エリアを優先する（Issue #174）", () => {
+  it("エリア外の行が先頭でも、代表エリアの行があればそちらを返す", async () => {
+    // 本番の再現: OR 形 SQL は「初代川柳墓（蔵前・area NULL）」を先頭で返していた
+    await seed([
+      { name: "初代川柳墓", area: null, address: "蔵前4丁目36番7号" },
+      { name: "寛永寺", area: "上野" },
+    ]);
+    const llm = scriptedLlm(SELECT_ALL);
+
+    const answered = expectAnswered(await aggregate(MEISHO_ID, "文化、家族向け、自然", depsWith(llm)));
+
+    expect(answered.result.name, "area NULL の先頭ではなく代表エリアの行").toBe("寛永寺");
+    expect(llm.asked, "SQL は直させない（書き直しなし）").toHaveLength(1);
+  });
+
+  it("intent に代表エリアが載っていれば、そのエリアの行を選ぶ", async () => {
+    await seed([
+      { name: "寛永寺", area: "上野" },
+      { name: "浅草寺", area: "浅草" },
+    ]);
+    const llm = scriptedLlm(SELECT_ALL);
+
+    const answered = expectAnswered(await aggregate(MEISHO_ID, "浅草の寺社を1件", depsWith(llm)));
+
+    expect(answered.result.name, "先頭（上野）ではなく訊かれた浅草の行").toBe("浅草寺");
+  });
+
+  it("代表エリアの行が1件も無ければ従来どおり先頭を返す", async () => {
+    // ここで未回答に倒すと「行はあるのに無いと言う」＝偽の未回答（Issue #148 の逆流）になる。
+    // 返る行のエリアを検証して伝える話は Issue #152 が扱う
+    await seed([
+      { name: "初代川柳墓", area: null },
+      { name: "小塚原刑場跡", area: null },
+    ]);
+    const llm = scriptedLlm(SELECT_ALL);
+
+    const answered = expectAnswered(await aggregate(MEISHO_ID, "文化、家族向け、自然", depsWith(llm)));
+
+    expect(answered.result.name).toBe("初代川柳墓");
   });
 });
