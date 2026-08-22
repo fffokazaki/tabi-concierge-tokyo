@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.37.0"
+version: "1.38.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 107
+ace_entry_count: 111
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -338,8 +338,27 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-150-2 | 生成物の妥当性は形の列挙では閉じない ―― 結果が出た時点でデータに問い直す | architecture | [playbook/architecture.md#ace-150-2](./playbook/architecture.md#ace-150-2) |
 | ACE-150-3 | 「検査した意味」と「実行される意味」がずれると、検査は静かに素通りする | testing | [playbook/testing.md#ace-150-3](./playbook/testing.md#ace-150-3) |
 | ACE-150-4 | 「無い」と報告する前に、その問いが成立していたかを残す | process | [playbook/process.md#ace-150-4](./playbook/process.md#ace-150-4) |
+| ACE-155-1 | 「前より速い」だけではキャッシュの効きを判別できない ―― 対照を同じ条件に並べる | process | [playbook/process.md#ace-155-1](./playbook/process.md#ace-155-1) |
+| ACE-155-2 | 生成された設定の型は、実行時にその値がある保証ではない | architecture | [playbook/architecture.md#ace-155-2](./playbook/architecture.md#ace-155-2) |
+| ACE-155-3 | 「無効」を値域の特別な値へ潰すと、無効にしたつもりのまま効き続ける | architecture | [playbook/architecture.md#ace-155-3](./playbook/architecture.md#ace-155-3) |
+| ACE-155-4 | 設定値の妥当性を `Number()` に任せると、書き間違いが別の値として通る | data-processing | [playbook/data-processing.md#ace-155-4](./playbook/data-processing.md#ace-155-4) |
 
 ## Changelog
+
+### [1.38.0] - 2026-08-22
+
+#### 追加
+
+- ACE-155-1: 「前より速い」だけではキャッシュの効きを判別できない ―― 対照を同じ条件に並べる（Issue #143 / PR #155）
+- ACE-155-2: 生成された設定の型は、実行時にその値がある保証ではない（Issue #143 / PR #155）
+- ACE-155-3: 「無効」を値域の特別な値へ潰すと、無効にしたつもりのまま効き続ける（Issue #143 / PR #155）
+- ACE-155-4: 設定値の妥当性を `Number()` に任せると、書き間違いが別の値として通る（Issue #143 / PR #155）
+
+#### カウンター更新
+
+- ACE-113-1: Helpful +1（`gatewayOptions` の doc が「使い回すと SDK の変異が全呼び出しへ波及する」と防御を主張しながら、それを固定する検査が無かった。「偽の防波堤」の型として検出し、実装を戻して落ちることを確認したうえでテストを追加した）
+- ACE-82-4: Helpful +1（上記の防御コメントをテストで固定する判断の根拠。実装を一時的に共有オブジェクト版へ戻して RED を見てから GREEN に戻した）
+- ACE-145-4: Helpful +1（Codex レビューの実行中はツリーを触らず、指摘が返ってから 1 fix commit にまとめた。1巡も無駄にしていない）
 
 ### [1.37.0] - 2026-08-22
 

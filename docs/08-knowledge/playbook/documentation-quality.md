@@ -283,7 +283,7 @@ CLAUDE.md の「frontmatter を持つ文書（MASTER / PROJECT / … ほか）�
 
 | Category | documentation-quality | Origin | PR #113 |
 | Date | 2026-08-21 |
-| Helpful | 1 | Harmful | 0 |
+| Helpful | 2 | Harmful | 0 |
 | Status | active |
 
 境界の検査は入力の組み合わせで分岐する（`parseSearchDatasetsInput` は `interests` の有無で `query` の検査を required/optional に切り替える）ため、「空文字の `query` は 400 になるから省く」という根拠は、まさにその根拠を書いた関数が作る形（interests 併送）では偽だった。防波堤を doc やテスト名の根拠に書くときは、**この呼び出しが到達しうる分岐で実際に発火するか**を検査側の条件で確認する。偽の防波堤は将来の単純化（「常に `query` を送る」への戻し）を黙って通す。セルフレビュー3観点（テスト・silent-failure・コメント正確性）が独立に検出した。

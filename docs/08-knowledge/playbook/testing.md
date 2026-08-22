@@ -149,7 +149,7 @@ ACE-28-2 の「実装を戻してテストが落ちるか確かめる」を `git
 | Category   | testing |
 | Origin     | PR #82 / Issue #84 |
 | Date       | 2026-08-19 |
-| Helpful    | 1            |
+| Helpful    | 2            |
 | Harmful    | 0            |
 | Status     | active       |
 

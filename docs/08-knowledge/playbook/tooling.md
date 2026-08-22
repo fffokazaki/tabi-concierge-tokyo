@@ -125,7 +125,7 @@ const jsonRoute =
 
 | Category | tooling | Origin | PR #145 / Issue #142 |
 | Date | 2026-08-22 |
-| Helpful | 0 | Harmful | 0 |
+| Helpful | 1 | Harmful | 0 |
 | Status | active |
 
 `multi-agent.sh --task review` をバックグラウンドで走らせている間にファイルを1つ編集したら、完了時に「The repository changed while the review was running — discarding the result.」で統合レポートが作られず、各観点の md も `Status: discarded` になった（2026-08-22 実測）。**サブエージェントは実行中にワークツリーを読むため、途中で変わると「何を見た結果なのか」が確定しない** ―― 破棄は正しい挙動で、緩めるべきものではない。
