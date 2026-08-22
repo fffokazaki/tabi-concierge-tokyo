@@ -256,14 +256,21 @@ describe("answered — 応答由来のルートと出典", () => {
   });
 
   it("出典のあるマナー情報が無いことを明示する（仮のマナー文を出さない）", async () => {
-    const { fetchImpl } = stubSuccessfulPlan();
-    await createBriefing(fetchImpl);
+    const { fetchImpl, calls } = stubSuccessfulPlan();
+    render(<AppTabs options={{ fetchImpl }} />);
+    // Issue の例どおり「文化のみ」にし、マナーの欠損を記録する問いを送っていないことも固定する
+    fireEvent.click(screen.getByRole("button", { name: "ラーメン" }));
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
 
     await waitFor(() => expect(screen.getByText("寛永寺")).toBeInTheDocument());
+    const searchCall = calls.find((call) => call.path === SEARCH_PATH);
+    expect(searchCall?.body).toMatchObject({ interests: ["文化"] });
     expect(screen.getByText(/出典のあるマナー情報はありません/)).toBeInTheDocument();
     // 「まだ」を使わない — 調査済み・存在しないことを確認済みという意味にする（Issue #67）
     expect(screen.queryByText(/まだありません/)).not.toBeInTheDocument();
     expect(screen.queryByText(/鳥居をくぐる前に一礼/)).not.toBeInTheDocument();
+    // 成功プランはマナーの問いを送っていないため、個別に記録したとは名乗らない（Issue #201）
+    expect(screen.queryByText(/都へのデータ公開リクエストの候補として記録しています/)).not.toBeInTheDocument();
     // 未選択のときだけ、停留地を選べばJNTO参考情報が出ることの誘導文を添える
     expect(screen.getByText(/停留地を選ぶと、JNTOの参考情報を表示します/)).toBeInTheDocument();
   });
@@ -352,6 +359,26 @@ describe("unanswered — 正常な結果として表示する", () => {
     expect(screen.getByText("分類: out_of_area")).toBeInTheDocument();
     // 障害の見出しは出ない
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("マナーの問いでは調査済み欠損と還元機構の説明を併記する（Issue #201）", async () => {
+    const etiquetteMessage =
+      "訪日観光客向けのマナー・作法の解説に相当するデータは、東京都オープンデータカタログに存在しないことを確認済みです（2026-08-17 調査）。この未回答は記録され、東京都へのデータ公開リクエストの題材になります。";
+    const { fetchImpl } = stubFetch({
+      [SEARCH_PATH]: (body) => {
+        expect(body).toMatchObject({ query: "日本のマナーを知りたい" });
+        return jsonResponse({ status: "unanswered", reason: "data_not_published", message: etiquetteMessage });
+      },
+    });
+    render(<AppTabs options={{ fetchImpl }} />);
+    fireEvent.change(screen.getByPlaceholderText("例：ベジタリアン、長時間の徒歩は避けたい"), {
+      target: { value: "日本のマナーを知りたい" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "ブリーフィングを作成" }));
+
+    await waitFor(() => expect(screen.getByText(etiquetteMessage)).toBeInTheDocument());
+    expect(screen.getByText(/答えられなかった問いは記録されます/)).toBeInTheDocument();
+    expect(screen.queryByText(/都へのデータ公開リクエストの候補として記録しています/)).not.toBeInTheDocument();
   });
 
   it("候補が全滅したときは、汎用の分類だけでなく個々の理由も画面に出る（Issue #94）", async () => {

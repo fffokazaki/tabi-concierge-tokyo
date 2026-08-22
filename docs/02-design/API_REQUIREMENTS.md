@@ -1,11 +1,11 @@
 ---
 title: "API_REQUIREMENTS"
-version: "1.10.0"
+version: "1.10.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-16"
 updated: "2026-08-22"
-changeImpact: "high"
+changeImpact: "low"
 ---
 
 <!-- markdownlint-disable MD013 MD022 MD024 MD025 MD032 -->
@@ -137,7 +137,7 @@ changeImpact: "high"
 
 上のボタンを外した判断は維持したまま、**記録され都へのデータ公開リクエストへ還元されること自体は画面に出す**ようにした（`src/features/plan/components/GapEscalationNote.tsx`）。それまで**答えられなかったことを告げている場所（`route-empty` / `DataGapCard`）の脇には**この説明が無く、仕組みは動いているのに利用者からは「答えられません」で行き止まりに見えていた（DOMAIN.md §7 の還元ループは企画の芯の半分）。
 
-> **「画面に1文も無かった」わけではない。** プラン画面のマナー欄フォールバックには以前から「都へのデータ公開リクエストの候補として記録しています。」の一文がある（`buildPlan` が `etiquette: []` を固定で入れるため、**成功プランでは必ず描画される**）。あれはマナーという1件について per-item で現在進行形を名乗っており、下の「個別の受領証にはしない」と衝突している。本 Issue のスコープ外として [Issue #201](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/201) に分けた。
+> **[Issue #201](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/201) で解消済み。** プラン画面のマナー欄フォールバックには以前「都へのデータ公開リクエストの候補として記録しています。」という一文があった。しかし `buildPlan` が `etiquette: []` を固定で入れるため、これはマナーを訊いていない成功プランでも必ず表示され、目の前の1件を記録したという受領証に読めていた。この固定文は削除し、成功プランでは調査済みのデータ欠損だけを述べる。マナーを含む問いが `unanswered` になった場合は、従来どおりサーバーの調査済み欠損メッセージと下記の機構説明を表示する。
 
 | 決めたこと | 内容 |
 | --- | --- |
@@ -307,6 +307,12 @@ API.md §3.5 に記載のある以下は、専用のコア操作として未実�
 | `aggregate_dataset` の `intent` にエリアを書いた場合 | **そのエリアの地物が返るとは限らない。** 保証は1つだけで、訊かれた代表エリアの行をそのデータセットが1行も収録していなければ `unanswered` にする（別エリアの行では埋めない）。それ以外は返る行の `area` を実行後に検証していないため、「上野の…」と訊いて浅草の行が返りうる（[Issue #152](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/152)）。**返ってきた `name` を「訊いたエリアの施設」として扱わないこと。** 詳細は [API.md](./API.md) §3.2 |
 
 ## Changelog
+
+### [1.10.1] - 2026-08-22
+
+#### 修正
+
+- [Issue #201](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/201) により、成功プランで必ず出るマナー欄フォールバックから per-item の受領証に読める「都へのデータ公開リクエストの候補として記録しています。」を削除。マナーを訊いていない画面は調査済みの欠損だけを述べ、マナーを含む未回答では既存の欠損メッセージと還元機構の注記を維持する
 
 ### [1.10.0] - 2026-08-22
 
