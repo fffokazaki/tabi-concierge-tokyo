@@ -2,6 +2,12 @@
 
 Claude Code がこのリポジトリで作業するときの指示。**このファイルは単独で完結している**（外部プラグインや個人設定に依存しない）。
 
+**下のマーカー行以降は [AGENTS.md](AGENTS.md) と一字一句同じ**。正典はどちらでもなく、片方を直したらもう片方へ写す（両方が単独で完結している必要があるため、共通部分を別ファイルへ切り出すことはしない）。写し忘れは CI の `npm run docs:check-agents-sync` が落として知らせる。マーカーより上の見出し・宛先の案内はファイルごとに違ってよい。
+
+Codex CLI など Claude Code 以外のエージェントは [AGENTS.md](AGENTS.md)、人間の作業者は [CONTRIBUTING.md](CONTRIBUTING.md) を参照。
+
+<!-- agent-instructions:shared:start -->
+
 ## このプロジェクトについて
 
 東京都知事杯オープンデータ・ハッカソン 2026 の参加作品。訪日観光客向け AI 旅行ガイド「旅コンシェルジュTOKYO」と、その背後で東京都オープンデータカタログ（約9,600データセット）を扱う「オープンデータ・コンシェルジュ」の2層構成。バックエンドは単一 Worker の二面公開で、React アプリは `/api/*`（JSON、[API.md](docs/02-design/API.md)）を呼び、MCP（`/mcp`、[MCP.md](docs/02-design/MCP.md)）は AI クライアント・翌年参加者向けの基盤開放面（ADR-008。React 側に MCP クライアントを実装するのは禁止）。
@@ -53,6 +59,7 @@ Issue があれば件名に含める: feat: #12 ...
 
 - **`docs/` 配下の文書はすべて frontmatter を持つ**（例外は `docs/08-knowledge/playbook/*.md`。あれは `/ace-curate` が追記する子ファイルで、メタデータは親の `PLAYBOOK.md` が持つ）。変更したら `version`・`updated`・`changeImpact` と末尾の Changelog を同時に更新する
 - 新しく `docs/` に文書を足すときも frontmatter（`title` / `version` / `status` / `owner` / `created` / `updated` / `changeImpact`）を付ける
+- `version` は SemVer。節の追加・方針変更は minor、文言修正は patch。`changeImpact` は小文字（`low` / `medium` / `high`）
 - 冒頭に「⚠️ テンプレート未具体化」の注記がある文書は、まだ本プロジェクト向けに書き換えられていない。**そこに書かれている技術（DB・REST/GraphQL・コンテナ等）を本プロジェクトの決定と誤認しない**
 
 ## 技術スタックの注意

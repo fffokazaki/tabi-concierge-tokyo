@@ -39,6 +39,12 @@ jobs:
       - name: ACE Playbook の frontmatter 検証
         run: npm run ace:check-playbook-frontmatter
 
+      # CLAUDE.md と AGENTS.md は同じ指示を 2 つ持つ写しである（どちらも単独で完結していないと
+      # いけないので、共通部分を別ファイルへ切り出せない）。写しは黙ってずれ、実際に片方にしか
+      # 無い指示が生まれていた（Issue #136）。マーカー以降が一字一句同じかを機械で照合する。
+      - name: CLAUDE.md / AGENTS.md の同期検証
+        run: npm run docs:check-agents-sync
+
       # ACE エントリの形式ゲート（Issue #102）。旧テーブル形式の新規追記を発生源で止める。
       # 既存の旧形式エントリは docs/08-knowledge/legacy-format-allowlist.txt で読み取り互換として通す。
       - name: ACE エントリの形式検証

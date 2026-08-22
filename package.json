@@ -23,6 +23,7 @@
     "ace:check-playbook-frontmatter": "node scripts/ace/sync-playbook-frontmatter.ts docs/08-knowledge/PLAYBOOK.md --check",
     "ace:check-entry-format": "node scripts/ace/check-entry-format.ts docs/08-knowledge/PLAYBOOK.md",
     "ace:sync-playbook-frontmatter": "node scripts/ace/sync-playbook-frontmatter.ts docs/08-knowledge/PLAYBOOK.md --write",
+    "docs:check-agents-sync": "node scripts/docs/check-agents-sync.ts CLAUDE.md AGENTS.md",
     "data:fetch": "node scripts/fetch-data.ts",
     "db:migrate:local": "wrangler d1 migrations apply tabi-concierge-tokyo --local",
     "db:migrate": "wrangler d1 migrations apply tabi-concierge-tokyo --remote",
