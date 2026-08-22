@@ -395,7 +395,34 @@ function contextOf(before: string): { column?: string; op?: string } {
  * リテラルだけを見て「興味の語（ラーメン）」と「施設名（浅草寺）」を区別する決定的な方法は無い
  * （どちらも利用者の入力語である）。**偽の未回答を残すより、選んだデータセットの実在する行を
  * 返す方を採った** ―― name の条件を書かなければ同じ行が返るので、これは name 条件に固有の
- * 損失ではない。すり替えを利用者に伝えるかどうかは [#153](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/153) で扱う。
+ * 損失ではない。**すり替わる先は同じデータセット・同じエリアの行に限られる** ―― エリアは
+ * 緩めないので、浅草を1行も収録していないデータセットで「浅草寺」を名指しされても、上野の行を
+ * 代わりに返したりはせず未回答になる。
+ *
+ * ## 「すり替えたと伝える」を今は採らない理由（[Issue #153](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/153)）
+ *
+ * 答えは返しつつ**すり替えたと伝える**形が設計として正しい ―― #153 でもその判断は変えていない。
+ * それでも現状（黙ってすり替える）を据え置いたのは、伝えるための器がこの層に無く、足すには
+ * **入力と出力の両方の契約**を変える必要があるからである。
+ *
+ * - 入力 `AggregateDatasetInput` は `{ datasetId, intent }` だけ。どの語が名指し（固有名詞）で
+ *   どれが興味の語かは渡ってこない（エリアすら `findRepresentativeArea` が自然文から拾っている）
+ * - 出力 `AggregateResult` は `{ name, summary }` だけ。「頼まれたものは無かった」を載せる器が無い
+ * - 足すと `shared/core.ts`（型）→ `parse.ts`（検査の実体）→ **`worker/mcp.ts` の
+ *   `AGGREGATE_DATASET_SCHEMA`（外部クライアントへ公開している広告スキーマ・
+ *   [MCP.md](../../docs/02-design/MCP.md) §3）** → API.md / MCP.md →
+ *   `src/features/plan/buildPlan.ts`（フロントエンド）まで波及する
+ *
+ * **`gaps` に積んで伝える形は採らない。** 答えを返しているのに欠損として記録すると、
+ * `gaps` は「答えられなかったことの一次情報」（DOMAIN.md §7）という定義を壊し、偽の欠損を
+ * 自分で足すことになる。
+ *
+ * **応答のどこを見てもすり替えは分からない。** `query` に載るのは書き直した**後**の SQL なので、
+ * 名指しされた語は応答のどこにも残らない。これは記録漏れではなく上の選択の帰結そのものであり、
+ * 残っている問題は [#166](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/166) で扱う。
+ *
+ * この選択は `text-to-sql.test.ts` の「名指しされた施設が無いときは黙ってすり替える（Issue #153 の
+ * 決定）」が固定している。**挙動を変えるときはそのテストを意図的に書き換えること。**
  */
 async function countRelaxed(
   input: AggregateDatasetInput,

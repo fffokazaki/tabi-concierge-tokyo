@@ -1,11 +1,11 @@
 ---
 title: "API"
-version: "1.10.0"
+version: "1.11.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
 updated: "2026-08-22"
-changeImpact: "low"
+changeImpact: "medium"
 ---
 
 # API.md - API設計書（フロントエンド ↔ バックエンド `/api/*`）
@@ -220,6 +220,7 @@ interests=["ラーメン","文化","家族向け","自然"] / limit=4（修正�
 | `query` | 実行したクエリ。**省略不可**（§4）。スタブは SQL を実行していないため、SQL 風の文字列ではなく「どのスナップショットのヘッダを除く何行目を、どう選んで固定で返したか」を記録する。行の選定根拠（固定サンプルのうち当該エリアの最初の1件 / 既知のエリア名が見つからず固定サンプルの先頭）と、**intent の内容との照合はしていない**ことを必ず含む（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)） |
 | `intent` のエリア | **指定されたエリアの地物しか返さない。** 一致する行が無ければ `unanswered`（そのデータセットが当該エリアを収録していなければ `data_not_published`）。対象エリア外の地名は `search_datasets` と同じく `out_of_area`。別エリアの行で代替すると、本物の出典がついた誤答になる |
 | `intent` に既知のエリア名が無い場合 | 固定サンプルの先頭を代表として返す。「エリア無指定」とは断定しない — 判定は既知の語彙表（代表エリア・対象外エリア）への照合であって網羅ではなく、未知の地名（例: 巣鴨）が書かれていてもこの経路に落ちる。**intent の内容との照合はどの経路でも行っていない**（内容側のガードは飲食店データセットへのジャンル指定のみ）。選定が収録順に依存する事実は `query` に明記して読み取れるようにする（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)）。内容適合そのものは Step 5（[Issue #32](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/32)・Text-to-SQL）で解消する |
+| `intent` に名指しされた施設 | **無ければ同じデータセット・同じエリアの別の行が返る**（黙ってすり替える。[Issue #153](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/153) の決定）。エリアの扱いと逆に見えるが、根拠が違う ―― **エリアの取り違えは場所についての事実誤り**で、収録範囲はデータから確かめられる。一方**どのデータセットを使うかは `search_datasets` が既に決めており、ここは関連性を審査し直す場ではない**（[Issue #78](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/78)）。加えて「興味の語（ラーメン）」と「施設名（浅草寺）」をリテラルから区別する決定的な方法が無く、名指しを未回答にすると [Issue #148](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/148) の偽の未回答が戻る。**すり替えは応答に現れない**（`query` に載るのは書き直した後の SQL）。伝える形は[Issue #166](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/166) で扱う |
 | 未確定 | 対応する集計操作の範囲（Step 5 で確定）、`result` に集計値そのもの（件数・平均等）を載せる形 |
 
 ### 3.3 `get_provenance` — 出典取得（`POST /api/provenance`・確定）
@@ -359,6 +360,13 @@ interests=["ラーメン","文化","家族向け","自然"] / limit=4（修正�
 - **サンドボックス環境**: 未定
 
 ## Changelog
+
+### [1.11.0] - 2026-08-22
+
+#### 追加
+
+- §3.2 に「`intent` に名指しされた施設」の行を追加（[Issue #153](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/153) の決定）。名指しされた施設がそのデータセットに無いとき、**同じデータセット・同じエリアの別の行が黙って返る**ことを契約として明記した。エリア（別エリアの行では代替しない）と扱いが逆に見えるため、根拠の違い（場所についての事実誤り vs. 関連性の再審査をしない層）も併記
+- すり替えが応答に現れないこと（`query` に載るのは書き直した後の SQL）と、伝える形を [Issue #166](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/166) で扱うことを明記
 
 ### [1.10.0] - 2026-08-22
 

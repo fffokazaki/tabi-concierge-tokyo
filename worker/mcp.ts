@@ -182,8 +182,14 @@ export function createTabiMcpServer(env: Env): McpServer {
     "aggregate_dataset",
     {
       title: "集計・抽出",
+      // 「意図に合う1件」とは言えない。名指しされた施設が無いときは同じエリアの別の行が返る
+      // （Issue #153 の決定・`text-to-sql.ts` の `countRelaxed` doc）。外部クライアントへの
+      // 広告で言い切ると、返った行が意図に一致していると誤認させる
       description:
-        "指定したデータセットから、集計意図に合う1件を取り出す。" +
+        "指定したデータセットから、集計意図に近い1件を取り出す。" +
+        "意図に名指しされた施設がこのデータセットに無い場合は、同じエリアの別の行が返る" +
+        "（すり替えたことは応答に現れない）。" +
+        "エリアは緩めないので、指定されたエリアの行が1件も無ければ unanswered。" +
         "実行したクエリを query として必ず添える（出典の再現に要る）。",
       inputSchema: AGGREGATE_DATASET_SCHEMA,
     },
