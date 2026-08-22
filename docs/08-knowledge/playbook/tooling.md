@@ -148,3 +148,17 @@ worktree で作業中に dev サーバーを立てたら、**メインリポジ�
 **実画面確認の1手目を「自分の変更が配信に入っていること」にする**（bundle でも CSS でもよい）。合わなければ `npm run dev -- --port <別> --strictPort` を worktree の cwd から直に起動し直す。worktree は `node_modules` を持たないので、先にメイン側へ symlink を張り（掃除時に外す）、`wrangler types` の生成物も無いため `npx wrangler types` を1度走らせる ―― どちらも欠けると typecheck だけが不可解に落ちる。
 
 ---
+<a id="ace-202-3"></a>
+
+### ACE-202-3: 一時領域で育てたスクリプトを取り込むときは、cwd 依存を `__dirname` 基準へ直す
+
+| Category | tooling | Origin | PR #202 |
+| Date | 2026-08-22 |
+| Helpful | 0 | Harmful | 0 |
+| Status | active |
+
+スクラッチパッドの `deck/build.js` は画像パスと出力先が cwd 相対だった。常に `cd deck` して叩いていたため露出しなかったが、リポジトリへ入れた瞬間に「直下から `node deck/build.js`」という自然な経路ができる。実測では画像の ENOENT で exit 1（書き出し前に落ちるので成果物は残らない）。`.gitignore` を `deck/*.pptx` でアンカーしていたため、cwd 次第で追跡候補が生まれる形でもあった。
+
+取り込みの diff で `require`・ファイルパス・出力先を見て、**cwd を仮定している箇所を `__dirname` 基準へ移す**。成果物の落ちる場所が1つに固定され、gitignore の穴も構造的に閉じる。cwd を見るのが外部コマンド（`soffice` / `pdftoppm`）側なら直せないので、実行ディレクトリを手順書に明記する。
+
+---

@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.48.0"
+version: "1.49.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 131
+ace_entry_count: 135
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -362,8 +362,21 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-198-1 | 断定を書いたら、同じ PR の中に反証がないかを先に探す —— 反証は自分のテストと自分のキャプチャだった | documentation-quality | [playbook/documentation-quality.md#ace-198-1](./playbook/documentation-quality.md#ace-198-1) |
 | ACE-198-2 | worktree で実画面を見る前に、dev サーバーがどのツリーを配信しているかを1つ grep で確かめる | tooling | [playbook/tooling.md#ace-198-2](./playbook/tooling.md#ace-198-2) |
 | ACE-198-3 | ゲートを足す前に「守る対象が実在するか」を数える —— 到達不能な集合を守るゲートは、実在する経路だけを落とす | architecture | [playbook/architecture.md#ace-198-3](./playbook/architecture.md#ace-198-3) |
+| ACE-202-1 | 生成物は原稿から静かにドリフトする —— 生成物側に SSOT のバージョンを書き、それを同期の検査点にする | documentation-quality | [playbook/documentation-quality.md#ace-202-1](./playbook/documentation-quality.md#ace-202-1) |
+| ACE-202-2 | 資料に載せた集計値は足し算で検算する —— 列の合計と注記の総計が 22 件ズレ、差は「取り込んでいない1件」だった | documentation-quality | [playbook/documentation-quality.md#ace-202-2](./playbook/documentation-quality.md#ace-202-2) |
+| ACE-202-3 | 一時領域で育てたスクリプトを取り込むときは、cwd 依存を `__dirname` 基準へ直す | tooling | [playbook/tooling.md#ace-202-3](./playbook/tooling.md#ace-202-3) |
+| ACE-202-4 | 「検証」欄に、その差分を1行も通っていないゲートを並べない | process | [playbook/process.md#ace-202-4](./playbook/process.md#ace-202-4) |
 
 ## Changelog
+
+### [1.49.0] - 2026-08-22
+
+#### 追加
+
+- ACE-202-1: 生成物は原稿から静かにドリフトする —— 生成物側の SSOT バージョンを同期の検査点にする（PR #202）
+- ACE-202-2: 資料に載せた集計値は足し算で検算する（PR #202）
+- ACE-202-3: 一時領域で育てたスクリプトを取り込むときは cwd 依存を `__dirname` 基準へ直す（PR #202）
+- ACE-202-4: 「検証」欄に、その差分を1行も通っていないゲートを並べない（PR #202）
 
 ### [1.48.0] - 2026-08-22
 
