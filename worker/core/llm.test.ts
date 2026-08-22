@@ -73,6 +73,19 @@ describe("workersAiLlm", () => {
     expect(calls[0]!.options).toEqual({ gateway: { id: "default", skipCache: true } });
   });
 
+  it("gateway オプションは呼び出しごとに作る（1つを使い回さない）", async () => {
+    // doc で「使い回すと SDK が変異させたとき全呼び出しへ波及する」と主張している以上、
+    // 主張だけ残して実装が戻ることが無いように固定する。このリポジトリには D1 の
+    // `.select()` が引数を変異させた前例がある
+    const { ai, calls } = fakeAi(completion("{}"));
+    const client = workersAiLlm(ai, "default", CACHE_1H);
+    await client.complete(REQUEST);
+    await client.complete(REQUEST);
+
+    expect(calls[0]!.options["gateway"]).not.toBe(calls[1]!.options["gateway"]);
+    expect(calls[0]!.options).toEqual(calls[1]!.options);
+  });
+
   it("成功したら本文を前後の空白を落として返す", async () => {
     const { ai } = fakeAi(completion('\n\n{"areas":["上野"]}\n'));
     expect(await workersAiLlm(ai, "default", CACHE_1H).complete(REQUEST)).toEqual({
