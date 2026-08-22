@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.47.0"
+version: "1.48.0"
 status: "approved"
 created: "2026-08-15"
 updated: "2026-08-22"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 128
+ace_entry_count: 131
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -359,8 +359,19 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-191-3 | 値を返すスクリプトでは、ゲート系なら「検査が無効化」で済む失敗が「0 件」に化ける | architecture | [playbook/architecture.md#ace-191-3](./playbook/architecture.md#ace-191-3) |
 | ACE-200-1 | 集計軸が任意入力由来なら個票と同じ機密値として扱い、SQL 境界で公開分類へ丸める | architecture | [playbook/architecture.md#ace-200-1](./playbook/architecture.md#ace-200-1) |
 | ACE-200-2 | プライバシー境界テストは機密値らしいセンチネルを実 DB へ入れ、集計整合と非露出を同時に固定する | testing | [playbook/testing.md#ace-200-2](./playbook/testing.md#ace-200-2) |
+| ACE-198-1 | 断定を書いたら、同じ PR の中に反証がないかを先に探す —— 反証は自分のテストと自分のキャプチャだった | documentation-quality | [playbook/documentation-quality.md#ace-198-1](./playbook/documentation-quality.md#ace-198-1) |
+| ACE-198-2 | worktree で実画面を見る前に、dev サーバーがどのツリーを配信しているかを1つ grep で確かめる | tooling | [playbook/tooling.md#ace-198-2](./playbook/tooling.md#ace-198-2) |
+| ACE-198-3 | ゲートを足す前に「守る対象が実在するか」を数える —— 到達不能な集合を守るゲートは、実在する経路だけを落とす | architecture | [playbook/architecture.md#ace-198-3](./playbook/architecture.md#ace-198-3) |
 
 ## Changelog
+
+### [1.48.0] - 2026-08-22
+
+#### 追加
+
+- ACE-198-1: 断定を書いたら、同じ PR の中に反証がないかを先に探す（Issue #192 / PR #198）
+- ACE-198-2: worktree で実画面を見る前に、dev サーバーがどのツリーを配信しているかを確かめる（Issue #192 / PR #198）
+- ACE-198-3: ゲートを足す前に「守る対象が実在するか」を数える（Issue #192 / PR #198）
 
 ### [1.47.0] - 2026-08-22
 

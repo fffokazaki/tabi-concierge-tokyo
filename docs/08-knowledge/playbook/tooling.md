@@ -133,3 +133,18 @@ const jsonRoute =
 レビューを起動したら**終わるまでツリーを触らない**。待っている間にやってよいのはリモート操作（`gh pr edit` / `gh issue create`）と読み取りだけ。指摘への対応は結果が返ってから 1 fix commit にまとめ、次巡はコミット後に回す。
 
 破棄された md の中身は読めるので情報としては使えるが、**「安定した版に対する検証済みの結果」としては扱わない**。実装を直したうえで巡を回し直すこと。
+
+<a id="ace-198-2"></a>
+
+### ACE-198-2: worktree で実画面を見る前に、dev サーバーがどのツリーを配信しているかを1つ grep で確かめる
+
+| Category | tooling | Origin | PR #198 / Issue #192 |
+| Date | 2026-08-22 |
+| Helpful | 0 | Harmful | 0 |
+| Status | active |
+
+worktree で作業中に dev サーバーを立てたら、**メインリポジトリのツリーを配信していた**（`.claude/launch.json` を worktree に置いても、起動側は別の cwd を使った）。画面には新要素が出ず、DOM を見ても不在 —— 実装の不具合と区別が付かない形で 10 分溶かした。判定は1行で付く: `curl -s localhost:<port>/src/index.css | grep -c '<今回足したクラス>'` が 0 なら、配信元が自分のツリーではない。
+
+**実画面確認の1手目を「自分の変更が配信に入っていること」にする**（bundle でも CSS でもよい）。合わなければ `npm run dev -- --port <別> --strictPort` を worktree の cwd から直に起動し直す。worktree は `node_modules` を持たないので、先にメイン側へ symlink を張り（掃除時に外す）、`wrangler types` の生成物も無いため `npx wrangler types` を1度走らせる ―― どちらも欠けると typecheck だけが不可解に落ちる。
+
+---
