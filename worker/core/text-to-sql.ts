@@ -1,6 +1,7 @@
 import { REPRESENTATIVE_AREAS, type AggregateDatasetInput, type AggregateResult } from "../../shared/core";
 import type { CatalogEntry } from "./catalog";
 import type { CoreDeps } from "./llm";
+import { findRepresentativeArea } from "./search-gaps";
 import { ALLOWED_TABLES, guardSelect, MAX_LIMIT } from "./sql-guard";
 
 /**
@@ -261,12 +262,38 @@ function judgeAgainstActual(use: LiteralUse, actual: string[]): string | undefin
  * 位置を無視して「含むかどうか」で見ると、`LIKE '文化%'`（前方一致）が「区民文化財」に
  * 当たると誤判定する。**検査は実行される意味と同じでなければ、検査したことにならない**
  * （[ACE-137-1](../../docs/08-knowledge/playbook/architecture.md#ace-137-1) と同じ筋）。
+ *
+ * **正規表現に変換しない。** `%` を `[\s\S]*` へ写すと `%%%…X%%%` のようなパターンが
+ * 破滅的バックトラックを起こす ―― 実測で `%` 40個 × 200文字の非一致に対し **2分でも終わらなかった**
+ * （`likeMatches` は LLM が書いた文字列を毎回受け取るので、これは Worker の CPU を焼く経路になる）。
+ * 貪欲マッチの位置を覚えて戻る、素直な線形の照合にしてある。
  */
 function likeMatches(pattern: string, value: string): boolean {
-  const source = [...pattern]
-    .map((char) => (char === "%" ? "[\\s\\S]*" : char === "_" ? "[\\s\\S]" : char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
-    .join("");
-  return new RegExp(`^${source}$`).test(value);
+  // SQLite の LIKE は ASCII の大小を区別しない。日本語は元から区別されないので影響しない
+  const chars = [...pattern.toLowerCase()];
+  const target = [...value.toLowerCase()];
+  let p = 0;
+  let v = 0;
+  let star = -1;
+  let resume = 0;
+  while (v < target.length) {
+    if (p < chars.length && (chars[p] === "_" || chars[p] === target[v])) {
+      p++;
+      v++;
+      continue;
+    }
+    if (p < chars.length && chars[p] === "%") {
+      star = p++;
+      resume = v;
+      continue;
+    }
+    if (star < 0) return false;
+    // 直前の `%` が1文字多く飲み込んだ、として再開する（戻り先は1つだけなので指数爆発しない）
+    p = star + 1;
+    v = ++resume;
+  }
+  while (p < chars.length && chars[p] === "%") p++;
+  return p === chars.length;
 }
 
 /** 文字列リテラルと、その直前に現れる「列 演算子」。 */
@@ -332,6 +359,47 @@ function contextOf(before: string): { column?: string; op?: string } {
   // 「当たる LIKE」として通ってしまう（レビュー指摘）
   const op = matched[2]!.toUpperCase().replace(/\s+/g, " ");
   return { column: matched[1]!.toLowerCase(), op };
+}
+
+/**
+ * 「絞り込みを全部外したら何行あるか」をデータに訊く（[Issue #148](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/148)）。
+ *
+ * ## なぜ形の検査だけでは閉じないか
+ *
+ * 生成 SQL の書き方を並べて禁じる検査は、レビューのたびに新しい抜け道が出た ―― 数値比較
+ * （`AND 1 = 0`）・`IS NULL`・外側の `NOT`・空文字との比較・定数式。**どれも「実在値だけで
+ * 絞れ」を満たしたまま0行にできる。** 形の列挙では閉じない。
+ *
+ * 0行になった時点で「dataset_id（＋訊かれたエリア）だけ」で数え直せば、**絞り込みが強すぎたのか
+ * 本当に無いのか**がデータで分かる。どんな書き方をされても効くのでここが最後の歯止めになる。
+ * 推論は増えない（D1 を1回引くだけ）。
+ *
+ * **エリアは緩めない。** 「渋谷の…」と訊かれて渋谷の行が無いとき、エリアまで外して数えると
+ * 上野の行が見つかり「絞りすぎ」と誤判定してしまう ―― 書き直しの果てに**別のエリアの行**を
+ * 返す方へ誘導することになる（それは偽の未回答よりさらに悪い）。
+ */
+async function countRelaxed(
+  input: AggregateDatasetInput,
+  entry: CatalogEntry,
+  deps: CoreDeps,
+): Promise<number> {
+  const area = findRepresentativeArea(input.intent);
+  const escapedId = entry.datasetId.replace(/'/g, "''");
+  const areaClause = area ? ` AND area = '${area.replace(/'/g, "''")}'` : "";
+  const result = await deps.sql.select(
+    `SELECT COUNT(*) AS n FROM spots WHERE dataset_id = '${escapedId}'${areaClause} LIMIT 1`,
+  );
+  if (!result.ok) return 0; // 数えられないなら「絞りすぎ」と主張しない（fail closed）
+  const n = result.rows[0]?.["n"];
+  return typeof n === "number" ? n : 0;
+}
+
+/** 書き直しの指示に使う一文。何件あるかまで見せないと、同じ SQL を書き直してくる。 */
+function describeRelaxed(input: AggregateDatasetInput, count: number): string {
+  const area = findRepresentativeArea(input.intent);
+  return area
+    ? `この dataset_id には「${area}」の行が ${count} 件あります`
+    : `この dataset_id には ${count} 件の行があります`;
 }
 
 /**
@@ -479,7 +547,22 @@ async function attemptTextToSql(
     }
 
     if (executed.rows.length === 0) {
-      // (c) 障害ではない。「探したが無かった」という答えである
+      // **「無かった」と言う前に、緩めた問いでも0行かをデータに訊く**（Issue #148）。
+      // 絞り込みが強すぎただけなら、それは答えではなく書き直すべき SQL である
+      const relaxed = await countRelaxed(input, entry, deps);
+      if (relaxed > 0) {
+        previousError =
+          `この SQL は0行でした。ただし ${describeRelaxed(input, relaxed)}。絞り込みが強すぎます。` +
+          "category の条件を外し、エリア（訊かれている場合）だけで絞って書き直してください。";
+        console.warn("[text-to-sql] 0行だが緩めれば行がある SQL を拒否しました", {
+          attempt,
+          datasetId: input.datasetId,
+          relaxed,
+          sql: guarded.sql,
+        });
+        continue;
+      }
+      // (c) 障害ではない。「探したが無かった」という答えである ―― 緩めても0行なので earned
       return { kind: "empty", sql: guarded.sql };
     }
 

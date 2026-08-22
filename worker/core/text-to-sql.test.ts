@@ -401,7 +401,9 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
         " AND name LIKE '%渋谷%' LIMIT 50";
       const llm = scriptedLlm(nameLike, SELECT_ALL);
 
-      expect(expectAnswered(await aggregate(MEISHO_ID, "渋谷の寺社を1件", depsWith(llm))).result.name).toBe("寛永寺");
+      // intent にエリアを書かない（「渋谷の…」と訊いたまま上野の行を受け取る形を期待値にしない
+      // ため。エリアを指定されたときに SQL からエリア条件が落ちる問題は別途 Issue にした）
+      expect(expectAnswered(await aggregate(MEISHO_ID, "寺社を1件", depsWith(llm))).result.name).toBe("寛永寺");
       expect(llm.asked).toHaveLength(2);
     } finally {
       warn.mockRestore();
@@ -539,5 +541,80 @@ describe("実在しない値では絞らせない（Issue #148）", () => {
 
     expect(expectAnswered(await aggregate(MEISHO_ID, "文化財を1件", depsWith(llm))).result.name).toBe("旧朝倉家住宅");
     expect(llm.asked).toHaveLength(1);
+  });
+  it("`%` を大量に含むパターンでも即座に判定する（破滅的バックトラックを起こさない）", async () => {
+    // 正規表現へ写す実装では、この形が**2分でも終わらなかった**（実測）。LLM が書いた文字列を
+    // 毎回受け取る経路なので、ここが焼けると Worker の CPU ごと持っていかれる
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await seed([{ name: "旧朝倉家住宅", area: "渋谷", category: "区民文化財".repeat(40) }]);
+      const pathological = `%`.repeat(40) + "X" + "%".repeat(40);
+      const evil = `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND category LIKE '${pathological}' LIMIT 50`;
+      const llm = scriptedLlm(evil, SELECT_ALL);
+
+      expect(expectAnswered(await aggregate(MEISHO_ID, "文化財を1件", depsWith(llm))).result.name).toBe("旧朝倉家住宅");
+      expect(llm.asked).toHaveLength(2); // 当たらないので書き直させる
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+
+/**
+ * 0行を「無かった」と報告する前に、**緩めた問いでも0行かどうかをデータに訊く**
+ * （[Issue #148](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/148) の構造的な歯止め）。
+ *
+ * 生成 SQL の形を並べて禁じる検査は、レビューのたびに新しい抜け道が出た（数値比較・`IS NULL`・
+ * 外側の `NOT`・空文字・定数式…）。**形の列挙では閉じない。** 0行になったときに
+ * 「dataset_id（＋訊かれたエリア）だけ」で数え直せば、絞り込みが強すぎたのか本当に無いのかが
+ * データで分かる ―― どんな書き方をされても効く。
+ */
+describe("0行は緩めた問いでも0行のときだけ「無かった」と言う（Issue #148）", () => {
+  it("リテラルを持たない絞り込み（`1 = 0`）で0行になっても、偽の未回答にはしない", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await seed([{ name: "寛永寺", area: "上野" }]);
+      // 文字列リテラルが1つも出てこないので、リテラル検査は素通りする
+      const constantFalse = `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND 1 = 0 LIMIT 50`;
+      const llm = scriptedLlm(constantFalse, SELECT_ALL);
+
+      expect(expectAnswered(await aggregate(MEISHO_ID, "寺社を1件", depsWith(llm))).result.name).toBe("寛永寺");
+      expect(llm.asked).toHaveLength(2);
+      expect(llm.asked[1]!.user).toContain("0行");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("本当に行が無いときは未回答のまま（正しい0行は壊さない）", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await seed([{ name: "寛永寺", area: "上野" }]);
+      const shibuya = `SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND area = '渋谷' LIMIT 50`;
+      const llm = scriptedLlm(shibuya);
+
+      expectUnanswered(await aggregate(MEISHO_ID, "渋谷の寺社を1件", depsWith(llm)));
+      expect(llm.asked, "緩めても0行なので書き直させない").toHaveLength(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("書き直しても0行のままなら縮退する（未回答として名乗らない）", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await seed([{ name: "寛永寺", area: "上野" }]);
+      const llm = scriptedLlm(`SELECT dataset_id, name, address, note FROM spots WHERE dataset_id = '${MEISHO_ID}' AND 1 = 0 LIMIT 50`);
+
+      const answered = expectAnswered(await aggregate(MEISHO_ID, "寺社を1件", depsWith(llm)));
+
+      expect(answered.query).toContain("固定データ抽出（スタブ）");
+      expect(llm.asked).toHaveLength(MAX_SQL_ATTEMPTS);
+      expect(error).toHaveBeenCalled();
+    } finally {
+      error.mockRestore();
+      warn.mockRestore();
+    }
   });
 });
