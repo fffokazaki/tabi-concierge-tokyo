@@ -296,6 +296,12 @@ function ResultView({ result }: { result: CoreCallResult | null }) {
           tone="error"
         />
       );
+    case "timeout":
+      // 「接続できません」（network）に寄せない。届いている可能性があり、
+      // 原因と逆方向へ誘導するため（Issue #146）
+      return (
+        <ResultShell headline={`応答がありません（${result.timeoutMs}ms でタイムアウト）・ ${result.elapsedMs}ms`} tone="error" />
+      );
     case "input":
       return (
         <ResultShell

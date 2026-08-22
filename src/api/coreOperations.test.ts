@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { callCoreOperation, peekAnswerStatus, CORE_ENDPOINTS } from "./coreOperations";
+import { callCoreOperation, peekAnswerStatus, CORE_ENDPOINTS, DEFAULT_TIMEOUT_MS } from "./coreOperations";
 
 /**
  * 「叩いて分類する」ロジックの検証。fetch と時計を注入し、ブラウザなしで
@@ -15,16 +15,36 @@ const fixedClock = () => {
 const jsonResponse = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
+/**
+ * 「応答しない」fetch のスタブ（Issue #146）。渡された `signal` が発火するまで一切
+ * 解決しない ―― 実装が本当にタイムアウトを起こしているかを検証する（`vi.useFakeTimers`
+ * だけでは、実装が `signal` を渡し忘れていても気づけない）。
+ *
+ * reject 理由は実測に基づく（Node 24 実行・Chrome 実行の両方で確認済み。
+ * `AbortSignal.timeout()` は "TimeoutError" の `DOMException` で reject する）。
+ */
+const hangingFetch = (): typeof fetch =>
+  vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+    return new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => {
+        reject(new DOMException("The operation was aborted due to timeout", "TimeoutError"));
+      });
+    });
+  }) as unknown as typeof fetch;
+
 describe("callCoreOperation", () => {
   it("POST・JSON ボディ・確定パスで呼び出す", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { status: "answered", candidates: [] }));
 
     await callCoreOperation("search_datasets", { query: "上野" }, { fetchImpl, now: fixedClock() });
 
+    // signal は AbortSignal.timeout() が呼び出しごとに新しく作るインスタンスなので、
+    // 参照の一致ではなく AbortSignal であることだけを見る（Issue #146）
     expect(fetchImpl).toHaveBeenCalledWith(CORE_ENDPOINTS.search_datasets, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ query: "上野" }),
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -100,6 +120,33 @@ describe("callCoreOperation", () => {
 
     expect(result).toMatchObject({ kind: "input" });
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("応答しない呼び出しは timeoutMs 以内に打ち切り、network ではなく timeout として返す（Issue #146）", async () => {
+    const fetchImpl = hangingFetch();
+    const startedAt = Date.now();
+
+    // 実時間を待つテストだが、既定値（6000ms）ではなく短い値を注入して速く済ませる
+    const result = await callCoreOperation(
+      "aggregate_dataset",
+      { datasetId: "t1", intent: "上野" },
+      { fetchImpl, timeoutMs: 20 },
+    );
+
+    // 打ち切られていること自体を実時間で確認する（実装が signal を渡し忘れていると、
+    // このスタブは永遠に解決せずテストがタイムアウトで落ちる ―― それ自体が退行の検出）
+    expect(Date.now() - startedAt).toBeLessThan(2000);
+    expect(result).toMatchObject({ kind: "timeout", timeoutMs: 20 });
+  });
+
+  it("timeoutMs を省略すると DEFAULT_TIMEOUT_MS が使われる", async () => {
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { status: "answered", candidates: [] }));
+
+    await callCoreOperation("search_datasets", { query: "上野" }, { fetchImpl, now: fixedClock() });
+
+    expect(timeoutSpy).toHaveBeenCalledWith(DEFAULT_TIMEOUT_MS);
+    timeoutSpy.mockRestore();
   });
 });
 

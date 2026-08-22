@@ -65,7 +65,7 @@ export type SourcedStop = { stop: Stop; source: ProvenanceSource };
  * 種別は `coreOperations.ts` の分類をそのまま持ち上げる（health.ts / Issue #14 と同じ方針）。
  */
 export type PlanFailure = {
-  kind: "input" | "network" | "http" | "parse";
+  kind: "input" | "network" | "http" | "parse" | "timeout";
   detail: string;
   status?: number;
 };
@@ -77,7 +77,9 @@ export type PlanOutcome =
   | { kind: "unanswered"; reason: UnansweredReason; message: string; gaps: Unanswered[] }
   | { kind: "failure"; failure: PlanFailure };
 
-export type BuildPlanOptions = { fetchImpl?: typeof fetch };
+/** `timeoutMs` はテストが `coreOperations.ts` の既定タイムアウト（実時間）を待たずに
+ *  タイムアウト経路を検証するための注入口（Issue #146）。本番は既定値のまま使う。 */
+export type BuildPlanOptions = { fetchImpl?: typeof fetch; timeoutMs?: number };
 
 /**
  * 旅のプロフィールから、意図・根拠の再現に使う全文を組み立てる。
@@ -308,10 +310,18 @@ async function callAndRead<T>(
   readAnswered: (body: Record<string, unknown>) => T | undefined,
   options: BuildPlanOptions,
 ): Promise<ReadOutcome<T>> {
-  const result = await callCoreOperation(operation, body, { fetchImpl: options.fetchImpl });
+  const result = await callCoreOperation(operation, body, {
+    fetchImpl: options.fetchImpl,
+    timeoutMs: options.timeoutMs,
+  });
 
   if (result.kind !== "ok") {
-    const detail = result.kind === "http" ? describeHttp(result.status, result.body) : result.detail;
+    const detail =
+      result.kind === "http"
+        ? describeHttp(result.status, result.body)
+        : result.kind === "timeout"
+          ? `${result.timeoutMs}ms 以内に応答がありませんでした`
+          : result.detail;
     return {
       kind: "failure",
       outcome: {

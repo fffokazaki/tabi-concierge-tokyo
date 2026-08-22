@@ -623,6 +623,21 @@ describe("buildPlan", () => {
     expect(outcome.kind === "failure" && outcome.failure.kind).toBe("network");
   });
 
+  it("応答しない呼び出しは network ではなく timeout の障害にする（Issue #146。あなたへ側と対）", async () => {
+    // signal が発火するまで一切解決しない fetch。実装が timeoutMs を coreOperations.ts へ
+    // 渡し忘れていると、このテストは実時間で固まる（それ自体が退行の検出になる）
+    const fetchImpl = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted due to timeout", "TimeoutError"));
+        });
+      });
+    }) as unknown as typeof fetch;
+
+    const outcome = await buildPlan(DEFAULT_TRIP, { fetchImpl, timeoutMs: 20 });
+    expect(outcome.kind === "failure" && outcome.failure.kind).toBe("timeout");
+  });
+
   it("仕様外の応答は parse の障害にする（unanswered に倒さない）", async () => {
     // 「サーバーが壊れた応答を返している」が「データがありません」として出ると、
     // 原因と逆方向へデバッグを誘導する

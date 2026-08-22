@@ -25,6 +25,23 @@ export const CORE_ENDPOINTS = {
 export type CoreOperation = keyof typeof CORE_ENDPOINTS;
 
 /**
+ * `fetch` のタイムアウト（ミリ秒）（Issue #146）。
+ *
+ * 6000ms は Futoshi が本番実測（`wrangler tail`）に基づき確定した値。Step 5（#119・#120）の
+ * 定常状態は単発約1.1秒・並列集計は1件あたり1,296〜1,412ms・4件同時1.55秒・6件同時2.28秒
+ * （429 なし）。この呼び出しは search → aggregate（候補ごと並列） → provenance の3段を
+ * 直列に踏むため、1回あたりのタイムアウトは総待ち時間の最悪ケースに3倍で効く
+ * （6000ms → 最悪18秒。8000ms なら24秒・10000ms なら30秒）。無料枠混雑時の最悪応答は
+ * 未観測（意図的な再現不可）であり、これは定常値からの安全側の下限であって tail
+ * レイテンシの実測ではない。
+ *
+ * **クライアント側の中断は Worker 側の推論を止めない** ―― 無料枠のニューロン消費は
+ * タイムアウトの有無に関わらず発生する。この値は画面が固まるのを防ぐための UX 上の
+ * 上限であり、コスト制御の手段ではない。
+ */
+export const DEFAULT_TIMEOUT_MS = 6000;
+
+/**
  * 1回の呼び出しの結果。`ok` は HTTP 2xx かつ JSON として読めたことだけを意味する。
  * `answered` / `unanswered` の別は応答ボディ側の `status` であり、ここでは区別しない
  * （どちらも正常応答。API.md §4）。
@@ -43,20 +60,30 @@ export type CoreCallResult =
    * （ストリーム切断・プロキシの HTML 差し込み等）。`network` と分けるのは、
    * 「接続できていない」と表示すると原因と逆方向へデバッグを誘導するため
    */
-  | { kind: "parse"; status: number; elapsedMs: number; detail: string; rawText: string };
+  | { kind: "parse"; status: number; elapsedMs: number; detail: string; rawText: string }
+  /**
+   * `timeoutMs` 以内に応答が無かった（Issue #146）。**`network` に含めない。** 「接続できません」は
+   * 原因を誤誘導する ―― fetch 自体は届いていて、サーバー側の処理待ち（Step 5 の LLM 推論・D1
+   * 混雑等）で止まっているだけかもしれない。並列化（Issue #142・PR #145）で候補順に最初の
+   * 確定した失敗を採るようになったが、そもそも確定しない（応答が永遠に来ない）候補には
+   * 無力だった ―― この分類の追加自体がその無限待ちを解消する
+   */
+  | { kind: "timeout"; elapsedMs: number; timeoutMs: number };
 
 /**
  * コア操作を1回叩いて分類する。例外は投げない。
  *
  * @param options.fetchImpl テストから応答を差し替えるための注入口
  * @param options.now 所要時間の計測用（テストで固定できるようにする）
+ * @param options.timeoutMs `DEFAULT_TIMEOUT_MS` を上書きする（テストが実時間を待たずに
+ *   タイムアウト経路を検証するための注入口。本番では基本的に既定値のまま使う）
  */
 export async function callCoreOperation(
   operation: CoreOperation,
   requestBody: unknown,
-  options: { fetchImpl?: typeof fetch; now?: () => number } = {},
+  options: { fetchImpl?: typeof fetch; now?: () => number; timeoutMs?: number } = {},
 ): Promise<CoreCallResult> {
-  const { fetchImpl = fetch, now = () => performance.now() } = options;
+  const { fetchImpl = fetch, now = () => performance.now(), timeoutMs = DEFAULT_TIMEOUT_MS } = options;
   const startedAt = now();
   const elapsed = () => Math.round(now() - startedAt);
 
@@ -71,12 +98,22 @@ export async function callCoreOperation(
 
   let response: Response;
   try {
+    // AbortSignal.timeout は workerd・ブラウザどちらも標準実装で追加ライブラリが要らない。
+    // 発火時の reject 理由の name は実測で確認済み（Node 24 実行・Chrome 実行の両方で
+    // "TimeoutError"、DOMException）。ユーザー操作による中断（新規実装済みではないが、将来
+    // 足す場合は "AbortError" になる）と区別できるよう、下の catch では両方を timeout として
+    // 扱う ―― どちらであっても「応答を待っていた側が打ち切った」という意味は同じで、
+    // 「サーバーに接続できません」（network）に分類する方が原因を誤誘導する
     response = await fetchImpl(CORE_ENDPOINTS[operation], {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: serialized,
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (cause) {
+    if (cause instanceof DOMException && (cause.name === "TimeoutError" || cause.name === "AbortError")) {
+      return { kind: "timeout", elapsedMs: elapsed(), timeoutMs };
+    }
     return { kind: "network", elapsedMs: elapsed(), detail: toMessage(cause) };
   }
 
