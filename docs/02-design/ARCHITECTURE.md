@@ -1,6 +1,6 @@
 ---
 title: "ARCHITECTURE"
-version: "1.5.0"
+version: "1.5.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -122,7 +122,7 @@ graph LR
     - 構成: 設けない（本フェーズでは不要）
   本番:
     - 構成: Cloudflare Workers（アカウント opendata）
-    - URL: https://tabi-concierge-tokyo.opendata-002.workers.dev
+    - URL: https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev
     - 注記: First Stage はライブデモ不可のため、常時公開は必須要件ではない
 ```
 
@@ -332,6 +332,12 @@ Phase 番号は [ROADMAP.md](../07-project-management/ROADMAP.md) に準拠す�
 | Phase 4（Final Stage 準備） | 〜2026-10-17 | 介助者モード・音声対応、都への API 公開提案、動的取り込みの検討 |
 
 ## Changelog
+
+### [1.5.1] - 2026-08-22
+
+#### 変更
+
+- 構成図中の Worker の URL を更新。Cloudflare アカウントを事務局発行の `tokyo_odh_091` へ移設したことに伴い、本番URLを <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev> へ更新（[Issue #171](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/171)）
 
 ### [1.5.0] - 2026-08-22
 

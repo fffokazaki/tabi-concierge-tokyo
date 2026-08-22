@@ -1,10 +1,10 @@
 ---
 title: "MCP"
-version: "1.1.0"
+version: "1.1.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-16"
-updated: "2026-08-21"
+updated: "2026-08-22"
 changeImpact: "low"
 ---
 
@@ -115,13 +115,13 @@ npx @modelcontextprotocol/inspector           # ブラウザから http://localh
 claude mcp add --transport http tabi-local http://localhost:5173/mcp
 
 # 本番
-claude mcp add --transport http tabi https://tabi-concierge-tokyo.opendata-002.workers.dev/mcp
+claude mcp add --transport http tabi https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev/mcp
 ```
 
 素の HTTP でも確かめられる（セッション不要なので `initialize` を先に送らなくてよい）。
 
 ```bash
-U=https://tabi-concierge-tokyo.opendata-002.workers.dev
+U=https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev
 curl -s -X POST $U/mcp \
   -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
@@ -131,6 +131,12 @@ curl -s -o /dev/null -w '%{http_code}\n' $U/mcp
 ```
 
 ## Changelog
+
+### [1.1.1] - 2026-08-22
+
+#### 変更
+
+- 接続手順（`claude mcp add`）と確認コマンドのURLを更新。Cloudflare アカウントを事務局発行の `tokyo_odh_091` へ移設したことに伴い、本番URLを <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev> へ更新（[Issue #171](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/171)）。**既存クライアントは旧URLのままでは繋がらないため再登録が要る**
 
 ### [1.1.0] - 2026-08-21
 

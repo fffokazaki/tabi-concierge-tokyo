@@ -1,10 +1,10 @@
 ---
 title: "TASKS"
-version: "1.4.0"
+version: "1.4.1"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-21"
+updated: "2026-08-22"
 changeImpact: "medium"
 ---
 
@@ -29,7 +29,7 @@ changeImpact: "medium"
 | 企画 | ✅ 完了（最終企画案 v1.0） |
 | UI デザイン | ✅ プロトタイプ完成（5画面・日英2バージョン → `/showcase/`） |
 | UI 実装 | 🔄 進行中（プラン画面・あなたへ画面が `/api/*` に接続済み。旅のプロフィール→プラン、あなたへ興味チップ→レコメンドの2系統が縦貫通で成立。スキャン・周辺は未着手） |
-| Cloudflare 基盤 | ✅ Worker ＋ SPA ＋ showcase をデプロイ済み（<https://tabi-concierge-tokyo.opendata-002.workers.dev>） |
+| Cloudflare 基盤 | ✅ Worker ＋ SPA ＋ showcase をデプロイ済み（<https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev>） |
 | データ（D1） | ✅ 利用データ10件を確定（[Issue #10](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/10)・[DATABASE.md](../02-design/DATABASE.md) §2）。ブロック解消 |
 | データ組み込み | ✅ 完了（1,645 spots・エリア分類済み。[Issue #24](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/24)） |
 | `/api/*` 接続 | ✅ 完了（スタブ。Issue #31・#22）。プランのコア3操作をフロントから呼べる |
@@ -131,6 +131,12 @@ MCP 最小実装 ─────────────────────
 - First Stage 2分スライドと台本: [first-stage-presentation.md](../first-stage-presentation.md)
 
 ## Changelog
+
+### [1.4.1] - 2026-08-22
+
+#### 変更
+
+- Cloudflare 基盤の行のURLを更新。Cloudflare アカウントを事務局発行の `tokyo_odh_091` へ移設したことに伴い、本番URLを <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev> へ更新（[Issue #171](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/171)）
 
 ### [1.4.0] - 2026-08-21
 

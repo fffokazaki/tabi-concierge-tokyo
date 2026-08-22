@@ -1,6 +1,6 @@
 ---
 title: "first-stage-presentation"
-version: "2.1.1"
+version: "2.1.2"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
@@ -66,13 +66,19 @@ v1.0（2026-08-15）の台本は、その後1週間の実装と乖離した。�
 
 ## 4. 収録メモ
 
-- **動画埋め込みは #3 と #4**。素材は**本番アプリの画面収録**（<https://tabi-concierge-tokyo.opendata-002.workers.dev>）。`public/showcase/` は使わない（使う場合のみ `fonts.googleapis.com` 依存でオフライン時に崩れるため事前のネットワーク確認が必要）
+- **動画埋め込みは #3 と #4**。素材は**本番アプリの画面収録**（<https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev>）。`public/showcase/` は使わない（使う場合のみ `fonts.googleapis.com` 依存でオフライン時に崩れるため事前のネットワーク確認が必要）
 - **BGM は使用しない**（主催者規定）。音声合成を使う場合は合理的理由が要る（[CONSTRAINTS.md](01-context/CONSTRAINTS.md) §3）
 - **尺の実測はスライド単位で行う。** 全体で 1:55 に収まっても、1枚ずつの尺がずれていると収録時に映像と音がずれる。超えた枚だけ削る（R-01）
 - スライド内のタイムコード（右上）はペース配分用。本番書き出し前に非表示化する
 - 提出用キャプチャ（1600×900px・1〜3点）は[提出資料側](submission-deck.md) §5 のチェックリストで管理する
 
 ## Changelog
+
+### [2.1.2] - 2026-08-22
+
+#### 変更
+
+- 収録素材の取得元URLを更新。Cloudflare アカウントを事務局発行の `tokyo_odh_091` へ移設したことに伴い、本番URLを <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev> へ更新（[Issue #171](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/171)）
 
 ### [2.1.1] - 2026-08-22
 
