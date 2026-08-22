@@ -249,6 +249,23 @@ describe("coreDeps", () => {
     // TTL も同じ — env に置いても組み立て側で拾っていなければ、収録直前に値を変えても効かない（Issue #143）
     expect(calls[0]!.options).toEqual({ gateway: { id: "from-env", cacheTtl: 60 } });
   });
+
+  it('env の "0" が実際の呼び出しまで skipCache として届く（Issue #143 の本体）', async () => {
+    // 解析（resolveCachePolicy）と組み立て（workersAiLlm）は別々に固定してあるが、
+    // **その2つを繋ぐ配線が抜けても両方のテストは通る**。収録中は応答が返ってしまうため
+    // 画面から気づけない — env から `ai.run` の引数までを1本で見る
+    const { ai, calls } = fakeAi(completion("ok"));
+    const deps = coreDeps({
+      AI: ai,
+      AI_GATEWAY_ID: "from-env",
+      AI_GATEWAY_CACHE_TTL: "0",
+      DB: {} as D1Database,
+    } as unknown as Env);
+
+    await deps.llm.complete(REQUEST);
+
+    expect(calls[0]!.options).toEqual({ gateway: { id: "from-env", skipCache: true } });
+  });
 });
 
 /**
@@ -272,6 +289,25 @@ describe("resolveCachePolicy", () => {
     expect(resolveCachePolicy("2592000")).toEqual({ kind: "cache", ttlSeconds: 2592000 });
   });
 
+  it("設定そのものが無くても落ちない（欠落は既定へ倒す）", () => {
+    // 生成型（`worker-configuration.d.ts`）は wrangler.jsonc の**現在の値**を写した
+    // リテラルなので、「型が付いている＝実行時に必ず入っている」の保証にはならない。
+    // ここで throw すると `coreDeps` の組み立てで死に、LLM の縮退経路へ入る前に
+    // `/api/*` と `/mcp` が丸ごと落ちる
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(resolveCachePolicy(undefined)).toEqual({ kind: "cache", ttlSeconds: 3600 });
+      expect(spy).toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("前後の空白は無視する", () => {
+    expect(resolveCachePolicy(" 3600 ")).toEqual({ kind: "cache", ttlSeconds: 3600 });
+    expect(resolveCachePolicy(" 0 ")).toEqual({ kind: "skip" });
+  });
+
   it.each([
     ["下限未満", "59"],
     ["上限超過", "2592001"],
@@ -279,6 +315,11 @@ describe("resolveCachePolicy", () => {
     ["空文字（Number('') が 0 になるので、素直に読むと skip に化ける）", ""],
     ["整数でない", "3600.5"],
     ["負数", "-1"],
+    // Number() は指数・16進・符号つきを受理してしまう。設定ファイルにこれらが現れるのは
+    // まず書き間違いなので、10進数字だけを受けて残りは既定へ倒す（黙って 60 秒にしない）
+    ["指数表記", "6e1"],
+    ["16進表記", "0x3c"],
+    ["符号つき", "+60"],
   ])("%s は既定へ倒し、握りつぶさずに console.error へ出す（値: %s）", (_label, raw) => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
