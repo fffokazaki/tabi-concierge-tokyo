@@ -29,6 +29,17 @@ cd deck && npm ci && npm run build
 叩いても同じ結果になる（cwd には依存しない）。成果物（`*.pptx` / `*.pdf` / `slide-*.jpg`）は
 `.gitignore` 済みで、コミットするのは入力だけ。
 
+First Stage 用は次のコマンドで生成する。
+
+```bash
+cd deck && npm run build:first-stage
+```
+
+`tabi-concierge-tokyo-first-stage.pptx`（14 枚）が `deck/` に出る。内容とスライド番号は提出版と同じで、
+スライドショーでは [First Stage の SSOT](../docs/first-stage-presentation.md) に定めた
+`1 → 2 → 3 → 6 → 8 → 9 → 10 → 13` だけを表示する。使わない `4・5・7・11・12・14` は削除せず、
+PowerPoint の**非表示スライド**として残す。
+
 ## 提出用の派生物と目視QA
 
 提出フォームには PDF も要る。**`soffice` と `pdftoppm` は出力先が cwd なので `deck/` 内で叩くこと**
