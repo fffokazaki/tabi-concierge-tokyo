@@ -1,6 +1,6 @@
 ---
 title: "submission-deck"
-version: "1.23.0"
+version: "1.24.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-21"
@@ -20,7 +20,7 @@ changeImpact: "medium"
 
 > **この原稿から PPTX を生成するビルダーは [`deck/`](../deck/) にある**（`cd deck && npm run build`）。本書を直したら `deck/build.js` 側も同期すること。`build.js` は冒頭コメントで参照している本書のバージョンを持っており、そこがズレていたら未同期のサインである。
 >
-> **First Stage の2分スライドとは別のデッキ**（[ROADMAP.md](07-project-management/ROADMAP.md) §4）。本書がフルバージョンで、[first-stage-presentation.md](first-stage-presentation.md) の8枚はここからの切り出し。スライド番号を書くときはどちらのデッキか明示すること。
+> **First Stageはこの提出済み14枚から8枚を選んで使う**（[ROADMAP.md](07-project-management/ROADMAP.md) §4）。選択する提出資料番号は `1 → 2 → 3 → 6 → 8 → 9 → 10 → 13`。時間配分と台本は [first-stage-presentation.md](first-stage-presentation.md) をSSOTとし、別内容のデッキは作らない。
 >
 > スライドの実体（PPTX / PDF）と First Stage 用の個別シーン素材は本リポジトリの管理外。Jotform 3-8 に記載する**申請用の操作デモ動画1本**は [`public/demo/operation-demo.mp4`](../public/demo/operation-demo.mp4) で管理する。本書は構成と文言の SSOT。
 
@@ -177,13 +177,20 @@ changeImpact: "medium"
 
 ## 参照
 
-- [first-stage-presentation.md](first-stage-presentation.md) — 本書から切り出す2分版8枚
+- [first-stage-presentation.md](first-stage-presentation.md) — 本書から選ぶ8枚と2分トークスクリプト
 - [proposal-summary.md](proposal-summary.md) — 企画概要 v1.0
 - [DATABASE.md](02-design/DATABASE.md) §2 — 利用オープンデータ確定10件
 - [CONSTRAINTS.md](01-context/CONSTRAINTS.md) — 提出規定・著作権ルール
 - [TASKS.md](07-project-management/TASKS.md) — 提出物タスクの進捗
 
 ## Changelog
+
+### [1.24.0] - 2026-08-23
+
+#### 変更
+
+- First Stageを別内容のデッキとする前提を改め、提出済み14枚から `1 → 2 → 3 → 6 → 8 → 9 → 10 → 13` の8枚をそのまま使う方針へ更新
+- 8枚の時間配分とトークスクリプトのSSOTを [first-stage-presentation.md](first-stage-presentation.md) v3.0.0へ一本化
 
 ### [1.23.0] - 2026-08-23
 

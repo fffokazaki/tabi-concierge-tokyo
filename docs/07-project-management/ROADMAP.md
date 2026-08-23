@@ -1,10 +1,10 @@
 ---
 title: "ROADMAP"
-version: "1.2.0"
+version: "1.3.0"
 status: "draft"
 owner: "@fffokazaki"
 created: "2026-08-15"
-updated: "2026-08-22"
+updated: "2026-08-23"
 changeImpact: "low"
 ---
 
@@ -55,9 +55,9 @@ changeImpact: "low"
 
 ### Phase 3: First Stage 収録（2026-08-26 〜 08-30）
 
-- [ ] ナレーション台本（約620字）の読み上げ練習 — 1分55秒着地
-- [ ] スライド8枚のタイムコード非表示化
-- [ ] 収録（2分厳守・ライブデモ不可・動画埋め込み）
+- [ ] 提出資料8枚（`1 → 2 → 3 → 6 → 8 → 9 → 10 → 13`）の513字台本を読み上げ練習 — 1分55秒着地
+- [ ] 発表用コピーの目的別スライドショーを上記8枚で設定
+- [ ] 収録（2分厳守・ライブデモ不可・静止画のみ・BGMなし）
 
 ### Phase 4: Final Stage 準備（2026-08-31 〜 10-17）
 
@@ -82,7 +82,7 @@ changeImpact: "low"
 
 チームshiwata。役割は**提出資料（16:9）のチーム紹介パート**で提示する（必須4項目の④）。
 
-> 提出資料（16:9・14枚・8/23 締切・[submission-deck.md](../submission-deck.md)）と First Stage スライド（8枚・[first-stage-presentation.md](../first-stage-presentation.md)）は**別のデッキ**。後者はチーム紹介スライドを含まない（2分に収めるため）。スライド番号を書くときはどちらのデッキか明示すること。
+> First Stageは、提出資料（16:9・14枚・8/23 締切・[submission-deck.md](../submission-deck.md)）から8枚を選んで使う。選択番号・時間配分・台本は [first-stage-presentation.md](../first-stage-presentation.md) をSSOTとし、別内容のスライドは作らない。チーム紹介は2分に収めるため選択対象外とする。
 
 ### 予算配分
 
@@ -159,6 +159,13 @@ changeImpact: "low"
 | 2026-08-15 | スコープを POC レベルへ縮小、アーキテクチャを MCP 構成に確定 |
 
 ## Changelog
+
+### [1.3.0] - 2026-08-23
+
+#### 変更
+
+- First Stageを別デッキとする前提を改め、提出済み14枚から8枚を選ぶ運用へ変更
+- Phase 3へ選択番号、513字台本、目的別スライドショー設定、静止画のみ・BGMなしの収録条件を反映
 
 ### [1.2.0] - 2026-08-22
 
