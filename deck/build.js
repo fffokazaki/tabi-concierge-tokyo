@@ -31,11 +31,19 @@ const P = {
 const HEAD = "Yu Mincho";
 const BODY = "Yu Gothic";
 const PAGE_TOTAL = 14;
+const FIRST_STAGE_SLIDES = new Set([1, 2, 3, 6, 8, 9, 10, 13]);
+const firstStage = process.argv.slice(2).includes("--first-stage");
+
+const unknownArgs = process.argv.slice(2).filter((arg) => arg !== "--first-stage");
+if (unknownArgs.length > 0) {
+  throw new Error(`未対応の引数です: ${unknownArgs.join(", ")}`);
+}
 
 const pres = new pptxgen();
 pres.layout = "LAYOUT_WIDE";
 pres.author = "チームshiwata";
 pres.title = "旅コンシェルジュTOKYO";
+let createdSlideCount = 0;
 
 const LAYER = {
   live: { label: "稼働中", color: P.live, w: 0.94 },
@@ -57,13 +65,21 @@ function pill(slide, x, y, kind) {
   });
 }
 
-const darkSlide = () => {
+const addSlide = () => {
   const s = pres.addSlide();
+  createdSlideCount += 1;
+  if (firstStage && !FIRST_STAGE_SLIDES.has(createdSlideCount)) {
+    s.hidden = true;
+  }
+  return s;
+};
+const darkSlide = () => {
+  const s = addSlide();
   s.background = { color: P.espresso };
   return s;
 };
 const lightSlide = () => {
-  const s = pres.addSlide();
+  const s = addSlide();
   s.background = { color: P.white };
   return s;
 };
@@ -804,4 +820,12 @@ screenSlide({
   s.addNotes("チーム紹介。役割分担のみを載せる。AI仕様駆動開発はスライド9へ集約。3名のポートレートは本人提供画像を使用。shiwataの横長イラストとsho gamohの写真は imagegen で顔〜肩が中心の円形アバターへ加工。\n\n[Sources]\n- User-provided shiwata illustration, edited with imagegen (2026-08-22)\n- User-provided sho gamoh photo, edited with imagegen (2026-08-22)\n- User-provided Futoshi illustration (2026-08-22)");
 }
 
-pres.writeFile({ fileName: here("tabi-concierge-tokyo-submission.pptx") }).then((f) => console.log("wrote", f));
+if (createdSlideCount !== PAGE_TOTAL) {
+  throw new Error(`スライド枚数が不正です: expected=${PAGE_TOTAL}, actual=${createdSlideCount}`);
+}
+
+const outputName = firstStage
+  ? "tabi-concierge-tokyo-first-stage.pptx"
+  : "tabi-concierge-tokyo-submission.pptx";
+
+pres.writeFile({ fileName: here(outputName) }).then((f) => console.log("wrote", f));
