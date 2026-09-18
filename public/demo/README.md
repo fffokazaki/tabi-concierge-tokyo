@@ -1,9 +1,14 @@
 # 申請用の操作デモ動画
 
-`operation-demo.mp4` は、Jotform 3-8「デモの操作動画（URL）」へ記載する完成版1本です。
-Cloudflare Workers の静的アセットとして次のURLで公開します。
+`operation-demo.mp4` は、Jotform 3-8「デモの操作動画（URL）」へ記載した完成版1本です。
+
+提出時は Cloudflare Workers の静的アセットとして次のURLで公開していました。
 
 <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev/demo/operation-demo.mp4>
+
+> ⚠️ **このURLは停止予定です。** 主催者から貸与された Cloudflare アカウント（`tokyo_odh_091`）上にあるため、
+> ハッカソン終了にともない到達できなくなります。停止後は**このリポジトリのファイルが正**です
+> → [`operation-demo.mp4`](operation-demo.mp4)（下記の SHA-256 で同一性を確認できます）。
 
 ## 仕様
 

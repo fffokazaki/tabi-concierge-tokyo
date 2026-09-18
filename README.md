@@ -6,6 +6,12 @@
 
 **本番（Cloudflare Workers）**: <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev> — 管理画面（データ還元ダッシュボード）は <https://tabi-concierge-tokyo.tokyo-odh-091.workers.dev/gaps>
 
+> ⚠️ **この公開URLは停止予定です。** デプロイ先の Cloudflare アカウント（`tokyo_odh_091`）は主催者から貸与されたもので、
+> ハッカソン終了にともない利用できなくなります（2026-09-19 時点ではまだ 200 を返します）。
+> 動く実物の記録として、**操作デモ動画・提出資料・提出キャプチャをこのリポジトリと Releases に残してあります** → [提出物](#提出物ハッカソンに出したものそのもの)。
+
+**ライセンス**: コードと文書は MIT。同梱の東京都オープンデータ（`data/`）は CC BY 4.0、メンバーの肖像は本人提供素材で対象外 → [ライセンス](#ライセンス)
+
 ## 概要
 
 訪日観光客向けのAI旅行ガイドアプリ。東京都オープンデータカタログ（約9,600データセット）をバックエンドの「オープンデータ・コンシェルジュ」経由で活用し、出典付きで旅程提案・文化ガイド・周辺案内を提供する。
@@ -103,7 +109,11 @@ docs/                 # AI仕様駆動開発ドキュメント（索引は docs/
 
 ## 公開URL
 
-すべて手動デプロイ（`npm run deploy`）。以下は 2026-08-22 に本番へ実際に到達することを確認した。
+すべて手動デプロイ（`npm run deploy`）。以下は 2026-08-22 に本番へ実際に到達することを確認した
+（2026-09-19 にもトップが 200 を返すことを確認済み）。
+
+> ⚠️ **これらは停止予定。** 主催者から貸与された Cloudflare アカウント（`tokyo_odh_091`）上にあるため、
+> ハッカソン終了にともない到達できなくなる。停止後も残る記録は [提出物](#提出物ハッカソンに出したものそのもの)にまとめてある。
 
 | URL | 内容 |
 | --- | --- |
@@ -198,6 +208,101 @@ curl -s localhost:5173/api/search-datasets \
 **③ テスト** — `npm run test:worker` が workerd 上で 3 ルート × answered / unanswered・出典7フィールド・400 の境界を検証している（`worker/api.test.ts`）。
 
 > デプロイ先（workers.dev）は**手動デプロイ**のため、ローカルより古いことがある。API の確認はローカル（`npm run dev`）を基準にする。
+
+## 提出物（ハッカソンに出したものそのもの）
+
+公開URLが停止しても残るように、提出物をリポジトリと Releases に固定してある。**撮り直すと同じものにならない**ため
+（`/gaps` の件数は稼働中のカウンターで、撮影中も 46 → 48 と動いた）、再生成物ではなく提出物として保存している。
+
+| 提出物 | 置き場所 |
+| --- | --- |
+| **操作デモ動画**（25.1秒・無音・1600×900） | [`public/demo/operation-demo.mp4`](public/demo/operation-demo.mp4) — 仕様とハッシュは [`public/demo/README.md`](public/demo/README.md) |
+| **提出資料**（14枚・PPTX / PDF） | [Releases: submission-2026-08-23](https://github.com/fffokazaki/tabi-concierge-tokyo/releases/tag/submission-2026-08-23) |
+| **First Stage 資料**（2分版・PPTX / PDF） | 同上 |
+| **提出キャプチャ**（1600×900・3点） | [`deck/submit/`](deck/submit) |
+
+資料は `pptxgenjs` で**コードから生成**している（[`deck/build.js`](deck/build.js)）。原稿は [submission-deck.md](docs/submission-deck.md)、
+組版は `build.js` 側にあり、PowerPoint で直接開いて直すと次のビルドで消える。ビルド手順は [deck/README.md](deck/README.md)。
+
+## この作品の作り方 — ほぼすべてを AI で作った
+
+企画・設計・実装・テスト・レビュー・資料・動画まで、**作業のほぼ全量を [Claude Code](https://claude.com/claude-code) のセッション上で進めた**。
+隠さず書いておくので、同じやり方を試す人の参考になれば。
+
+### 何を AI が作ったか
+
+| 成果物 | 作り方 |
+| --- | --- |
+| コード（`src/` `worker/` `shared/` `scripts/` `migrations/`） | Claude Code が実装。人間はレビューと方針判断 |
+| 仕様文書（`docs/` 37文書・ADR 14件） | 同上。実装より先に文書を書く順序を守った |
+| 提出資料（14枚 PPTX） | `deck/build.js` を Claude Code が書き、コードから生成 |
+| 画面キャプチャ（1600×900・3点） | Playwright で本番URLを操作し、ビューポートごと撮影 |
+| 操作デモ動画（25.1秒） | 本番アプリを実際に操作して画面収録し、1本へ書き出し（[Issue #131](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/131) に検証記録） |
+
+### 開発期間と規模（実測）
+
+2026-08-15 〜 2026-08-23 の **9日間**。
+
+| 指標 | 値 |
+| --- | --- |
+| マージ済み PR | 136 |
+| コミット | 202 |
+| テスト | 903（44ファイル・全通過。`npm test` で再現可能） |
+| 仕様文書 / ADR | 37文書 / 14件 |
+| ACE 知見エントリ | 148（7カテゴリファイル） |
+
+> **「ほぼすべて AI」の根拠について。** コミットの `Co-Authored-By: Claude` トレーラーは 202 件中 57 件だが、
+> この数字は割合として読めない —— squash merge が PR 本文で上書きするため、トレーラーが落ちたコミットが多数ある
+> （実測で確認済み）。したがって 57 は**下限**であって内訳ではない。ここでは割合を主張せず、
+> 「どういう仕組みで回したか」を下に書く。
+
+### 使ったツール
+
+**[ff-dev-toolkit](https://github.com/feel-flow/ff-dev-toolkit)**（Apache-2.0）を全面的に使った。
+**本プロジェクトのメンバー（@fffokazaki）が作成・メンテナンスしている** Claude Code / Codex 向けのプラグインで、
+AI仕様駆動開発（AI-SDD）の公式実装にあたる。26スキル + `docs/` を検索する MCP サーバー（spec-docs）を収録している（スキル数は執筆時点）。
+本プロジェクトで実際に効いたのは次のあたり:
+
+| スキル | このプロジェクトでの役目 |
+| --- | --- |
+| `/init-docs` `/validate-docs` | コア7文書の初期化と構造検証。`docs/` の骨格はここから |
+| `/create-issue` `/close-issue` | 受け入れ条件（GWT + DoD）付きで起票し、**マージ直前に AC を照合するゲート**を通す |
+| `/multi-review` | PR ごとのクロスモデルレビュー。Claude 以外のモデルにも同じ差分を読ませる |
+| `/merge-cleanup` | マージ後のブランチ・worktree の後片付け |
+| `/ace-curate` | PR ごとの知見を [PLAYBOOK.md](docs/08-knowledge/PLAYBOOK.md) へ構造化して蓄積し、次のタスクで再利用する |
+
+導入は次のとおり（Public リポジトリなので認証不要）:
+
+```bash
+claude plugin marketplace add feel-flow/ff-dev-toolkit
+claude plugin install ff-dev-toolkit@ff-dev-toolkit
+```
+
+### 自律で回すために効いたこと
+
+**AI に自由に書かせるのではなく、嘘をつけない仕組みを先に置いた。** 効いたのは主に3つ。
+
+1. **「推測で埋めない」を絶対ルールにした**（[CLAUDE.md](CLAUDE.md)）。仕様が不明なら「未定」「未確認」と書かせ、それらしい数値で埋めさせない。
+   否定・限定の主張（「〜は起きない」）は、コードを読んだだけでは確認済みとせず**実行で裏を取る**ことまで規則にした
+2. **出典の強制をアプリの設計に埋め込んだ**。根拠が無い回答は生成せず「ありません」と返す。
+   答えられなかった問いは未回答として記録し、`/gaps` で東京都へ還元する集計に回す
+3. **知見をプレイブックへ蓄積した**（ACE）。同じ失敗を次の PR で繰り返さないよう、PR ごとに得た知見を構造化して残した
+
+AI ツールが読む規約は [CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md)（両者は同期。CI の `docs:check-agents-sync` が照合する）、
+人間向けは [CONTRIBUTING.md](CONTRIBUTING.md) にある。いずれも**単独で完結**しており、個人設定やプラグインが無くても読める。
+
+## ライセンス
+
+**コードと文書は [MIT License](LICENSE)。** ただし第三者に権利がある同梱物には及ばない。
+
+| 対象 | ライセンス |
+| --- | --- |
+| `src/` `worker/` `shared/` `scripts/` `migrations/` `deck/build.js` `docs/` ほか | **MIT** |
+| `data/`（東京都オープンデータのスナップショット） | **CC BY 4.0** / 出典: 東京都オープンデータカタログサイト |
+| `deck/img/team-*.png`（メンバーの肖像） | 本人提供素材。**転載・再利用は不可** |
+| 提出資料（PPTX / PDF）・デモ動画・提出キャプチャ | 上記の第三者素材を内包するため、**記録としての公開**。引用時は出典を明記 |
+
+詳細は [LICENSE](LICENSE) の冒頭と [CONSTRAINTS.md](docs/01-context/CONSTRAINTS.md) §3 を参照。
 
 ## 資料
 
