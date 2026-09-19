@@ -224,24 +224,35 @@ curl -s localhost:5173/api/search-datasets \
 資料は `pptxgenjs` で**コードから生成**している（[`deck/build.js`](deck/build.js)）。原稿は [submission-deck.md](docs/submission-deck.md)、
 組版は `build.js` 側にあり、PowerPoint で直接開いて直すと次のビルドで消える。ビルド手順は [deck/README.md](deck/README.md)。
 
-## この作品の作り方 — ほぼすべてを AI で作った
+## この作品の作り方 — AI を中心に作った
 
-企画・設計・実装・テスト・レビュー・資料・動画まで、**作業のほぼ全量を [Claude Code](https://claude.com/claude-code) のセッション上で進めた**。
+企画・設計・実装・テスト・レビュー・資料・動画まで、多くを [Claude Code](https://claude.com/claude-code) のセッション上で進めた。
 隠さず書いておくので、同じやり方を試す人の参考になれば。
 
-### 何を AI が作ったか
+### まず担当の切り分け
+
+チーム3名（shiwata / sho gamoh / Futoshi）で、コードの担当は分かれている。
+
+| 範囲 | 担当 |
+| --- | --- |
+| **フロントエンド（`src/`）** | **sho gamoh**（本サービスの発案者・フロントエンド担当） |
+| バックエンド（`worker/` `shared/`）・データ（`scripts/` `migrations/` `data/`）・文書（`docs/`）・提出資料（`deck/`） | Futoshi（@fffokazaki） |
+
+**以下に書くのは Futoshi が担当した範囲の作り方**で、フロントエンドの作り方を代弁するものではない。
+
+### 何を AI が作ったか（Futoshi 担当分）
 
 | 成果物 | 作り方 |
 | --- | --- |
-| コード（`src/` `worker/` `shared/` `scripts/` `migrations/`） | Claude Code が実装。人間はレビューと方針判断 |
+| コード（`worker/` `shared/` `scripts/` `migrations/`） | Claude Code が実装。人間はレビューと方針判断 |
 | 仕様文書（`docs/` 37文書・ADR 14件） | 同上。実装より先に文書を書く順序を守った |
 | 提出資料（14枚 PPTX） | `deck/build.js` を Claude Code が書き、コードから生成 |
 | 画面キャプチャ（1600×900・3点） | Playwright で本番URLを操作し、ビューポートごと撮影 |
-| 操作デモ動画（25.1秒） | 本番アプリを実際に操作して画面収録し、1本へ書き出し（[Issue #131](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/131) に検証記録） |
+| 操作デモ動画（25.1秒） | 本番アプリを実際に操作して画面収録し、1本へ書き出し（[Issue #131](https://github.com/fffokazaki/tabi-concierge-tokyo/issues/131) にあるのは**尺・コーデック・無音などの仕様検証**であって、制作者の記録ではない） |
 
 ### 開発期間と規模（実測）
 
-2026-08-15 〜 2026-08-23 の **9日間**。
+2026-08-15 〜 2026-08-23 の **9日間**。以下は**リポジトリ全体**の数字で、担当ごとの内訳ではない。
 
 | 指標 | 値 |
 | --- | --- |
@@ -251,7 +262,7 @@ curl -s localhost:5173/api/search-datasets \
 | 仕様文書 / ADR | 37文書 / 14件 |
 | ACE 知見エントリ | 148（7カテゴリファイル） |
 
-> **「ほぼすべて AI」の根拠について。** コミットの `Co-Authored-By: Claude` トレーラーは 202 件中 57 件だが、
+> **「AI を中心に」の粒度について。** コミットの `Co-Authored-By: Claude` トレーラーは 202 件中 57 件だが、
 > この数字は割合として読めない —— squash merge が PR 本文で上書きするため、トレーラーが落ちたコミットが多数ある
 > （実測で確認済み）。したがって 57 は**下限**であって内訳ではない。ここでは割合を主張せず、
 > 「どういう仕組みで回したか」を下に書く。
