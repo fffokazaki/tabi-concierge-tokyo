@@ -1,12 +1,12 @@
 ---
 title: "PLAYBOOK"
-version: "1.54.0"
+version: "1.55.0"
 status: "approved"
 created: "2026-08-15"
-updated: "2026-08-23"
+updated: "2026-09-19"
 changeImpact: "medium"
 owner: "@fffokazaki"
-ace_entry_count: 148
+ace_entry_count: 151
 tags: [ace, playbook, knowledge-management]
 references:
   - docs/05-operations/deployment/ace-cycle.md
@@ -379,8 +379,19 @@ Playbook が導出上限（`ヘッダ行数 + 件数 × 16`）を超え、正準
 | ACE-227-2 | SPA フォールバック下では「消した」ことを status code で確かめられない —— 検証したい URL は消さずに空の正準値を残す | architecture | [playbook/architecture.md#ace-227-2](./playbook/architecture.md#ace-227-2) |
 | ACE-227-3 | テンプレート生成される識別子は grep で出ない —— 「grep 0件」を「存在しない」の証拠にしない | process | [playbook/process.md#ace-227-3](./playbook/process.md#ace-227-3) |
 | ACE-227-4 | 「文書に出典を記録せよ」という指示は表示義務を満たさない —— 表示機構があるかを先に確かめる | documentation-quality | [playbook/documentation-quality.md#ace-227-4](./playbook/documentation-quality.md#ace-227-4) |
+| ACE-234-1 | 公開する数値は、コマンドの出力ではなく内訳を一度出してから確定する | documentation-quality | [playbook/documentation-quality.md#ace-234-1](./playbook/documentation-quality.md#ace-234-1) |
+| ACE-234-2 | レビュー指摘の修正で新しい主張を足すと、その主張が次ラウンドの指摘源になり収束しない | process | [playbook/process.md#ace-234-2](./playbook/process.md#ace-234-2) |
+| ACE-234-3 | リポジトリ直下の素の LICENSE は、同梱した第三者素材まで再ライセンスする | documentation-quality | [playbook/documentation-quality.md#ace-234-3](./playbook/documentation-quality.md#ace-234-3) |
 
 ## Changelog
+
+### [1.55.0] - 2026-09-19
+
+#### 追加
+
+- ACE-234-1: 公開する数値は、コマンドの出力ではなく内訳を一度出してから確定する（PR #234）
+- ACE-234-2: レビュー指摘の修正で新しい主張を足すと、その主張が次ラウンドの指摘源になり収束しない（PR #234）
+- ACE-234-3: リポジトリ直下の素の LICENSE は、同梱した第三者素材まで再ライセンスする（PR #234）
 
 ### [1.54.0] - 2026-08-23
 
