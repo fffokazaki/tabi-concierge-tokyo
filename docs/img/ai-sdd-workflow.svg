@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 534" width="900" height="534" role="img" aria-labelledby="t d">
+<title id="t">AI が承認を待たずに走り切れるワークフロー</title>
+<desc id="d">Issue 起票から知見記録までのチェーンと、AI を自律で走らせるために先に置いた止める仕組み（仕様文書・実行での裏取り・出典強制・AC 照合ゲート・クロスモデルレビュー）を示した図。</desc>
+<style>
+  .f{font-family:'Hiragino Sans','Noto Sans JP','Yu Gothic',system-ui,sans-serif}
+  .ttl{font-size:19px;font-weight:700;fill:#1F2933}
+  .sub{font-size:13px;fill:#52606D}
+  .box{font-size:13px;fill:#1F2933;font-weight:600}
+  .lbl{font-size:11.5px;fill:#52606D}
+  .gt{font-size:12px;fill:#9C4221;font-weight:700}
+  .lp{font-size:11.5px;fill:#276749;font-weight:600}
+  .cap{font-size:12.5px;fill:#1F2933;font-weight:700}
+  .cd{font-size:11.5px;fill:#52606D}
+</style>
+<rect width="900" height="534" fill="#FCFBF9"/>
+<rect x="0.5" y="0.5" width="899" height="533" fill="none" stroke="#E3E0DA"/>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#8A94A0"/>
+  </marker>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#C05621"/>
+  </marker>
+  <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#276749"/>
+  </marker>
+</defs>
+
+<text class="f ttl" x="34" y="40">AI が承認を待たずに走り切れるワークフロー</text>
+<text class="f sub" x="34" y="62">AI仕様駆動開発のもう半分。人が入るのは「方針の判断」と「レビュー指摘を採るかの決定」だけ。</text>
+
+<!-- row 1 -->
+<rect x="34" y="88" width="150" height="50" rx="6" fill="#fff" stroke="#CBD2D9"/>
+<text class="f box" x="109" y="110" text-anchor="middle">Issue 起票</text>
+<text class="f lbl" x="109" y="127" text-anchor="middle">受け入れ条件つき</text>
+
+<rect x="204" y="88" width="150" height="50" rx="6" fill="#fff" stroke="#CBD2D9"/>
+<text class="f box" x="279" y="110" text-anchor="middle">ブランチ作成</text>
+<text class="f lbl" x="279" y="127" text-anchor="middle">develop から</text>
+
+<rect x="374" y="88" width="150" height="50" rx="6" fill="#fff" stroke="#CBD2D9"/>
+<text class="f box" x="449" y="110" text-anchor="middle">実装</text>
+<text class="f lbl" x="449" y="127" text-anchor="middle">文書を先に固定</text>
+
+<rect x="544" y="88" width="150" height="50" rx="6" fill="#fff" stroke="#CBD2D9"/>
+<text class="f box" x="619" y="110" text-anchor="middle">PR 作成</text>
+<text class="f lbl" x="619" y="127" text-anchor="middle">何を・なぜ</text>
+
+<rect x="714" y="88" width="152" height="50" rx="6" fill="#FFF7ED" stroke="#C05621" stroke-width="1.6"/>
+<text class="f box" x="790" y="110" text-anchor="middle">クロスモデル</text>
+<text class="f box" x="790" y="127" text-anchor="middle">レビュー</text>
+
+<line x1="186" y1="113" x2="200" y2="113" stroke="#8A94A0" marker-end="url(#a)"/>
+<line x1="356" y1="113" x2="370" y2="113" stroke="#8A94A0" marker-end="url(#a)"/>
+<line x1="526" y1="113" x2="540" y2="113" stroke="#8A94A0" marker-end="url(#a)"/>
+<line x1="696" y1="113" x2="710" y2="113" stroke="#8A94A0" marker-end="url(#a)"/>
+
+<!-- wrap to row 2 -->
+<path d="M790 138 L790 168 L109 168 L109 196" fill="none" stroke="#8A94A0" marker-end="url(#a)"/>
+
+<!-- row 2 -->
+<rect x="34" y="202" width="150" height="50" rx="6" fill="#fff" stroke="#CBD2D9"/>
+<text class="f box" x="109" y="224" text-anchor="middle">指摘対応</text>
+<text class="f lbl" x="109" y="241" text-anchor="middle">1 fix commit へ</text>
+
+<rect x="204" y="202" width="150" height="50" rx="6" fill="#FFF7ED" stroke="#C05621" stroke-width="1.6"/>
+<text class="f box" x="279" y="224" text-anchor="middle">AC 照合ゲート</text>
+<text class="f lbl" x="279" y="241" text-anchor="middle">/close-issue</text>
+
+<rect x="374" y="202" width="150" height="50" rx="6" fill="#fff" stroke="#CBD2D9"/>
+<text class="f box" x="449" y="224" text-anchor="middle">squash merge</text>
+<text class="f lbl" x="449" y="241" text-anchor="middle">develop へ</text>
+
+<rect x="544" y="202" width="150" height="50" rx="6" fill="#fff" stroke="#CBD2D9"/>
+<text class="f box" x="619" y="224" text-anchor="middle">後片付け</text>
+<text class="f lbl" x="619" y="241" text-anchor="middle">/merge-cleanup</text>
+
+<rect x="714" y="202" width="152" height="50" rx="6" fill="#F0FDF4" stroke="#276749" stroke-width="1.4"/>
+<text class="f box" x="790" y="224" text-anchor="middle">知見の記録</text>
+<text class="f lbl" x="790" y="241" text-anchor="middle">ACE · 148 件</text>
+
+<line x1="186" y1="227" x2="200" y2="227" stroke="#8A94A0" marker-end="url(#a)"/>
+<line x1="356" y1="227" x2="370" y2="227" stroke="#8A94A0" marker-end="url(#a)"/>
+<line x1="526" y1="227" x2="540" y2="227" stroke="#8A94A0" marker-end="url(#a)"/>
+<line x1="696" y1="227" x2="710" y2="227" stroke="#8A94A0" marker-end="url(#a)"/>
+
+<!-- reject loop: AC gate back to fix -->
+<path d="M279 254 L279 274 L109 274 L109 256" fill="none" stroke="#C05621" stroke-dasharray="5 3" marker-end="url(#ar)"/>
+<text class="f gt" x="300" y="278">未解消の Critical / 未達の AC が残っている間はマージしない</text>
+
+<!-- ACE reuse -->
+<path d="M790 254 L790 312 L150 312" fill="none" stroke="#276749" stroke-dasharray="6 4" marker-end="url(#ag)"/>
+<text class="f lp" x="470" y="306" text-anchor="middle">蓄積した知見は次のタスクで再利用される — 走るほど自律の精度が上がる</text>
+
+<!-- gates band -->
+<rect x="34" y="336" width="832" height="166" rx="8" fill="#fff" stroke="#E3E0DA"/>
+<text class="f cap" x="54" y="362">先に置いた「止める仕組み」 — これがあるから、各ステップで人が承認しなくても進められる</text>
+
+<text class="f cap" x="54" y="392">仕様を文書に固定する</text>
+<text class="f cd" x="54" y="410">推測で埋める余地を消す。一次情報で</text>
+<text class="f cd" x="54" y="426">確定できない値は「未定」と書かせる</text>
+
+<text class="f cap" x="320" y="392">実行で裏を取らせる</text>
+<text class="f cd" x="320" y="410">「〜は起きない」を目視で確認済みと</text>
+<text class="f cd" x="320" y="426">しない。実測か変異テストを要求する</text>
+
+<text class="f cap" x="586" y="392">出典を強制する</text>
+<text class="f cd" x="586" y="410">根拠の無い回答を生成させない。答え</text>
+<text class="f cd" x="586" y="426">られない問いは未回答として記録する</text>
+
+<text class="f cap" x="54" y="460" fill="#9C4221">AC 照合ゲート</text>
+<text class="f cd" x="54" y="478">受け入れ条件（GWT + DoD）と差分が</text>
+<text class="f cd" x="54" y="494">合わなければ、マージへ進ませない</text>
+
+<text class="f cap" x="320" y="460" fill="#9C4221">クロスモデルレビュー</text>
+<text class="f cd" x="320" y="478">別のモデルに同じ差分を読ませる。未</text>
+<text class="f cd" x="320" y="494">解消の Critical を残したまま通さない</text>
+
+<text class="f cap" x="586" y="460" fill="#276749">知見の蓄積（ACE）</text>
+<text class="f cd" x="586" y="478">同じ失敗を次のタスクで繰り返させな</text>
+<text class="f cd" x="586" y="494">い。本プロジェクトでは 148 件</text>
+</svg>
