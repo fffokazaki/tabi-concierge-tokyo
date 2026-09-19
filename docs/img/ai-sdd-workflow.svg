@@ -56,7 +56,7 @@
 <line x1="696" y1="113" x2="710" y2="113" stroke="#8A94A0" marker-end="url(#a)"/>
 
 <!-- wrap to row 2 -->
-<path d="M866 142 L878 142 L878 168 L22 168 L22 196" fill="none" stroke="#8A94A0" marker-end="url(#a)"/>
+<path d="M790 138 L790 168 L109 168 L109 196" fill="none" stroke="#8A94A0" marker-end="url(#a)"/>
 
 <!-- row 2 -->
 <rect x="34" y="202" width="150" height="50" rx="6" fill="#fff" stroke="#CBD2D9"/>

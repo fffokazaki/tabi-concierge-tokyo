@@ -56,7 +56,7 @@
 
 <rect x="500" y="302" width="300" height="56" rx="6" fill="#fff" stroke="#CBD2D9"/>
 <text class="f b" x="650" y="324" text-anchor="middle">AI クライアント</text>
-<text class="f s" x="650" y="343" text-anchor="middle">Claude / ChatGPT から MCP で直接</text>
+<text class="f s" x="650" y="343" text-anchor="middle">Claude Desktop 等から MCP で直接</text>
 
 <!-- converge to gaps -->
 <path d="M250 358 L250 382 L450 382 L450 402" fill="none" stroke="#8A94A0"/>
@@ -65,13 +65,13 @@
 <text class="f s" x="462" y="397">両経路の「答えられなかった問い」が同じように残る</text>
 
 <rect x="230" y="404" width="440" height="52" rx="6" fill="#fff" stroke="#CBD2D9"/>
-<text class="f b" x="450" y="426" text-anchor="middle">未回答ログ（D1 `gaps`）</text>
+<text class="f b" x="450" y="426" text-anchor="middle">未回答ログ（D1 gaps テーブル）</text>
 <text class="f s" x="450" y="444" text-anchor="middle">データ未公開 / 粒度不足 / 対象エリア外 / その他 に分類</text>
 
 <line x1="450" y1="456" x2="450" y2="478" stroke="#8A94A0" marker-end="url(#b)"/>
 
 <rect x="180" y="480" width="540" height="52" rx="6" fill="#F0FDF4" stroke="#276749" stroke-width="1.4"/>
-<text class="f b" x="450" y="502" text-anchor="middle">データ還元ダッシュボード（`/gaps`）</text>
+<text class="f b" x="450" y="502" text-anchor="middle">データ還元ダッシュボード（/gaps）</text>
 <text class="f s" x="450" y="520" text-anchor="middle">東京都・GovTech東京 向け。何が足りないかを集計で見せる</text>
 
 <!-- improvement loop back to catalog -->
