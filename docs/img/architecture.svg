@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 580" width="900" height="580" role="img" aria-labelledby="t2 d2">
+<title id="t2">旅コンシェルジュTOKYO — 出典強制と改善ループ</title>
+<desc id="d2">東京都オープンデータカタログから D1 へ取り込み、単一 Worker が出典を強制したうえで /api と /mcp の二面で公開し、答えられなかった問いを未回答ログとして記録して東京都へ還元する改善ループを示した図。</desc>
+<style>
+  .f{font-family:'Hiragino Sans','Noto Sans JP','Yu Gothic',system-ui,sans-serif}
+  .ttl{font-size:19px;font-weight:700;fill:#1F2933}
+  .sub{font-size:13px;fill:#52606D}
+  .h{font-size:14px;font-weight:700;fill:#1F2933}
+  .b{font-size:13px;fill:#1F2933;font-weight:600}
+  .s{font-size:11.5px;fill:#52606D}
+  .op{font-size:12px;fill:#2A4365;font-weight:600}
+  .em{font-size:13px;fill:#9C4221;font-weight:700}
+  .lp{font-size:12px;fill:#276749;font-weight:700}
+</style>
+<rect width="900" height="580" fill="#FCFBF9"/>
+<rect x="0.5" y="0.5" width="899" height="579" fill="none" stroke="#E3E0DA"/>
+<defs>
+  <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#8A94A0"/>
+  </marker>
+  <marker id="bg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#276749"/>
+  </marker>
+</defs>
+
+<text class="f ttl" x="34" y="40">旅コンシェルジュTOKYO — 出典を強制し、答えられなかったことを還元する</text>
+<text class="f sub" x="34" y="62">オープンデータを SSOT に置き、アプリと AI クライアントの二面へ公開する（ADR-008）</text>
+
+<!-- catalog -->
+<rect x="120" y="84" width="660" height="46" rx="6" fill="#fff" stroke="#CBD2D9"/>
+<text class="f b" x="450" y="104" text-anchor="middle">東京都オープンデータカタログ（約 9,600 データセット・CC BY 4.0）</text>
+<text class="f s" x="450" y="121" text-anchor="middle">このプロジェクトが使うのは 10 データセット / 1,645 スポット → Cloudflare D1 へ取り込み</text>
+<line x1="450" y1="130" x2="450" y2="154" stroke="#8A94A0" marker-end="url(#b)"/>
+
+<!-- worker -->
+<rect x="80" y="156" width="740" height="116" rx="8" fill="#F7FAFC" stroke="#2C5282" stroke-width="1.6"/>
+<text class="f h" x="450" y="180" text-anchor="middle">オープンデータ・コンシェルジュ（単一 Cloudflare Worker）</text>
+<rect x="108" y="192" width="220" height="32" rx="5" fill="#fff" stroke="#BEE3F8"/>
+<text class="f op" x="218" y="213" text-anchor="middle">search_datasets</text>
+<rect x="340" y="192" width="220" height="32" rx="5" fill="#fff" stroke="#BEE3F8"/>
+<text class="f op" x="450" y="213" text-anchor="middle">aggregate_dataset</text>
+<rect x="572" y="192" width="220" height="32" rx="5" fill="#fff" stroke="#BEE3F8"/>
+<text class="f op" x="682" y="213" text-anchor="middle">get_provenance</text>
+<rect x="108" y="232" width="684" height="28" rx="5" fill="#FFF7ED" stroke="#C05621"/>
+<text class="f em" x="450" y="251" text-anchor="middle">出典強制 — 根拠のあるデータが無ければ回答を作らず「ありません」と返す</text>
+
+<!-- two faces -->
+<path d="M250 272 L250 300" fill="none" stroke="#8A94A0" marker-end="url(#b)"/>
+<path d="M650 272 L650 300" fill="none" stroke="#8A94A0" marker-end="url(#b)"/>
+<text class="f s" x="258" y="291">/api/*（JSON）</text>
+<text class="f s" x="658" y="291">/mcp（JSON-RPC）</text>
+
+<rect x="100" y="302" width="300" height="56" rx="6" fill="#fff" stroke="#CBD2D9"/>
+<text class="f b" x="250" y="324" text-anchor="middle">旅コンシェルジュTOKYO</text>
+<text class="f s" x="250" y="343" text-anchor="middle">React SPA — 訪日観光客向け</text>
+
+<rect x="500" y="302" width="300" height="56" rx="6" fill="#fff" stroke="#CBD2D9"/>
+<text class="f b" x="650" y="324" text-anchor="middle">AI クライアント</text>
+<text class="f s" x="650" y="343" text-anchor="middle">Claude / ChatGPT から MCP で直接</text>
+
+<!-- converge to gaps -->
+<path d="M250 358 L250 382 L450 382 L450 402" fill="none" stroke="#8A94A0"/>
+<path d="M650 358 L650 382 L450 382" fill="none" stroke="#8A94A0"/>
+<path d="M450 382 L450 402" fill="none" stroke="#8A94A0" marker-end="url(#b)"/>
+<text class="f s" x="462" y="397">両経路の「答えられなかった問い」が同じように残る</text>
+
+<rect x="230" y="404" width="440" height="52" rx="6" fill="#fff" stroke="#CBD2D9"/>
+<text class="f b" x="450" y="426" text-anchor="middle">未回答ログ（D1 `gaps`）</text>
+<text class="f s" x="450" y="444" text-anchor="middle">データ未公開 / 粒度不足 / 対象エリア外 / その他 に分類</text>
+
+<line x1="450" y1="456" x2="450" y2="478" stroke="#8A94A0" marker-end="url(#b)"/>
+
+<rect x="180" y="480" width="540" height="52" rx="6" fill="#F0FDF4" stroke="#276749" stroke-width="1.4"/>
+<text class="f b" x="450" y="502" text-anchor="middle">データ還元ダッシュボード（`/gaps`）</text>
+<text class="f s" x="450" y="520" text-anchor="middle">東京都・GovTech東京 向け。何が足りないかを集計で見せる</text>
+
+<!-- improvement loop back to catalog -->
+<path d="M180 506 L40 506 L40 107 L116 107" fill="none" stroke="#276749" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#bg)"/>
+<text class="f lp" x="56" y="300" transform="rotate(-90 56 300)" text-anchor="middle">改善ループ</text>
+
+<text class="f s" x="742" y="498">※ 都への提出プロセスは</text>
+<text class="f s" x="742" y="514">　 構想段階（未実装）</text>
+<text class="f lp" x="450" y="552" text-anchor="middle">「答えられなかったこと」をデータ公開リクエストとしてカタログへ返す — これが改善ループ</text>
+</svg>
